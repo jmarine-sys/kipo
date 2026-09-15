@@ -77,6 +77,11 @@
   const isExchange = $derived(
     mode === 'move' && !!account && !!toAccount && account.unit !== toAccount.unit
   );
+
+  // ADR-004, los dos lados del ciclo de la tarjeta. La app tiene que decirlos en
+  // voz alta: son el caso donde es más fácil contar el mismo gasto dos veces.
+  const onCard    = $derived(mode === 'expense' && account?.kind === 'liability');
+  const payingOff = $derived(mode === 'move' && toAccount?.kind === 'liability');
   const rate = $derived(isExchange && amount && amount2 ? impliedRate(amount, amount2) : null);
 
   const ready = $derived.by(() => {
@@ -269,7 +274,12 @@
             <p class="dim sm">No tenés otra cuenta a dónde mover.</p>
           {/each}
         </div>
-        {#if toAccount}
+        {#if payingOff}
+          <p class="what dim sm">
+            Pagás deuda de {toAccount?.name}. <strong>No es un gasto</strong>: ya lo contaste
+            cuando compraste. Tu patrimonio no cambia — baja la plata y baja la deuda.
+          </p>
+        {:else if toAccount}
           <p class="what dim sm">
             {#if isExchange}
               Cambiás {account?.unit} por {toAccount.unit}. No es un gasto: tu patrimonio
