@@ -1,0 +1,100 @@
+# Respaldo de la base — cierra OD-16.
+#
+# El plan gratuito de Supabase NO incluye backups ni recuperacion punto-en-el-tiempo
+# (verificado 2026-09-15). Esto es la unica red bajo el historial financiero.
+#
+# Hace falta UN secreto en el repositorio:
+#   SUPABASE_DB_URL = la cadena de conexion directa de Postgres
+#   (Supabase > Project Settings > Database > Connection string > URI)
+#
+# El volcado queda versionado en el propio repositorio privado: eso es lo que da
+# durabilidad FUERA del proveedor, que es de lo que se trata.
+
+name: Respaldo de la base
+
+on:
+  schedule:
+    - cron: '17 6 * * *'   # todos los dias 06:17 UTC (~03:17 en Argentina)
+  workflow_dispatch:        # y a mano cuando quieras
+
+concurrency:
+  group: backup
+  cancel-in-progress: false
+
+jobs:
+  dump:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Detectar la version del servidor
+        id: pg
+        env:
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          # psql conecta entre versiones sin problema; pg_dump NO: se niega si el
+          # servidor es mas nuevo que el cliente. Por eso se detecta primero.
+          major=$(docker run --rm postgres:17-alpine \
+            psql "$DB_URL" -tAc "select current_setting('server_version_num')::int / 10000")
+          echo "major=$major" >> "$GITHUB_OUTPUT"
+          echo "servidor PostgreSQL $major"
+
+      - name: Volcar
+        env:
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          PG: ${{ steps.pg.outputs.major }}
+        run: |
+          mkdir -p backups
+          stamp=$(date -u +%Y-%m-%d)
+          docker run --rm "postgres:${PG}-alpine" \
+            pg_dump "$DB_URL" --no-owner --no-privileges --clean --if-exists \
+            > "backups/kipo-$stamp.sql"
+          gzip -9 -f "backups/kipo-$stamp.sql"
+          ls -lh "backups/kipo-$stamp.sql.gz"
+          echo "stamp=$stamp" >> "$GITHUB_ENV"
+
+      # ---------------------------------------------------------------------
+      # Un backup que nunca restauraste no es un backup.
+      # Se restaura en una base limpia y se comprueba que los datos esten.
+      # ---------------------------------------------------------------------
+      - name: Verificar que restaura
+        env:
+          PG: ${{ steps.pg.outputs.major }}
+        run: |
+          docker run -d --name verify -e POSTGRES_PASSWORD=x -p 5433:5432 "postgres:${PG}-alpine"
+          for _ in $(seq 1 60); do
+            docker exec verify psql -U postgres -tAc 'select 1' >/dev/null 2>&1 && break
+            sleep 1
+          done
+
+          gunzip -c "backups/kipo-$stamp.sql.gz" \
+            | docker exec -i verify psql -U postgres -v ON_ERROR_STOP=0 -q >/dev/null 2>&1 || true
+
+          tablas=$(docker exec verify psql -U postgres -tAc \
+            "select count(*) from information_schema.tables
+              where table_schema='public' and table_type='BASE TABLE'")
+          lineas=$(docker exec verify psql -U postgres -tAc \
+            "select count(*) from entry" 2>/dev/null || echo 0)
+
+          echo "restaurado: $tablas tablas, $lineas lineas"
+          docker rm -f verify >/dev/null
+
+          # 11 tablas segun docs/modelo-de-datos.md. Menos que eso = volcado incompleto.
+          if [ "$tablas" -lt 11 ]; then
+            echo "::error::El respaldo NO restaura bien: solo $tablas tablas de 11"
+            exit 1
+          fi
+
+      - name: Conservar solo los ultimos 30
+        run: ls -1t backups/*.sql.gz 2>/dev/null | tail -n +31 | xargs -r rm --
+
+      - name: Guardar en el repositorio
+        run: |
+          git config user.name  'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git add backups/
+          git diff --staged --quiet && { echo 'sin cambios'; exit 0; }
+          git commit -m "respaldo $stamp"
+          git push
