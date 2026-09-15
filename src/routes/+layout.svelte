@@ -79,7 +79,7 @@
     right: 1rem; bottom: calc(100% + .75rem);
     width: 62px; height: 62px;
     border-radius: 50%;
-    background: var(--accent); color: var(--accent-fg);
+    background: var(--fab-bg); color: var(--fab-fg);
     display: grid; place-items: center;
     box-shadow: 0 6px 20px rgb(0 0 0 / .3);
     text-decoration: none;

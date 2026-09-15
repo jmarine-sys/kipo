@@ -27,6 +27,13 @@
   --warn:      #8A5D00;
   --radius:    14px;
   --tap:       48px;      /* area minima tocable */
+
+  /* El boton de registrar lleva color propio, no --accent/--accent-fg.
+     En modo oscuro --accent-fg es casi negro sobre un teal claro, y el '+'
+     se leia gris. Este par garantiza blanco sobre verde en los dos temas. */
+  --fab-bg: #22616A;
+  --fab-fg: #ffffff;
+
   color-scheme: light dark;
 }
 
@@ -43,6 +50,8 @@
     --neg:       #F0736A;
     --pos:       #4EC98C;
     --warn:      #FEC85E;   /* el oro de la moneda pide atencion sin gritar */
+    --fab-bg:    #2C7F86;   /* aclarado, para destacarse sobre el fondo oscuro */
+    --fab-fg:    #ffffff;
   }
 }
 

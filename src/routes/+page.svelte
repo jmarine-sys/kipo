@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { listEntries, listBalances, summarize, type EntryDetail, type MonthSummary } from '$lib/ledger/api';
   import { money, monthRange } from '$lib/format';
+  import { colorCategoria } from '$lib/categorias';
   import type { AccountBalance } from '$lib/types';
 
   let entries = $state<EntryDetail[]>([]);
@@ -96,7 +97,9 @@
         <ul class="cats">
           {#each sum.byCategory.slice(0, 6) as c}
             <li class="spread">
-              <span>{c.name}{#if c.parent}<span class="dim sm"> · {c.parent}</span>{/if}</span>
+              <span class="cat">
+                <i class="punto" style="background:{colorCategoria(c.parent)}"></i>{c.name}
+              </span>
               <b class="money">{money(c.total)}</b>
             </li>
           {/each}
@@ -128,6 +131,10 @@
 
   h2 { margin-bottom: .6rem; }
   .cats { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .55rem; }
+  .cat { display: inline-flex; align-items: center; gap: .45rem; min-width: 0;
+         overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* mismo distintivo que en Movimientos: la madre es un punto, no texto */
+  .punto { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
 
   .empty { text-align: center; }
   .go { display: inline-block; text-decoration: none; padding: .8rem 1.2rem; border-radius: var(--radius); margin-top: .5rem; }
