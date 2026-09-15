@@ -58,9 +58,17 @@
         {/if}
       </div>
 
-      <div class="split">
+      <div class="split" class:three={sum.adjustments !== 0}>
         <div><span class="dim">Ingresos</span><b class="money pos">{money(sum.income)}</b></div>
         <div><span class="dim">Gastos</span><b class="money neg">{money(sum.expense)}</b></div>
+        {#if sum.adjustments !== 0}
+          <!-- ADR-005: el ajuste resta del resultado, pero no es un gasto.
+               Mezclarlo con "Gastos" mentiría sobre en qué gastaste. -->
+          <div>
+            <span class="dim">Ajustes</span>
+            <b class="money" class:neg={sum.adjustments > 0}>{money(-sum.adjustments)}</b>
+          </div>
+        {/if}
       </div>
 
       <!-- Lo que corrige el error 1: ahorrar o invertir NO empeora este numero,
@@ -110,6 +118,7 @@
   .sm { font-size: .82rem; }
 
   .split { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
+  .split.three { grid-template-columns: repeat(3, 1fr); }
   .split3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: .5rem; }
   .split > div, .split3 > div { display: flex; flex-direction: column; gap: .1rem; font-size: .82rem; }
   .split b, .split3 b { font-size: 1.05rem; }

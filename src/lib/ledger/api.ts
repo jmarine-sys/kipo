@@ -12,6 +12,7 @@ export interface EntryDetail {
   category_id: string | null;
   category_name: string | null;
   category_kind: 'income' | 'expense' | null;
+  category_is_system: boolean | null;
   category_parent: string | null;
   occurred_on: string;
   description: string | null;
@@ -89,7 +90,14 @@ export async function deleteTransaction(id: string): Promise<void> {
 
 export interface MonthSummary {
   income: number;
+  /** Gastos de verdad. NO incluye los ajustes de saldo. */
   expense: number;
+  /**
+   * Ajustes de saldo (ADR-005). Restan del resultado igual que un gasto —esa plata
+   * se fue de verdad, aunque no sepamos en qué— pero se muestran aparte: mezclarlos
+   * con "Gastos" mentiría sobre en qué gastaste.
+   */
+  adjustments: number;
   result: number;
   savingRate: number | null;
   byCategory: { name: string; parent: string | null; total: number }[];
@@ -98,31 +106,41 @@ export interface MonthSummary {
 export function summarize(entries: EntryDetail[], unit = 'ARS'): MonthSummary {
   let income = 0;
   let expense = 0;
+  let adjustments = 0;
   const byCategory = new Map<string, { name: string; parent: string | null; total: number }>();
 
   for (const e of entries) {
     if (!e.category_id || e.unit !== unit) continue;
     const amount = Number(e.amount);
-    // convenio de signos: ingreso negativo, gasto positivo
-    if (e.category_kind === 'income') income += -amount;
-    else expense += amount;
 
-    if (e.category_kind === 'expense') {
-      const key = e.category_id;
-      const row = byCategory.get(key) ?? {
-        name: e.category_name ?? '—',
-        parent: e.category_parent,
-        total: 0
-      };
-      row.total += amount;
-      byCategory.set(key, row);
+    // convenio de signos: ingreso negativo, gasto positivo
+    if (e.category_kind === 'income') {
+      income += -amount;
+      continue;
     }
+
+    if (e.category_is_system) {
+      adjustments += amount;   // resta del resultado, pero no es un gasto
+      continue;
+    }
+
+    expense += amount;
+    const row = byCategory.get(e.category_id) ?? {
+      name: e.category_name ?? '—',
+      parent: e.category_parent,
+      total: 0
+    };
+    row.total += amount;
+    byCategory.set(e.category_id, row);
   }
 
-  const result = income - expense;
+  // El ajuste TIENE que restar: si no, el resultado del mes dejaría de explicar
+  // el cambio de patrimonio, y ese es justamente el punto del modelo.
+  const result = income - expense - adjustments;
   return {
     income,
     expense,
+    adjustments,
     result,
     savingRate: income > 0 ? result / income : null,
     byCategory: [...byCategory.values()].sort((a, b) => b.total - a.total)

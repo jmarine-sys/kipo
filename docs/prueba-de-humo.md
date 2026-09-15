@@ -54,7 +54,16 @@ Fijate que la app te avisa: *"Movés plata entre tus cuentas. No es un gasto."*
 | | Esperado |
 |---|---|
 | Resultado del mes | **+$975.000 — EXACTAMENTE IGUAL que antes** |
-| Disponible | bajó, porque salió del banco… pero sigue contando: está en Ahorro |
+| Disponible | **tampoco cambia** |
+
+**¿Por qué "Disponible" no baja?** Porque una caja de ahorro *está* disponible: podés
+sacar esa plata cuando quieras. Lo que no está disponible es un **plazo fijo** —inmovilizado
+hasta su vencimiento— o un **CEDEAR**, que primero hay que vender
+([ADR-012](ADRs.md#adr-012--las-cuentas-se-clasifican-por-cómo-se-valúan-no-por-cómo-las-llama-el-banco)).
+
+O sea: *disponible* significa **"lo puedo usar hoy sin romper nada"**, no *"no lo reservé
+mentalmente"*. Si querés que un ahorro se sienta apartado, eso es un **objetivo de ahorro**
+y es otra funcionalidad, de más adelante.
 
 > **Este es el paso que justifica el proyecto entero.** En tu planilla, ahorrar $300.000
 > empeoraba el resultado del mes en $300.000. Acá **no lo mueve ni un peso**, porque cambiar
@@ -103,13 +112,23 @@ Como cambian de moneda, aparece **Recibís**: poné `100`.
 
 Te muestra el ajuste que va a registrar, contra la categoría *Ajustes*. Confirmá.
 
+Antes del ajuste el banco tenía $512.000, así que se registra un ajuste de **−$12.000**.
+
 | | Esperado |
 |---|---|
 | Banco | exactamente **$500.000** |
+| Inicio → **Ajustes** | **−$12.000**, en su propia línea |
+| Resultado del mes | baja a **+$945.000** |
 | El ajuste | aparece en Movimientos como un movimiento más, no como una corrección invisible |
 
-> La deriva queda **medida**. Si *Ajustes* crece mes a mes, es señal de que algo se está
-> cargando mal.
+> **El ajuste resta del resultado, y tiene que restar.** Esos $12.000 se fueron de verdad
+> —simplemente no sabés en qué—. Si no restaran, el resultado del mes dejaría de explicar el
+> cambio de tu patrimonio, que es justo el punto del modelo.
+>
+> Pero **no se mezclan con "Gastos"**: van en su propia línea. Decir que gastaste $55.000
+> cuando gastaste $43.000 y perdiste el rastro de $12.000 sería mentir sobre en qué gastaste.
+>
+> La deriva queda **medida**. Si *Ajustes* crece mes a mes, algo se está cargando mal.
 
 ## 8 · Exportar
 
@@ -122,11 +141,14 @@ cuenta, categoría y monto. Ese archivo es tu garantía de no quedar atado a nad
 
 | Dónde | Esperado |
 |---|---|
-| Resultado del mes | **+$957.000** |
-| Ingresos / Gastos | $1.000.000 / $43.000 |
-| Tasa de ahorro | **96%** |
+| Resultado del mes | **+$945.000** |
+| Ingresos | $1.000.000 |
+| Gastos | $43.000 |
+| Ajustes | −$12.000 |
+| Tasa de ahorro | **95%** |
 | Banco | $500.000 |
 | Ahorro | $300.000 |
+| Disponible | $800.000 |
 | Visa | $0 |
 | Dólares | US$100 |
 
