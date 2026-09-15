@@ -308,6 +308,17 @@ Y `not_found_handling` es lo que evita un síntoma desconcertante: **sin eso, en
 home anda pero recargar en `/movimientos` devuelve 404** — porque ese archivo no existe, la
 app decide qué mostrar del lado del cliente.
 
+> ### No agregues un archivo `_redirects`
+>
+> Es el mecanismo equivalente en Netlify, y en Cloudflare **rompe el despliegue**: la regla
+> `/* /index.html 200` se rechaza con *"Infinite loop detected"*, porque Cloudflare normaliza
+> `/index.html` a `/` y la regla vuelve a matchearse a sí misma.
+>
+> Este proyecto tuvo ese archivo y hubo que sacarlo. **Si algún día publicás en Netlify**,
+> creá ahí un `static/_redirects` con `/*  /index.html  200` — pero solo entonces, y sacando
+> `not_found_handling`. Dos mecanismos para lo mismo no son redundancia: son un conflicto
+> esperando.
+
 ### Después de publicar
 
 **Si activaste Google** (paso 7): en Supabase, **Authentication → URL Configuration**, agregá

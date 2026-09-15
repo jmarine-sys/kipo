@@ -16,5 +16,11 @@
     "not_found_handling": "single-page-application"
   },
 
+  // Declarados explicitos porque wrangler los sobrescribe igual: si no estan aca,
+  // la configuracion real del Worker queda solo en el panel y nadie la ve en el
+  // repositorio. El deploy avisa de esta diferencia como WARNING.
+  "workers_dev": true,     // la URL .workers.dev con la que se usa la app
+  "preview_urls": true,    // las ramas generan preview; Cloudflare Access los protege
+
   "observability": { "enabled": true }
 }
