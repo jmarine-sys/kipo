@@ -197,18 +197,77 @@ En `http://localhost:5173`. Entrá con uno de los usuarios del paso 6.
 Si no lo logra, el problema está en la interfaz y hay que arreglarlo ahí. Ese número, y no
 otro, es el criterio de éxito del MVP.
 
-## 10. Publicar
+## 10. Publicar en Cloudflare Pages
 
-```bash
-npm run build     # queda en build/
-```
+### Qué es, en dos minutos
 
-Es un sitio estático: se sube igual a Cloudflare Pages, Vercel o GitHub Pages
+Cloudflare Pages hace **una sola cosa**: guarda archivos estáticos y los sirve rápido
+desde todas partes.
+
+La analogía que mejor funciona: **Cloudflare es la vidriera, Supabase es la caja fuerte.**
+La vidriera está replicada en cientos de ciudades para que abra rápido desde cualquier
+lado; la caja fuerte es una sola, en São Paulo, y es donde están las cosas de valor.
+
+Lo que pasa cuando publicás:
+
+1. Conectás el repositorio de GitHub.
+2. En **cada push a `main`**, Cloudflare clona el repo, corre `npm run build` y se queda
+   con lo que quedó en `build/` — HTML, CSS, JS y nada más.
+3. Copia esos archivos a sus centros de datos repartidos por el mundo.
+4. Cuando abrís la app, los archivos te llegan del más cercano.
+
+**Cloudflare nunca ve tus datos.** No hay servidor, no hay base: los archivos llegan al
+navegador, y desde ahí el navegador habla directo con Supabase. Por eso el plan gratuito
+alcanza y va a seguir alcanzando — servir archivos quietos es baratísimo, y el ancho de
+banda es ilimitado en todos sus planes.
+
+También es lo que hace que **cambiar de hosting sea trivial**: como lo único que se publica
+son archivos, los mismos andan igual en Vercel, Netlify o GitHub Pages
 ([ADR-017](ADRs.md#adr-017--el-frontend-es-sveltekit-con-adapter-static-en-modo-spa)).
-Acordate de cargar las dos variables de entorno también en el hosting.
 
-Y si activaste Google, agregá la URL publicada en **Authentication → URL Configuration →
-Redirect URLs**.
+### Los pasos
+
+1. Entrá a [dash.cloudflare.com](https://dash.cloudflare.com) y creá una cuenta.
+2. **Workers & Pages → Create → Pages → Connect to Git**. Autorizá GitHub y elegí `kipo`.
+3. Configuración de compilación:
+
+   | Campo | Valor |
+   |---|---|
+   | Framework preset | **SvelteKit** (o *None*) |
+   | Build command | `npm run build` |
+   | Build output directory | `build` |
+   | Root directory | *(vacío)* |
+
+4. **Environment variables** — las mismas dos del `.env`. Sin esto la compilación falla,
+   porque SvelteKit las incrusta **en el momento de compilar**, no al ejecutar:
+
+   | Nombre | Valor |
+   |---|---|
+   | `PUBLIC_SUPABASE_URL` | tu URL de Supabase |
+   | `PUBLIC_SUPABASE_PUBLISHABLE_KEY` | tu `sb_publishable_…` |
+   | `NODE_VERSION` | `22` |
+
+   La última evita que Cloudflare compile con una versión de Node vieja.
+
+5. **Save and Deploy**. El primer despliegue tarda un par de minutos y te deja una URL
+   `https://kipo-xxx.pages.dev`.
+
+Desde ahí, **cada push a `main` publica solo**.
+
+### Lo que hay que hacer después de publicar
+
+**Si activaste Google** (paso 7): en Supabase, **Authentication → URL Configuration**,
+agregá tu URL de `.pages.dev` a *Redirect URLs*. Si no, el acceso con Google vuelve a
+ningún lado.
+
+**Instalala en el celular:** abrí la URL en el navegador y usá *Agregar a pantalla de
+inicio*. Queda como una app, con su ícono, sin barra de direcciones.
+
+> **Sobre `static/_redirects`:** ese archivo es lo que le dice a Cloudflare que sirva la
+> app para cualquier ruta. Sin él, entrar por la home anda pero **recargar en
+> `/movimientos` tira 404** — porque ese archivo no existe: la app decide qué mostrar del
+> lado del cliente. Ya está en el repositorio; se menciona porque el síntoma es
+> desconcertante si algún día se borra.
 
 ---
 
