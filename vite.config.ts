@@ -24,7 +24,8 @@ export default defineConfig({
         // aplicacion cubre toda la navegacion, y no oculta la barra de direcciones.
         scope: '/',
         display: 'standalone',
-        background_color: '#B6E2D7'  // el menta del icono: la pantalla de arranque hace juego,
+        // el menta del icono: la pantalla de arranque hace juego con el
+        background_color: '#B6E2D7',
         theme_color: '#194E59',
         // Estos archivos TIENEN que existir y decodificarse como PNG. Si faltan,
         // Android degrada la instalacion a un acceso directo -no va al cajon de
