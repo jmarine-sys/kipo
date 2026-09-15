@@ -1,10 +1,12 @@
 \set ON_ERROR_STOP on
 -- Lo mas critico de todo: que el aislamiento este EN LA BASE y no en el codigo.
 -- Se corre como rol NO superusuario, porque un superusuario saltea RLS.
+-- El rol de prueba hereda SOLO de 'authenticated': nada de permisos directos.
+-- Si se los dieramos a mano, el test no mediria lo que la app realmente tiene
+-- y los permisos del Data API quedarian sin verificar.
 create role rls_probe login;
-grant usage on schema public, auth to rls_probe;
 grant authenticated to rls_probe;
-grant select, insert, update, delete on all tables in schema public to rls_probe;
+grant usage on schema auth to rls_probe;
 grant select on auth.users to rls_probe;
 
 do $$

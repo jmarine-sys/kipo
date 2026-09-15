@@ -49,5 +49,8 @@ echo "== escritura atomica de movimientos (RPC) =="
 psql -h localhost -p "$PORT" -U postgres -qtA -f supabase/tests/05_rpc.sql 2>&1 | grep -E '^(ok|FALLO)'
 
 
+echo "== permisos del Data API (anon vs authenticated) =="
+psql_run supabase/tests/06_grants.sql 2>&1 | grep -oP '(?<=NOTICE:  ).*'
+
 echo
 echo "TODO VERDE"

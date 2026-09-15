@@ -40,6 +40,7 @@ decision nobody made is fiction, and an agent will believe it.
 | [ADR-017](#adr-017--el-frontend-es-sveltekit-con-adapter-static-en-modo-spa) | El frontend es SvelteKit con adapter-static en modo SPA | Accepted |
 | [ADR-018](#adr-018--la-puesta-en-marcha-separa-dos-regímenes-de-datos) | La puesta en marcha separa dos regímenes de datos | Accepted |
 | [ADR-019](#adr-019--registrar-un-movimiento-es-una-función-de-base-no-dos-inserciones-del-cliente) | Registrar un movimiento es una función de base, no dos inserciones del cliente | Accepted |
+| [ADR-020](#adr-020--los-permisos-del-data-api-son-explícitos-y-anon-no-tiene-ninguno) | Los permisos del Data API son explícitos, y `anon` no tiene ninguno | Accepted |
 
 ---
 
@@ -851,3 +852,66 @@ Prueba de mutacion: eliminando el trigger de balance, el test DETECTA la regresi
 ```
 
 Un test que no puede fallar no prueba nada. Este falla cuando debe.
+
+
+---
+
+## ADR-020 — Los permisos del Data API son explícitos, y `anon` no tiene ninguno
+
+**Context.** Supabase trae tres interruptores que deciden cómo se expone la base al navegador.
+Dos vienen activados de fábrica y uno apagado, y **la combinación por defecto deja un solo candado
+entre un desconocido y los datos financieros**:
+
+| Interruptor | De fábrica | Qué hace |
+|---|---|---|
+| *Enable Data API* | activado | Genera la API REST sobre el esquema público |
+| *Automatically expose new tables* | activado | Otorga privilegios a `anon`, `authenticated` y `service_role` sobre **toda tabla nueva** |
+| *Enable automatic RLS* | **apagado** | Dispara un trigger que activa RLS en toda tabla nueva del esquema público |
+
+Con la configuración de fábrica, `anon` —un pedido **sin autenticar**— tiene privilegios sobre las
+tablas, y lo único que lo detiene es RLS. Si alguna vez se crea una tabla y se olvida la política,
+queda legible para cualquiera con la URL y la clave publicable, que es pública por diseño.
+
+**Decision.** El Data API queda activado; la exposición automática de tablas nuevas se **apaga** y los
+permisos se otorgan explícitamente en una migración; el RLS automático se **enciende**.
+
+**Consequences.**
+- **Dos candados en vez de uno.** `anon` no tiene ningún privilegio: un pedido sin autenticar **no
+  llega ni a la tabla**, mucho antes de que RLS tenga que decidir nada. `authenticated` llega a la
+  tabla, y ahí RLS decide qué filas ve.
+- **Los permisos quedan en el repositorio**, no en un interruptor de un panel. Se revisan en una
+  revisión de código y se reproducen en cualquier entorno.
+- **`ledger` y `ledger_member` no se otorgan a nadie.** El cliente nunca las consulta y `my_ledgers()`
+  las lee como `SECURITY DEFINER`. Con esto
+  [ADR-003](#adr-003--toda-fila-del-dominio-pertenece-a-un-libro-ledger-no-a-un-usuario) deja de ser
+  una intención de diseño y pasa a ser un permiso denegado: el libro **no existe** para el cliente.
+- Encender el RLS automático hace **imposible** crear una tabla en el esquema público sin RLS. Es la
+  clase de refuerzo que se busca siempre: que lo correcto sea lo único posible.
+- **La parte incómoda:** cada tabla nueva necesita ahora su `GRANT` explícito en una migración. Si
+  alguien agrega una tabla y se olvida, la aplicación falla con *permiso denegado* — un error ruidoso
+  en desarrollo. Es el modo correcto de fallar: se rompe visible en vez de exponer datos en silencio.
+
+**Rejected alternatives.**
+- *Dejar los tres interruptores como vienen*: menos trabajo y deja a `anon` con privilegios sobre todo
+  el esquema, con RLS como única defensa. Descartada: para datos financieros privados, un solo candado
+  es poco cuando el segundo es gratis.
+- *Apagar el Data API*: imposible. `supabase-js` lo necesita, y
+  [ADR-017](#adr-017--el-frontend-es-sveltekit-con-adapter-static-en-modo-spa) no tiene servidor propio
+  por el que pasar.
+- *Otorgar `select` a `anon` "por si acaso"*: no hay ningún caso. La aplicación es privada de punta a
+  punta, no tiene ni una pantalla pública.
+
+**Evidence.** `supabase/migrations/20260915120000_grants.sql`, `supabase/tests/06_grants.sql`.
+
+**Verified against what already exists.**
+
+```
+PostgreSQL 16, 2026-09-15:
+  anon -> select de la tabla transaction      -> insufficient_privilege
+  anon -> select de la vista entry_detail     -> insufficient_privilege
+  authenticated -> sus transacciones          -> 14, como debe
+  authenticated -> select de la tabla ledger  -> insufficient_privilege
+
+El rol de prueba se corrigio para heredar SOLO de 'authenticated'. Antes tenia
+permisos directos, y por eso no medía lo que la aplicacion realmente tiene.
+```

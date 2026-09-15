@@ -3,5 +3,6 @@
 create schema if not exists auth;
 create table auth.users (id uuid primary key default gen_random_uuid(), email text);
 create role authenticated;
+create role anon;
 create or replace function auth.uid() returns uuid
   language sql stable as $$ select current_setting('test.uid', true)::uuid $$;
