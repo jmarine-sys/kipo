@@ -258,6 +258,23 @@ versión de Node vieja.
 
 Desde ahí, **cada push a `main` publica solo**.
 
+#### Las dos opciones del formulario
+
+| Opción | Viene | Dejala en | Por qué |
+|---|---|---|---|
+| **Builds for non-production branches** | activada | ✅ **como viene** | Hoy no hace nada porque solo hay `main`. El día que quieras probar un cambio sin tocar la app que usás a diario, una rama con su URL propia vale oro |
+| **Protect with Cloudflare Access** | apagada | ✅ **prendela** | Sin ella cada rama genera una URL **pública**. Solo afecta a los previews: **no** agrega un segundo login en producción |
+
+> ### ⚠️ Un preview NO es un sandbox
+>
+> Los builds de ramas usan **las mismas variables de entorno** que producción, así que una
+> rama de prueba **escribe en tu base real**.
+>
+> Sirve perfecto para probar interfaz. **No** la uses para probar migraciones, borrados ni
+> nada que escriba distinto — eso va contra tus datos de verdad. Un sandbox real exigiría un
+> segundo proyecto de Supabase con sus propias variables. Registrado en
+> [OD-25](ODs.md).
+
 ### Opción B — desde tu máquina
 
 Si los nombres del panel no coinciden con lo de arriba —Cloudflare los mueve seguido— este

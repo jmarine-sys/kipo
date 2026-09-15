@@ -62,12 +62,13 @@ It is the counterpart of [ADRs.md](ADRs.md): there is **what was decided and why
 | OD-22 | Nada impide correr el reseteo después de la puesta en marcha | `risk` | OPEN | [ADR-018](ADRs.md#adr-018--la-puesta-en-marcha-separa-dos-regímenes-de-datos) define dos regímenes de datos, pero **la línea la marca una persona, no el sistema**: no hay bandera de producción en la base. `reset_ledger.sql` con su confirmación explícita borra todo, el día que sea. La mitigación descartada por ahora es una bandera `is_production` en el libro. **Se vuelve real el día de la puesta en marcha**, no antes | Todos los datos, a partir de la puesta en marcha |
 | OD-23 | Las cuotas no tienen calendario: solo se conoce el saldo total de deuda | `decision` | OPEN | **Verificado 2026-09-15**: una compra en cuotas se registra como un solo gasto contra la tarjeta y los pagos del resumen bajan la deuda — funciona sin cambios. Pero el saldo dice *cuánto* debés, no *cuándo*: con varias compras en cuotas no se puede anticipar el resumen del mes que viene. **Una cuota futura es un evento futuro con fecha y monto conocidos**, o sea el mismo objeto de [ADR-016](ADRs.md#adr-016--los-vencimientos-y-los-gastos-recurrentes-comparten-una-sola-tabla): entra gratis en `scheduled_event` | Etapa 3, junto con recurrentes y vencimientos |
 | OD-24 | Una compra en cuotas distorsiona el resultado del mes | `risk` | OPEN | El mes de la compra se lleva el total y los siguientes se ven artificialmente buenos (verificado: octubre −120.000 por una heladera de la que se pagaron 10.000). Es **honesto** —ese día el patrimonio bajó 120.000— pero distorsiona la comparación mes contra mes, que es el corazón de la app. Agravante local: con inflación alta el total nominal **sobreestima** el costo real de las cuotas sin interés. **Sin decidir** si se muestra el resultado de otra forma, o solo se aclara | Lectura del resultado mensual. Solo evaluable con uso real |
+| OD-25 | Un preview apunta a la base de PRODUCCIÓN, no a un sandbox | `risk` | OPEN | Los builds de ramas no productivas usan **las mismas variables de entorno** que producción, así que una rama de prueba escribe en la base real. Sirve para probar interfaz; **no** para probar migraciones ni nada destructivo. Un sandbox de verdad exigiría un segundo proyecto de Supabase con sus propias variables — hoy desproporcionado. **Se vuelve real el día que se pruebe algo que escribe distinto** | Integridad de los datos reales al experimentar |
 
 ---
 
 ## The state of the project, read off the register
 
-Actualizado 2026-09-15 (decimotercera revisión). Veinticuatro ítems: **14 `DECIDED`**, **10 `OPEN`**,
+Actualizado 2026-09-15 (decimocuarta revisión). Veinticinco ítems: **14 `DECIDED`**, **11 `OPEN`**,
 **0 `LEANING`** y **0 `NEEDS-INPUT`**.
 
 **El MVP está escrito.** Diecinueve decisiones en [ADRs.md](ADRs.md), el esquema en
