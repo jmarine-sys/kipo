@@ -37,7 +37,14 @@
           <span class="lb">{t.label}</span>
         </a>
       {/each}
-      <a href="/nuevo" class="fab" aria-label="Registrar movimiento">+</a>
+      <a href="/nuevo" class="fab" aria-label="Registrar movimiento">
+        <!-- Trazo dibujado, no el caracter '+': una tipografia en peso liviano
+             adelgaza el signo hasta volverlo casi invisible sobre el color. -->
+        <svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true" focusable="false">
+          <path d="M12 5.5v13M5.5 12h13" stroke="currentColor" stroke-width="2.8"
+                stroke-linecap="round" fill="none"/>
+        </svg>
+      </a>
     </nav>
   {/if}
 {/if}
@@ -70,12 +77,12 @@
   .fab {
     position: absolute;
     right: 1rem; bottom: calc(100% + .75rem);
-    width: 60px; height: 60px;
+    width: 62px; height: 62px;
     border-radius: 50%;
     background: var(--accent); color: var(--accent-fg);
-    font-size: 2rem; font-weight: 300; line-height: 1;
     display: grid; place-items: center;
-    box-shadow: 0 6px 20px rgb(0 0 0 / .28);
+    box-shadow: 0 6px 20px rgb(0 0 0 / .3);
     text-decoration: none;
   }
+  .fab:active { transform: scale(.94); }
 </style>

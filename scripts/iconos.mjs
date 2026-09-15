@@ -78,9 +78,14 @@ const salidas = [
   ['static/icon-192.png', 192, 0.98, false],
   ['static/icon-512.png', 512, 0.98, false],
   ['static/apple-touch-icon.png', 180, 0.98, false],
-  // Maskable: menta a sangre y el arte al 72%, porque la zona segura es el 80%
-  // central y Samsung recorta en circulo.
-  ['static/icon-maskable-512.png', 512, 0.72, true]
+  // Maskable: menta a sangre y el arte al 88%.
+  //
+  // La zona segura del recorte circular es el 80% central del lienzo, pero eso
+  // aplica al DIBUJO, no al arte completo: el arte trae su propio cuadrado menta
+  // y el dibujo ocupa menos de la mitad de ese cuadrado. Al 72% el dibujo quedaba
+  // en el 42% del lienzo y el anillo menta sobrante se leia como un borde claro
+  // alrededor de un icono chico. Al 88% llena el circulo sin rozar el borde.
+  ['static/icon-maskable-512.png', 512, 0.88, true]
 ];
 
 for (const [ruta, size, escala, sangre] of salidas) {
