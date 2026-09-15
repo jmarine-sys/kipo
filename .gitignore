@@ -1,0 +1,23 @@
+# dependencias
+node_modules/
+
+# build de SvelteKit
+.svelte-kit/
+build/
+dist/
+
+# entorno — NUNCA commitear credenciales
+.env
+.env.*
+!.env.example
+
+# Supabase CLI
+supabase/.temp/
+supabase/.branches/
+
+# sistema y editores
+.DS_Store
+*.log
+.idea/
+.vscode/*
+!.vscode/extensions.json
