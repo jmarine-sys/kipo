@@ -1,4 +1,9 @@
-# Ruteo de una SPA en Cloudflare Pages (y en Netlify: usan el mismo formato).
+# Ruteo de una SPA, en formato Netlify (Cloudflare tambien lo lee).
+#
+# En Cloudflare Workers esto es redundante: lo resuelve wrangler.jsonc con
+# not_found_handling. Se mantiene igual porque es el mecanismo PORTABLE: si algun
+# dia se publica en Netlify, es lo unico que hace falta. ADR-017 eligio salida
+# estatica justamente para que mudarse sea barato.
 #
 # El navegador pide /movimientos, pero ese archivo NO existe: la app es una sola
 # pagina que decide que mostrar del lado del cliente (ADR-017, modo SPA).
@@ -8,4 +13,4 @@
 #
 # 200 (no 301) significa "serví este archivo SIN cambiar la URL", que es lo que
 # permite que la app lea la ruta y muestre la pantalla correcta.
-/*    /200.html   200
+/*    /index.html   200

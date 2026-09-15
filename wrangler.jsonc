@@ -1,0 +1,20 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "kipo",
+  "compatibility_date": "2026-09-15",
+
+  // Sin "main": no hay script de Worker, solo archivos estaticos.
+  // Es lo que corresponde segun ADR-017 —el navegador habla directo con
+  // Supabase— y ademas no genera invocaciones facturables.
+  "assets": {
+    "directory": "./build",
+
+    // El navegador pide /movimientos y ese archivo no existe: la app decide que
+    // mostrar del lado del cliente. Con esto Workers sirve index.html con 200 OK
+    // en vez de un 404. Sin esto, entrar por la home anda pero recargar en
+    // cualquier otra pantalla falla.
+    "not_found_handling": "single-page-application"
+  },
+
+  "observability": { "enabled": true }
+}

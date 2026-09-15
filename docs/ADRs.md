@@ -41,6 +41,7 @@ decision nobody made is fiction, and an agent will believe it.
 | [ADR-018](#adr-018--la-puesta-en-marcha-separa-dos-regímenes-de-datos) | La puesta en marcha separa dos regímenes de datos | Accepted |
 | [ADR-019](#adr-019--registrar-un-movimiento-es-una-función-de-base-no-dos-inserciones-del-cliente) | Registrar un movimiento es una función de base, no dos inserciones del cliente | Accepted |
 | [ADR-020](#adr-020--los-permisos-del-data-api-son-explícitos-y-anon-no-tiene-ninguno) | Los permisos del Data API son explícitos, y `anon` no tiene ninguno | Accepted |
+| [ADR-021](#adr-021--el-hosting-es-cloudflare-workers-sirviendo-solo-activos-estáticos) | El hosting es Cloudflare Workers, sirviendo solo activos estáticos | Accepted |
 
 ---
 
@@ -914,4 +915,64 @@ PostgreSQL 16, 2026-09-15:
 
 El rol de prueba se corrigio para heredar SOLO de 'authenticated'. Antes tenia
 permisos directos, y por eso no medía lo que la aplicacion realmente tiene.
+```
+
+
+---
+
+## ADR-021 — El hosting es Cloudflare Workers, sirviendo solo activos estáticos
+
+**Context.** [ADR-017](#adr-017--el-frontend-es-sveltekit-con-adapter-static-en-modo-spa) dejó el
+hosting deliberadamente abierto (OD-02): la salida es estática y anda igual en cualquier lado. Al ir
+a publicar apareció un dato que invalida el plan original — **Cloudflare Pages dejó de ser el camino
+para proyectos nuevos**. Textual de su propia documentación, consultada el 2026-09-15:
+
+> *"Are you sure you want to use Pages? Workers supports most Pages use cases and offers a broader
+> feature set. It is Cloudflare's primary platform for building applications. **Start new projects
+> with Workers.**"*
+
+Pages sigue funcionando, pero está en mantenimiento y el panel se reorganizó en consecuencia — al
+punto de que la sección "Workers & Pages" que indicaba la guía **ya no existe**.
+
+**Decision.** Se publica en Cloudflare Workers con activos estáticos, **sin script de Worker**:
+`wrangler.jsonc` declara `assets.directory` y `assets.not_found_handling: "single-page-application"`.
+
+**Consequences.**
+- Ancho de banda ilimitado en el plan gratuito, y **cero invocaciones facturables**: al no haber
+  `main`, no se ejecuta ningún código de Cloudflare, solo se sirven archivos.
+- `not_found_handling` resuelve el ruteo de la SPA de forma nativa. Sin eso, entrar por la home
+  funciona pero **recargar en cualquier otra ruta devuelve 404**.
+- El fallback de `adapter-static` pasó de `200.html` a **`index.html`**, que es el archivo que
+  Workers sirve en modo SPA. SvelteKit desaconseja `index.html` cuando hay una home prerrenderizada;
+  acá `prerender = false`, así que no hay conflicto posible.
+- Se mantiene `static/_redirects` aunque en Workers sea redundante: es el mecanismo **portable**, y
+  es lo único que haría falta para publicar en Netlify. Mudarse sigue costando casi nada.
+- **La parte incómoda:** Cloudflare mueve las etiquetas de su panel seguido —esta guía ya quedó
+  desactualizada una vez antes de usarse— así que la documentación incluye un camino por línea de
+  comandos que no depende de ningún nombre de menú. Es más trabajo de mantener y es lo que evita que
+  la guía envejezca mal.
+
+**Rejected alternatives.**
+- *Cloudflare Pages*: era el plan original. Descartado porque **Cloudflare mismo dice que no se
+  empiecen proyectos nuevos ahí**.
+- *`adapter-cloudflare`*: es lo que recomienda la guía de SvelteKit de Cloudflare, y genera un
+  `_worker.js`. Descartado por dos motivos: no hay una sola línea de código de servidor que ejecutar,
+  y ataría la salida a Cloudflare, que es exactamente lo que
+  [ADR-017](#adr-017--el-frontend-es-sveltekit-con-adapter-static-en-modo-spa) quiso evitar.
+- *Vercel Hobby o GitHub Pages*: sirven igual, pero sus términos **prohíben el uso comercial**.
+  Hoy es irrelevante y es una atadura innecesaria cuando la alternativa no la tiene.
+
+**Evidence.** `wrangler.jsonc`, [puesta-en-marcha.md](puesta-en-marcha.md) §10.
+
+**Verified against what already exists.**
+
+```
+developers.cloudflare.com/pages/            (2026-09-15)
+  -> "Start new projects with Workers."
+developers.cloudflare.com/workers/static-assets/routing/single-page-application/
+  -> not_found_handling: "single-page-application" sirve /index.html con 200 OK
+     cuando el pedido no coincide con ningun archivo.
+
+El plan original de esta guia apuntaba a "Workers & Pages" en el panel. Esa
+seccion ya no existe: lo reporto el usuario al no encontrarla.
 ```

@@ -197,77 +197,107 @@ En `http://localhost:5173`. Entrá con uno de los usuarios del paso 6.
 Si no lo logra, el problema está en la interfaz y hay que arreglarlo ahí. Ese número, y no
 otro, es el criterio de éxito del MVP.
 
-## 10. Publicar en Cloudflare Pages
+## 10. Publicar en Cloudflare Workers
 
 ### Qué es, en dos minutos
 
-Cloudflare Pages hace **una sola cosa**: guarda archivos estáticos y los sirve rápido
-desde todas partes.
+Cloudflare hace acá **una sola cosa**: guarda archivos estáticos y los sirve rápido desde
+todas partes.
 
 La analogía que mejor funciona: **Cloudflare es la vidriera, Supabase es la caja fuerte.**
-La vidriera está replicada en cientos de ciudades para que abra rápido desde cualquier
-lado; la caja fuerte es una sola, en São Paulo, y es donde están las cosas de valor.
+La vidriera está replicada en cientos de ciudades para que abra rápido desde donde estés;
+la caja fuerte es una sola, en São Paulo, y es donde están las cosas de valor.
 
-Lo que pasa cuando publicás:
+Lo que pasa al publicar:
 
 1. Conectás el repositorio de GitHub.
-2. En **cada push a `main`**, Cloudflare clona el repo, corre `npm run build` y se queda
-   con lo que quedó en `build/` — HTML, CSS, JS y nada más.
+2. En **cada push a `main`**, Cloudflare clona el repo, corre `npm run build` y se queda con
+   lo que quedó en `build/` — HTML, CSS y JS. Nada más.
 3. Copia esos archivos a sus centros de datos repartidos por el mundo.
-4. Cuando abrís la app, los archivos te llegan del más cercano.
+4. Cuando abrís la app, te llegan del más cercano.
 
-**Cloudflare nunca ve tus datos.** No hay servidor, no hay base: los archivos llegan al
-navegador, y desde ahí el navegador habla directo con Supabase. Por eso el plan gratuito
-alcanza y va a seguir alcanzando — servir archivos quietos es baratísimo, y el ancho de
-banda es ilimitado en todos sus planes.
+**Cloudflare nunca ve tus datos.** No hay servidor ni base de datos ahí: los archivos llegan
+al navegador, y desde ahí el navegador habla directo con Supabase. Por eso el plan gratuito
+alcanza y va a seguir alcanzando — servir archivos quietos es baratísimo y el ancho de banda
+es ilimitado en todos sus planes.
 
-También es lo que hace que **cambiar de hosting sea trivial**: como lo único que se publica
-son archivos, los mismos andan igual en Vercel, Netlify o GitHub Pages
-([ADR-017](ADRs.md#adr-017--el-frontend-es-sveltekit-con-adapter-static-en-modo-spa)).
+> ### Por qué Workers y no Pages
+>
+> Si buscás **"Workers & Pages"** en el panel **no lo vas a encontrar**: Cloudflare
+> reorganizó. Textual de su documentación:
+>
+> > *"¿Seguro que querés usar Pages? Workers cubre la mayoría de los casos de Pages y ofrece
+> > más funcionalidad. Es la plataforma principal de Cloudflare. **Empezá los proyectos
+> > nuevos con Workers.**"*
+>
+> Pages sigue funcionando pero está en mantenimiento. Buscá **Workers** en la barra lateral
+> (Cloudflare le cambió el nombre hace poco, así que puede decir *Compute*).
 
-### Los pasos
+### Opción A — conectar el repositorio *(recomendada)*
 
-1. Entrá a [dash.cloudflare.com](https://dash.cloudflare.com) y creá una cuenta.
-2. **Workers & Pages → Create → Pages → Connect to Git**. Autorizá GitHub y elegí `kipo`.
-3. Configuración de compilación:
+En [dash.cloudflare.com](https://dash.cloudflare.com) → **Workers** → **Create** →
+**Import a repository** → elegí `kipo`.
 
-   | Campo | Valor |
-   |---|---|
-   | Framework preset | **SvelteKit** (o *None*) |
-   | Build command | `npm run build` |
-   | Build output directory | `build` |
-   | Root directory | *(vacío)* |
+| Campo | Valor |
+|---|---|
+| Build command | `npm run build` |
+| Deploy command | `npx wrangler deploy` |
+| Path / root directory | *(vacío)* |
 
-4. **Environment variables** — las mismas dos del `.env`. Sin esto la compilación falla,
-   porque SvelteKit las incrusta **en el momento de compilar**, no al ejecutar:
+Y las variables de entorno, que son lo que más se olvida:
 
-   | Nombre | Valor |
-   |---|---|
-   | `PUBLIC_SUPABASE_URL` | tu URL de Supabase |
-   | `PUBLIC_SUPABASE_PUBLISHABLE_KEY` | tu `sb_publishable_…` |
-   | `NODE_VERSION` | `22` |
+| Nombre | Valor |
+|---|---|
+| `PUBLIC_SUPABASE_URL` | tu URL de Supabase |
+| `PUBLIC_SUPABASE_PUBLISHABLE_KEY` | tu `sb_publishable_…` |
+| `NODE_VERSION` | `22` |
 
-   La última evita que Cloudflare compile con una versión de Node vieja.
-
-5. **Save and Deploy**. El primer despliegue tarda un par de minutos y te deja una URL
-   `https://kipo-xxx.pages.dev`.
+**Las dos primeras no son opcionales.** SvelteKit las incrusta **en el momento de compilar**,
+no al ejecutar: sin ellas la compilación falla. La tercera evita que Cloudflare use una
+versión de Node vieja.
 
 Desde ahí, **cada push a `main` publica solo**.
 
-### Lo que hay que hacer después de publicar
+### Opción B — desde tu máquina
 
-**Si activaste Google** (paso 7): en Supabase, **Authentication → URL Configuration**,
-agregá tu URL de `.pages.dev` a *Redirect URLs*. Si no, el acceso con Google vuelve a
-ningún lado.
+Si los nombres del panel no coinciden con lo de arriba —Cloudflare los mueve seguido— este
+camino no depende de ninguna etiqueta:
 
-**Instalala en el celular:** abrí la URL en el navegador y usá *Agregar a pantalla de
-inicio*. Queda como una app, con su ícono, sin barra de direcciones.
+```bash
+npx wrangler login      # abre el navegador para autorizar
+npm run build
+npx wrangler deploy
+```
 
-> **Sobre `static/_redirects`:** ese archivo es lo que le dice a Cloudflare que sirva la
-> app para cualquier ruta. Sin él, entrar por la home anda pero **recargar en
-> `/movimientos` tira 404** — porque ese archivo no existe: la app decide qué mostrar del
-> lado del cliente. Ya está en el repositorio; se menciona porque el síntoma es
-> desconcertante si algún día se borra.
+Sirve para publicar la primera vez y verificar que todo anda. Después conviene igual
+conectar el repositorio para no depender de tu máquina.
+
+### El archivo que hace que funcione
+
+`wrangler.jsonc` ya está en el repositorio y tiene lo único que Cloudflare necesita saber:
+
+```jsonc
+"assets": {
+  "directory": "./build",
+  "not_found_handling": "single-page-application"
+}
+```
+
+Fijate que **no hay `main`**: no existe ningún script de Worker, solo archivos. Eso es lo que
+corresponde según [ADR-017](ADRs.md#adr-017--el-frontend-es-sveltekit-con-adapter-static-en-modo-spa)
+y además no genera invocaciones facturables.
+
+Y `not_found_handling` es lo que evita un síntoma desconcertante: **sin eso, entrar por la
+home anda pero recargar en `/movimientos` devuelve 404** — porque ese archivo no existe, la
+app decide qué mostrar del lado del cliente.
+
+### Después de publicar
+
+**Si activaste Google** (paso 7): en Supabase, **Authentication → URL Configuration**, agregá
+tu URL de `.workers.dev` a *Redirect URLs*. Si no, el acceso con Google vuelve a ningún lado.
+
+**Instalala en el celular:** abrí la URL y usá *Agregar a pantalla de inicio*. Queda como una
+app, con su ícono y sin barra de direcciones.
 
 ---
 
