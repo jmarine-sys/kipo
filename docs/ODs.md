@@ -53,7 +53,7 @@ It is the counterpart of [ADRs.md](ADRs.md): there is **what was decided and why
 | OD-13 | La interfaz debe declarar que los saldos son estimados | `decision` | DECIDED | **Cumplido del todo el 2026-09-15**: el aviso *"≈ Saldos estimados"* aparece en Inicio y Cuentas, y el **ajuste de saldo** ya está en la interfaz — se toca una cuenta, se escribe el saldo real y se registra un movimiento contra la categoría *Ajustes*. **La deriva queda medida, no escondida**: si Ajustes crece mes a mes, algo se está cargando mal | — |
 | OD-14 | El repositorio no tiene remoto ni primer commit | `debt` | DECIDED | **Cerrado el 2026-09-15**: remoto privado en GitHub (`jmarine-sys/kipo`) y 13 commits en `main` con conventional commits. Destraba OD-16. **Reserva:** todavía sin `push` — los commits son locales |
 | OD-15 | ¿Un proyecto Supabase pausado revive solo o exige clic manual? | `risk` | DECIDED | **VERIFICADO 2026-09-15, y es la peor de las dos opciones: la restauración es MANUAL.** Textual de la doc oficial: *"You can restore paused projects from the Supabase dashboard"* — no documenta ningún despertar automático. No cambia [ADR-007](ADRs.md#adr-007--el-backend-es-supabase), cambia cómo se opera: tras 7 días sin uso alguien tiene que entrar al panel | — |
-| OD-16 | Sin backups automáticos en el plan gratuito de Supabase | `debt` | OPEN | **El flujo ya existe** (`.github/workflows/backup.yml`): vuelca a diario, **restaura en una base limpia y comprueba las 11 tablas** antes de guardar, conserva los últimos 30. **Falta un solo paso del usuario**: cargar el secreto `SUPABASE_DB_URL` en GitHub. Hasta entonces el historial no tiene red | Nada técnico. Un secreto |
+| OD-16 | Sin backups automáticos en el plan gratuito de Supabase | `debt` | DECIDED | **Cerrado el 2026-09-15, y funcionando de verdad**: el flujo corrió solo, volcó la base, la restauró en una base limpia, comprobó las tablas y commiteó `backups/kipo-2026-09-15.sql.gz` (50 KB). El volcado contiene **las 11 políticas de RLS**, así que restaurar devuelve también el aislamiento. Conserva los últimos 30 días. **Reserva:** el volcado vive en el mismo repositorio; si se perdiera la cuenta de GitHub se pierden ambos |
 | OD-17 | Los CEDEARs mezclan dos fuentes de rendimiento en un solo precio | `decision` | OPEN | Un CEDEAR cotiza en ARS y su precio incorpora el **CCL implícito**: sube si sube la acción en USD **o** si sube el CCL. Valuarlo con MEP ([ADR-011](ADRs.md#adr-011--la-fuente-de-cotización-es-una-propiedad-de-la-cuenta-no-de-la-fecha)) responde *"cuántos dólares saco si vendo"*, no *"cuánto rindió el activo"*. Además tienen **ratio de conversión** que puede cambiar. **Falta decidir** si se modelan con ratio + precio del subyacente o con precio ARS + CCL | Medición honesta del rendimiento de Balanz (etapa 5-6) |
 | OD-18 | Cómo se modela una cuenta remunerada | `decision` | DECIDED | **Es una cuenta bancaria, no una inversión** — corrección del propio usuario → [ADR-013](ADRs.md#adr-013--la-cuenta-remunerada-es-una-cuenta-bancaria-su-interés-es-un-ingreso-mensual). Interés como ingreso mensual. Reencuadró la taxonomía entera → [ADR-012](ADRs.md#adr-012--las-cuentas-se-clasifican-por-cómo-se-valúan-no-por-cómo-las-llama-el-banco). **Reserva:** simplificación deliberada — técnicamente es un FCI con cuotapartes | — |
 | OD-19 | Vencimientos de plazo fijo y gastos recurrentes son la misma funcionalidad | `decision` | DECIDED | **Se unifican** en `scheduled_event` → [ADR-016](ADRs.md#adr-016--los-vencimientos-y-los-gastos-recurrentes-comparten-una-sola-tabla). **Reserva:** `frequency` queda en null para los vencimientos — una columna que no aplica a la mitad de las filas, acotada por `CHECK` | — |
@@ -68,7 +68,7 @@ It is the counterpart of [ADRs.md](ADRs.md): there is **what was decided and why
 
 ## The state of the project, read off the register
 
-Actualizado 2026-09-15 (decimocuarta revisión). Veinticinco ítems: **14 `DECIDED`**, **11 `OPEN`**,
+Actualizado 2026-09-15 (decimoquinta revisión). Veinticinco ítems: **15 `DECIDED`**, **10 `OPEN`**,
 **0 `LEANING`** y **0 `NEEDS-INPUT`**.
 
 **El MVP está escrito.** Diecinueve decisiones en [ADRs.md](ADRs.md), el esquema en
@@ -87,9 +87,8 @@ De los diez `OPEN`, ninguno impide usar la aplicación:
   costo, OD-21 plausibilidad del tipo de cambio.
 - **Riesgo solo evaluable con uso real (4):** OD-10 pausa por inactividad, OD-11 la fricción de la
   tarjeta, OD-12 la apuesta de online-only, OD-22 el reseteo tras la puesta en marcha.
-- **Deuda (1):** OD-14 cerró —hay remoto privado y 13 commits— y con eso **OD-16 quedó a un solo paso
-  del usuario**: cargar el secreto `SUPABASE_DB_URL` en GitHub. El flujo de respaldo ya está escrito y
-  se verifica a sí mismo restaurando.
+- **Deuda: ninguna abierta.** OD-14 y OD-16 cerraron el mismo día: hay remoto privado con historia, y
+  el respaldo **corrió solo y dejó su primer volcado verificado**.
 
 ---
 
