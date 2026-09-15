@@ -38,6 +38,28 @@ viene de ocultarla, viene de RLS aplicado en la base
 ([ADR-007](ADRs.md#adr-007--el-backend-es-supabase)). Si dependiera del secreto de la
 clave, el modelo estaría mal.
 
+## 2 bis. Ajustar la exposición de la base — [ADR-020](ADRs.md#adr-020--los-permisos-del-data-api-son-explícitos-y-anon-no-tiene-ninguno)
+
+En **Project Settings → Data API**. **Dos de los tres van al revés de como vienen:**
+
+| Interruptor | De fábrica | Dejalo en | Por qué |
+|---|---|---|---|
+| **Enable Data API** | activado | ✅ **activado** | `supabase-js` lo necesita. No hay servidor propio por el que pasar |
+| **Automatically expose new tables** | activado | ❌ **desactivado** | De fábrica, un pedido **sin autenticar** tiene privilegios sobre tus tablas y lo único que lo detiene es RLS. Los permisos los da `20260915120000_grants.sql` |
+| **Enable automatic RLS** | apagado | ✅ **activado** | Hace imposible crear una tabla sin RLS. Es gratis |
+
+**Por qué importa el del medio.** La publishable key es pública por diseño: va compilada
+dentro del JavaScript que cualquiera puede leer. Con la configuración de fábrica, cualquiera
+con tu URL queda a **un solo error de política** de tus finanzas. Desactivándolo hay dos
+candados: `anon` no llega ni a la tabla, y recién después RLS decide qué filas ve un usuario.
+
+> El RLS automático solo afecta a las tablas **nuevas**. Las 11 actuales ya lo tienen
+> activado explícitamente en `20260915100200_rls.sql`; el interruptor es una red para el futuro.
+
+> Con la exposición automática apagada, **toda tabla nueva necesita su `GRANT` en una
+> migración**. Si te olvidás, la app falla con *permiso denegado*. Es el modo correcto de
+> fallar: ruidoso en desarrollo, en vez de silencioso y expuesto.
+
 ## 3. Crear el archivo `.env`
 
 ```bash
@@ -48,7 +70,7 @@ Y completalo con lo del paso 2. **`.env` está en `.gitignore`: nunca se sube.**
 
 ## 4. Aplicar las migraciones
 
-Son seis archivos en `supabase/migrations/`, y **hay que aplicarlos en orden**.
+Son siete archivos en `supabase/migrations/`, y **hay que aplicarlos en orden**.
 
 ### Opción A — el CLI de Supabase *(recomendada)*
 
@@ -69,6 +91,7 @@ En **SQL Editor**, pegá y ejecutá cada archivo **en este orden**:
 4. `20260915100300_bootstrap.sql` — el alta de usuario
 5. `20260915110000_rpc.sql` — escritura atómica
 6. `20260915110100_views.sql` — la vista de lectura
+7. `20260915120000_grants.sql` — los permisos del Data API
 
 ## 5. Comprobar que quedó bien
 
@@ -81,10 +104,14 @@ select count(*) from information_schema.tables
 
 select count(*) from pg_policies where schemaname = 'public';
 -- tiene que dar 11: una por tabla. Si da menos, RLS no aplicó en alguna.
+
+select count(*) from information_schema.role_table_grants
+ where grantee = 'anon' and table_schema = 'public';
+-- tiene que dar 0. Si da más, anon llega a tus tablas.
 ```
 
-Ese segundo número es el importante. **Una tabla sin política es una tabla que cualquiera
-puede leer.**
+Los dos últimos son los que importan. **Una tabla sin política es una tabla que cualquiera
+puede leer**, y **un privilegio para `anon` es una puerta antes de la puerta.**
 
 ## 6. Crear los usuarios
 
