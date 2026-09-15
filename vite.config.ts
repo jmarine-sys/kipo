@@ -15,8 +15,8 @@ export default defineConfig({
       },
       manifest: {
         id: '/',
-        name: 'kipo',
-        short_name: 'kipo',
+        name: 'Kipo',
+        short_name: 'Kipo',
         description: 'Finanzas personales',
         lang: 'es-AR',
         start_url: '/',
@@ -24,8 +24,8 @@ export default defineConfig({
         // aplicacion cubre toda la navegacion, y no oculta la barra de direcciones.
         scope: '/',
         display: 'standalone',
-        background_color: '#0f1115',
-        theme_color: '#0f1115',
+        background_color: '#B6E2D7'  // el menta del icono: la pantalla de arranque hace juego,
+        theme_color: '#194E59',
         // Estos archivos TIENEN que existir y decodificarse como PNG. Si faltan,
         // Android degrada la instalacion a un acceso directo -no va al cajon de
         // aplicaciones y no oculta la barra- y no dice por que.

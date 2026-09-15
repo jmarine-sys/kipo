@@ -1,18 +1,30 @@
 /* kipo · sistema visual
-   Mobile-first y pensado para una mano: lo que se toca mide al menos 48px. */
+   Mobile-first y pensado para una mano: lo que se toca mide al menos 48px.
+
+   Los colores NO son una interpretacion: salen medidos del vector de la marca
+   (static/marca/kipo_.svg). Todo pasa por estas variables, asi que cambiar la
+   identidad es tocar un solo bloque. */
 
 :root {
-  --bg:        #f6f7f9;
+  /* la marca, tal como esta en el archivo original */
+  --menta:  #B6E2D7;   /* el fondo del icono */
+  --verde:  #22616A;   /* el bolsillo */
+  --verde-claro: #3A8487;
+  --verde-oscuro: #194E59;
+  --oro:    #FEC85E;   /* la moneda */
+  --tinta:  #0C161A;   /* el contorno */
+
+  --bg:        #F1F8F5;
   --surface:   #ffffff;
-  --surface-2: #eceef2;
-  --border:    #dcdfe5;
-  --text:      #16181d;
-  --text-dim:  #666d7a;
-  --accent:    #2563eb;
+  --surface-2: #DFEFE9;
+  --border:    #C7DFD8;
+  --text:      #0C161A;
+  --text-dim:  #5A757C;
+  --accent:    #22616A;
   --accent-fg: #ffffff;
-  --neg:       #c0342b;   /* gastos, deuda */
-  --pos:       #147a4a;   /* ingresos */
-  --warn:      #9a6700;
+  --neg:       #C0392B;   /* gastos, deuda */
+  --pos:       #17714C;   /* ingresos */
+  --warn:      #8A5D00;
   --radius:    14px;
   --tap:       48px;      /* area minima tocable */
   color-scheme: light dark;
@@ -20,17 +32,17 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg:        #0f1115;
-    --surface:   #171a21;
-    --surface-2: #21252e;
-    --border:    #2b303b;
-    --text:      #e8eaee;
-    --text-dim:  #939aa8;
-    --accent:    #4d84f3;
-    --accent-fg: #0b0d11;
-    --neg:       #f0736a;
-    --pos:       #4ec98c;
-    --warn:      #e0b341;
+    --bg:        #0C161A;   /* la tinta de la marca */
+    --surface:   #14242A;
+    --surface-2: #1E3840;
+    --border:    #2A4A52;
+    --text:      #E6F1EE;
+    --text-dim:  #8CA5AB;
+    --accent:    #5FB3AC;   /* el verde aclarado, para contrastar sobre la tinta */
+    --accent-fg: #06131A;
+    --neg:       #F0736A;
+    --pos:       #4EC98C;
+    --warn:      #FEC85E;   /* el oro de la moneda pide atencion sin gritar */
   }
 }
 
