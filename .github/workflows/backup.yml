@@ -4,8 +4,16 @@
 # (verificado 2026-09-15). Esto es la unica red bajo el historial financiero.
 #
 # Hace falta UN secreto en el repositorio:
-#   SUPABASE_DB_URL = la cadena de conexion directa de Postgres
-#   (Supabase > Project Settings > Database > Connection string > URI)
+#   SUPABASE_DB_URL = la cadena del SESSION POOLER de Supabase
+#   (panel > boton "Connect" > Session pooler)
+#
+#   OJO: NO uses la "Direct connection". Resuelve a IPv6 salvo que pagues el
+#   complemento de IPv4, y los runners de GitHub Actions son IPv4 unicamente:
+#   fallaria con "network unreachable" todos los dias, en silencio.
+#   El puerto debe ser 5432. El 6543 es el transaction pooler y no sirve para
+#   pg_dump, porque no mantiene la sesion que el volcado necesita.
+#
+#   postgresql://postgres.<ref>:<pass>@aws-0-<region>.pooler.supabase.com:5432/postgres
 #
 # El volcado queda versionado en el propio repositorio privado: eso es lo que da
 # durabilidad FUERA del proveedor, que es de lo que se trata.

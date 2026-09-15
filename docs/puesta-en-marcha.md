@@ -140,16 +140,46 @@ decide si lo usa; el acceso ya lo detecta y pide el código solo a quien lo teng
 **Esto no es opcional.** El plan gratuito de Supabase **no incluye backups ni recuperación
 punto-en-el-tiempo**. Sin este paso, tu historial financiero no tiene ninguna red.
 
-1. **Project Settings → Database → Connection string → URI**. Copiala y reemplazá
-   `[YOUR-PASSWORD]` por la contraseña del paso 1.
-2. En GitHub: **Settings → Secrets and variables → Actions → New repository secret**
-   - Nombre: `SUPABASE_DB_URL`
-   - Valor: la cadena completa
-3. Probalo a mano: pestaña **Actions → Respaldo de la base → Run workflow**.
+### 8.1 Conseguir la cadena de conexión
+
+En el panel, botón **Connect** arriba a la derecha *(antes estaba en Project Settings →
+Database; Supabase lo movió)*. Se abre un modal con varias cadenas.
+
+> ### ⚠️ Elegí la del **Session pooler**, no la *Direct connection*
+>
+> La *Direct connection* (`db.xxxx.supabase.co`) resuelve a **IPv6**, salvo que pagues el
+> complemento de IPv4. **Los runners de GitHub Actions son IPv4 únicamente**, así que el
+> respaldo fallaría con *network unreachable* — en silencio, todos los días, hasta que un
+> día la necesites.
+>
+> La del **Session pooler** es compatible con IPv4 y se ve así:
+>
+> ```
+> postgresql://postgres.<project-ref>:[YOUR-PASSWORD]@aws-0-<region>.pooler.supabase.com:5432/postgres
+> ```
+>
+> **El puerto tiene que ser 5432.** Si ves `6543` estás mirando el *Transaction pooler*, que
+> no sirve para `pg_dump`: no mantiene la sesión que el volcado necesita.
+
+Reemplazá `[YOUR-PASSWORD]` por la contraseña de la base del paso 1.
+
+### 8.2 Cargarla como secreto
+
+En GitHub: **Settings → Secrets and variables → Actions → New repository secret**
+
+- Nombre: `SUPABASE_DB_URL`
+- Valor: la cadena completa del session pooler
+
+### 8.3 Probarlo
+
+Pestaña **Actions → Respaldo de la base → Run workflow**.
 
 El flujo vuelca la base, **la restaura en una base limpia y comprueba que las 11 tablas
 estén** antes de guardar nada. Un respaldo que nunca restauraste no es un respaldo.
 Después corre solo todos los días y conserva los últimos 30.
+
+Si falla con *network unreachable* o *connection timed out*, casi seguro copiaste la
+*Direct connection*. Volvé a 8.1.
 
 ## 9. Levantar la aplicación
 
