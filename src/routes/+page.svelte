@@ -3,10 +3,12 @@
   import { listEntries, listBalances, summarize, type EntryDetail, type MonthSummary } from '$lib/ledger/api';
   import { money, monthRange } from '$lib/format';
   import { colorCategoria } from '$lib/categorias';
+  import { listUpcoming, cuandoFalta, type Upcoming } from '$lib/ledger/recurrentes';
   import type { AccountBalance } from '$lib/types';
 
   let entries = $state<EntryDetail[]>([]);
   let balances = $state<AccountBalance[]>([]);
+  let viene = $state<Upcoming[]>([]);
   let loading = $state(true);
   let error = $state<string | null>(null);
 
@@ -27,9 +29,15 @@
     balances.filter((b) => b.kind === 'liability').reduce((t, b) => t + Number(b.balance), 0)
   );
 
+  /** Lo que se viene: vencidos primero, y solo lo de los próximos 30 días. */
+  const pendientes = $derived(viene.filter((v) => v.dias <= 30));
+  const vencidos = $derived(pendientes.filter((v) => v.vencido).length);
+
   onMount(async () => {
     try {
-      [entries, balances] = await Promise.all([listEntries(m.from, m.to), listBalances()]);
+      [entries, balances, viene] = await Promise.all([
+        listEntries(m.from, m.to), listBalances(), listUpcoming()
+      ]);
     } catch (e) {
       error = e instanceof Error ? e.message : 'No se pudo cargar';
     } finally {
@@ -91,6 +99,39 @@
       <p class="aprox">≈ Saldos estimados: no hay conciliación con el banco</p>
     </section>
 
+    {#if pendientes.length}
+      <!-- Brief §10: "quiero que la aplicación pueda anticiparme estos gastos".
+           Solo aparece si hay algo en los próximos 30 días: una tarjeta vacía
+           permanente es ruido. -->
+      <section class="card">
+        <div class="spread cab">
+          <h2>Lo que se viene</h2>
+          <a href="/recurrentes" class="sm">Ver todo →</a>
+        </div>
+        {#if vencidos}
+          <p class="vencidos">
+            {vencidos} vencid{vencidos === 1 ? 'o' : 'os'} sin registrar
+          </p>
+        {/if}
+        <ul class="viene">
+          {#each pendientes.slice(0, 3) as v}
+            <li class="spread">
+              <span class="qué">
+                {#if v.category_parent}
+                  <i class="punto" style="background:{colorCategoria(v.category_parent)}"></i>
+                {/if}
+                {v.description}
+              </span>
+              <span class="cuanto">
+                <b class="money">{v.amount ? money(v.amount, v.currency) : '—'}</b>
+                <span class="dim sm" class:neg={v.vencido}>{cuandoFalta(v.dias)}</span>
+              </span>
+            </li>
+          {/each}
+        </ul>
+      </section>
+    {/if}
+
     {#if sum.byCategory.length}
       <section class="card">
         <h2>En qué se fue</h2>
@@ -148,6 +189,18 @@
          overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   /* mismo distintivo que en Movimientos: la madre es un punto, no texto */
   .punto { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+
+  .cab { margin-bottom: .5rem; }
+  .cab a { text-decoration: none; font-weight: 600; }
+  .vencidos {
+    margin: 0 0 .5rem; font-size: .82rem; font-weight: 600; color: var(--neg);
+  }
+  .viene { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .5rem; }
+  .viene li { gap: .6rem; }
+  .qué { display: inline-flex; align-items: center; gap: .45rem; min-width: 0;
+         overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cuanto { display: flex; flex-direction: column; align-items: flex-end; gap: .05rem; flex-shrink: 0; }
+  .cuanto b { font-size: .92rem; white-space: nowrap; }
 
   .empty { text-align: center; }
   .empty img { display: block; margin: .25rem auto .4rem; width: 160px; height: auto; }

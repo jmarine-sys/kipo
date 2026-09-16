@@ -60,6 +60,9 @@ psql_run supabase/tests/06_grants.sql 2>&1 | grep -oP '(?<=NOTICE:  ).*' | mirar
 echo "== renombrar y borrar cuentas y categorias =="
 psql -h localhost -p "$PORT" -U postgres -qtA -f supabase/tests/07_borrado.sql 2>&1 | grep -E '^(ok|FALLO)' | mirar
 
+echo "== gastos recurrentes =="
+psql -h localhost -p "$PORT" -U postgres -qtA -f supabase/tests/08_recurrentes.sql 2>&1 | grep -E '^(ok|FALLO)' | mirar
+
 echo
 if grep -q 'FALLO' "$FALLOS"; then
   echo "HAY FALLOS:"
