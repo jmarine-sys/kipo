@@ -1,8 +1,10 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { cargarCartera } from '$lib/ledger/cartera.datos';
   import {
-    cargarCartera, calcular, cerradas, GRUPOS,
-    type FlujoInversion, type ValorInversion, type Faltante
+    calcular, calcularTodo, calcularPortafolio, cerradas, GRUPOS,
+    type FlujoInversion, type ValorInversion, type Faltante,
+    type ValorPortafolio, type FlujoPortafolio
   } from '$lib/ledger/cartera';
   import { prefs, elegirMedida, elegirObjetivo } from '$lib/preferencias.svelte';
   import { money, shortDate } from '$lib/format';
@@ -11,13 +13,21 @@
   let flujos = $state<FlujoInversion[]>([]);
   let valores = $state<ValorInversion[]>([]);
   let faltantes = $state<Faltante[]>([]);
+  let portafolios = $state<ValorPortafolio[]>([]);
+  let flujosPf = $state<FlujoPortafolio[]>([]);
   let loading = $state(true);
   let error = $state<string | null>(null);
 
   const medida = $derived(prefs.medida);
   const unidad = $derived(medida === 'USD' ? 'USD' : 'UVA');
 
-  const total = $derived(calcular(valores, flujos, medida));
+  // ADR-026: el borde es el portafolio. Cada uno entra como una unidad y las
+  // inversiones sueltas por su cuenta, sin contar las de adentro dos veces.
+  const total = $derived(calcularTodo(portafolios, valores, flujosPf, flujos, medida));
+
+  const carteras = $derived(
+    portafolios.map((p) => ({ p, r: calcularPortafolio(p, flujosPf, medida) }))
+  );
   const grupos = $derived(
     GRUPOS.map((g) => {
       const v = valores.filter(g.test);
@@ -45,6 +55,7 @@
     try {
       const c = await cargarCartera();
       flujos = c.flujos; valores = c.valores; faltantes = c.faltantes;
+      portafolios = c.portafolios; flujosPf = c.flujosPortafolio;
     } catch (e) {
       error = e instanceof Error ? e.message : 'No se pudo cargar';
     } finally { loading = false; }
@@ -75,7 +86,7 @@
 
   {#if loading}
     <p class="dim">Cargando…</p>
-  {:else if !valores.length}
+  {:else if !valores.length && !portafolios.length}
     <Vacio titulo="Todavía no hay inversiones que medir."
            detalle="Cargá un plazo fijo o una compra y acá vas a ver si estás llegando a tu objetivo."
            href="/inversiones" accion="Ir a inversiones" />
@@ -148,6 +159,40 @@
       </section>
     {/if}
 
+    {#if carteras.length}
+      <h2 class="lbl">Por portafolio</h2>
+      <ul class="list">
+        {#each carteras as { p, r } (p.portfolio_id)}
+          <li class="card fila">
+            <span class="txt">
+              <b>{p.name}</b>
+              <span class="dim sm">
+                {p.cuentas} {p.cuentas === 1 ? 'cuenta' : 'cuentas'}
+                {#if r.valor !== null}<span class="sep">·</span>{money(r.valor, unidad)}{/if}
+                {#if p.sin_valuar}<span class="sep">·</span><span class="aviso">{p.sin_valuar} sin valuar</span>{/if}
+              </span>
+            </span>
+            {#if r.anual !== null}
+              <b class="tasa-chica" class:pos={r.anual >= objetivo} class:neg={r.anual < 0}>
+                {pct(r.anual)}
+              </b>
+            {:else}
+              <span class="dim sm">sin datos</span>
+            {/if}
+          </li>
+        {/each}
+      </ul>
+      <a class="gestionar" href="/cartera/portafolios">Administrar portafolios →</a>
+    {:else}
+      <a class="gestionar destacado" href="/cartera/portafolios">
+        <b>Agrupá tus inversiones por broker</b>
+        <span class="dim sm">
+          Así el efectivo que dejás quieto cuenta, y comprar adentro deja de figurar
+          como un aporte nuevo.
+        </span>
+      </a>
+    {/if}
+
     {#if grupos.length > 1}
       <h2 class="lbl">Por tipo</h2>
       <ul class="list">
@@ -206,6 +251,13 @@
   .sep { opacity: .5; }
   .lbl { font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; color: var(--text-dim); margin: .3rem 0 -.1rem; }
 
+  .gestionar {
+    display: flex; flex-direction: column; gap: .15rem;
+    padding: .7rem .85rem; border-radius: 10px; text-decoration: none;
+    color: var(--text); font-size: .86rem;
+  }
+  .gestionar.destacado { background: var(--surface); border: 1px dashed var(--border); }
+  .aviso { color: var(--warn); }
   .medidas { display: grid; grid-template-columns: 1fr 1fr; gap: .4rem; }
   .medidas button {
     display: flex; flex-direction: column; align-items: flex-start; gap: .1rem;
