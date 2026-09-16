@@ -15,6 +15,12 @@ echo "── unitarios ──"
 npm test 2>&1 | grep -E 'ℹ (pass|fail)'
 npm test 2>&1 | grep -q 'ℹ fail 0' || { echo "✗ tests que fallan"; exit 1; }
 
+# Una pantalla terminada a la que no se llega no existe. Paso dos veces: los
+# recurrentes y la cartera. Ver scripts/navegacion.mjs.
+echo "── navegación ──"
+node scripts/navegacion.mjs | tail -1 || { echo "✗ hay pantallas sin camino"; exit 1; }
+node scripts/navegacion.mjs >/dev/null || exit 1
+
 echo "── base de datos ──"
 ./supabase/tests/run.sh >/tmp/db_test.log 2>&1 || {
   echo "✗ la suite de base falló:"; tail -12 /tmp/db_test.log; exit 1; }

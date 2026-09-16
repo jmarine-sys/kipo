@@ -68,6 +68,7 @@ It is the counterpart of [ADRs.md](ADRs.md): there is **what was decided and why
 | OD-31 | El historial de precios no se puede reconstruir hacia atrás | `risk` | DECIDED | **Detenido el 2026-09-16**: el flujo diario guarda una fila por instrumento y por día → [ADR-025](ADRs.md#adr-025--los-precios-se-traen-solos-todos-los-días-porque-el-de-hoy-no-se-recupera-mañana). Verificado que no había alternativa: `data912/historical` da 404 y pasarle una fecha a `/live/` devuelve el precio de hoy. **Reserva permanente:** todo lo anterior al 2026-09-16 no existe y no va a existir. El gráfico de evolución empieza ese día | OD-29, que necesita esta serie |
 | OD-32 | Instrumentos ajustados por inflación (plazo fijo UVA, bonos CER) | `decision` | OPEN | **Anotado como mejora futura** por el usuario el 2026-09-16. Hoy se pueden cargar como plazo fijo con monto final estimado y corregir al vencer, **con una reserva seria**: durante todo el plazo el patrimonio queda subestimado, y en un UVA a doce meses con inflación alta ese salto es enorme. La salida correcta ya se entrevé: un UVA es en realidad **unidades de UVA por su valor del día**, o sea la familia `market` disfrazada de plazo fijo, y modelarlo así haría que el patrimonio se actualice solo | Exactitud del patrimonio si alguna vez abre uno |
 | OD-33 | El rendimiento se mide por posición, no por portafolio | `decision` | DECIDED | **Portafolio explícito**, firmado por el usuario el 2026-09-16 → [ADR-026](ADRs.md#adr-026--el-portafolio-es-el-borde-es-flujo-solo-lo-que-lo-cruza). Una entidad `portfolio` y las cuentas apuntan a ella; pertenecer es opcional, que es lo que lo distingue de agrupar por `institution`. Es flujo solo lo que tiene la contraparte afuera, y eso cierra los tres agujeros sin casos especiales. **Reserva:** una cuenta que se olvida de apuntar a su portafolio no rompe nada, mide mal en silencio — mismo modo de falla que [ADR-025](ADRs.md#adr-025--los-precios-se-traen-solos-todos-los-días-porque-el-de-hoy-no-se-recupera-mañana) | — |
+| OD-34 | Una pantalla terminada puede quedar sin camino, y nadie se entera | `debt` | DECIDED | **Tercera vez que pasa** (recurrentes, y la cartera a tres clicks detrás de *Cuentas*). La auditoría anterior contaba **enlaces por ruta**, que no es lo mismo que recorrer caminos: un enlace puede estar dentro de un `{#if}` que nadie cumple, o colgar de una pantalla a la que tampoco se llega. `scripts/navegacion.mjs` recorre el grafo desde la barra y falla si algo queda a más de 2 clicks; corre dentro de `verificar.sh`. **Verificado por mutación:** sacando la pestaña Cartera, sale 1 | — |
 | OD-26 | El arte del ícono trae su propio fondo: debería ser una capa aparte | `decision` | DECIDED | **Resuelto el 2026-09-16.** Se quitan del vector las dos capas de relleno —el rectángulo blanco y el cuadrado menta— y se compone de nuevo: el bolsillo con la moneda es el frente, el menta es fondo generado. Verificado aplicando el recorte circular **al 80% y al 100%**: no se corta nada. El favicon pasa además a ser cuadrado y recortado al dibujo, porque el original es vertical y a 16 px eso dejaba aire donde menos lugar hay | — |
 | OD-27 | La lista de movimientos corta los nombres de categoría | `decision` | DECIDED | **Resuelto el 2026-09-15.** Se muestra solo la subcategoría y la madre pasa a ser un punto de color, derivado de su nombre con un hash estable. Se quitó además el texto *"no afecta el resultado"* de cada renglón: el color del monto ya lo dice, y el lugar de enseñarlo es el formulario, no una lista que se lee cientos de veces | — |
 | OD-28 | Faltan filtros en movimientos | `decision` | DECIDED | **Resuelto el 2026-09-16.** Filtro por **período** (mes con navegación, 3 y 6 meses, año, o entre dos fechas) y por **categoría madre**, con selección múltiple y el mismo código de color de la lista. Muestra cuántos movimientos quedan y cuánto suman. **Los gráficos NO entran acá**: quedan en OD-29 | — |
@@ -76,7 +77,7 @@ It is the counterpart of [ADRs.md](ADRs.md): there is **what was decided and why
 
 ## The state of the project, read off the register
 
-Actualizado 2026-09-16 (vigésima revisión). Treinta y tres ítems: **23 `DECIDED`**,
+Actualizado 2026-09-16 (vigesimoprimera revisión). Treinta y cuatro ítems: **24 `DECIDED`**,
 **10 `OPEN`**, **0 `LEANING`** y **0 `NEEDS-INPUT`**.
 
 **Veintiséis decisiones** en [ADRs.md](ADRs.md), diecinueve migraciones verificadas contra
@@ -102,7 +103,7 @@ De los 10 `OPEN`, ninguno impide usar la aplicación:
   tarjeta, OD-21 plausibilidad del tipo de cambio, OD-22 el reseteo tras la puesta en marcha, OD-25
   el preview que apunta a producción.
 - **Diferidos por el usuario (3):** OD-23 y OD-24 las cuotas, OD-32 los instrumentos UVA.
-- **Deuda: ninguna abierta.**
+- **Deuda: ninguna abierta.** OD-34 nació y cerró el mismo día, con su chequeo automático.
 
 ---
 

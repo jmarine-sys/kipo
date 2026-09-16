@@ -21,15 +21,27 @@
     if (session.ready && authed && isLogin) goto('/', { replaceState: true });
   });
 
-  // Cuatro destinos. 'Agenda' existe porque sin ella los gastos recurrentes eran
-  // inalcanzables: la única puerta era una tarjeta de Inicio que solo aparece
-  // cuando ya cargaste alguno, y para cargar el primero había que entrar ahí.
+  // Cinco destinos, y dos de ellos están acá por el mismo motivo: se construyeron
+  // enteros y no se llegaba.
+  //
+  // 'Agenda': la única puerta era una tarjeta de Inicio que aparece cuando ya
+  // cargaste un recurrente, y para cargar el primero había que entrar ahí.
+  //
+  // 'Cartera': estaba a tres clicks —Cuentas, Ver inversiones, Rendimiento— y el
+  // último era un enlace de texto en el encabezado de una subpantalla. Es la
+  // pantalla que contesta la pregunta central del proyecto; no puede estar
+  // escondida detrás de la administración de cuentas.
   const tabs = [
     { href: '/',             label: 'Inicio',      icon: 'casa' },
     { href: '/movimientos',  label: 'Movimientos', icon: 'lista' },
+    { href: '/cartera',      label: 'Cartera',     icon: 'cartera' },
     { href: '/recurrentes',  label: 'Agenda',      icon: 'agenda' },
     { href: '/cuentas',      label: 'Cuentas',     icon: 'cuentas' }
   ];
+
+  /** Una subpantalla marca su pestaña: /cartera/portafolios enciende Cartera. */
+  const enSeccion = (href: string) =>
+    href === '/' ? page.url.pathname === '/' : page.url.pathname.startsWith(href);
 </script>
 
 {#if !session.ready}
@@ -40,7 +52,7 @@
   {#if authed && !isLogin}
     <nav class="tabbar">
       {#each tabs as t}
-        <a href={t.href} class:active={page.url.pathname === t.href}>
+        <a href={t.href} class:active={enSeccion(t.href)}>
           {@render icono(t.icon)}
           <span class="lb">{t.label}</span>
         </a>
@@ -69,6 +81,10 @@
       <path d="M9.5 20v-6h5v6" />
     {:else if cual === 'lista'}
       <path d="M4 7h16M4 12h16M4 17h10" />
+    {:else if cual === 'cartera'}
+      <path d="M4 19.5V4.5" />
+      <path d="M4 19.5h16" />
+      <path d="M7.5 15.5l3.5-4 3 2.5 4.5-6" />
     {:else if cual === 'agenda'}
       <rect x="3.2" y="5" width="17.6" height="15.5" rx="2.5" />
       <path d="M8 3v4M16 3v4M3.2 10h17.6" />
@@ -100,8 +116,9 @@
     padding: .5rem 0;
     color: var(--text-dim);
     text-decoration: none;
-    font-size: .72rem;
+    font-size: .68rem;
   }
+  .tabbar .lb { white-space: nowrap; }
   .tabbar a.active { color: var(--accent); }
   .ic { display: block; }
 

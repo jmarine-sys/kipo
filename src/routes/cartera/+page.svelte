@@ -63,10 +63,12 @@
 </script>
 
 <div class="page stack">
+  <!-- Sin flecha de volver: Cartera es un destino de la barra, no una
+       subpantalla de Inversiones. La relación se invirtió y con razón — el
+       rendimiento es la pregunta, las posiciones son el detalle. -->
   <div class="spread">
-    <a href="/inversiones" class="back" aria-label="Volver">←</a>
     <h1>Cartera</h1>
-    <span></span>
+    <a href="/inversiones" class="rend">Posiciones →</a>
   </div>
 
   <!-- ADR-023: toda pantalla que muestre un rendimiento tiene que decir con qué
@@ -245,12 +247,12 @@
 </div>
 
 <style>
-  .back { font-size: 1.5rem; text-decoration: none; }
   h1 { font-size: 1.15rem; }
   .sm { font-size: .78rem; }
   .sep { opacity: .5; }
   .lbl { font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; color: var(--text-dim); margin: .3rem 0 -.1rem; }
 
+  .rend { font-size: .82rem; text-decoration: none; color: var(--accent); }
   .gestionar {
     display: flex; flex-direction: column; gap: .15rem;
     padding: .7rem .85rem; border-radius: 10px; text-decoration: none;
