@@ -148,7 +148,7 @@
 {#snippet editor(c: CategoryUsage)}
   <div class="panel stack">
     <label class="campo">
-      <span class="dim sm">Nombre</span>
+      <span>Nombre</span>
       <span class="row">
         <input bind:value={nombre} />
         <button class="btn-primary chico" disabled={busy || !nombre.trim() || nombre.trim() === c.name}
@@ -202,8 +202,8 @@
 
   .panel { padding: .8rem; margin: .2rem 0 .5rem; background: var(--surface-2); border-radius: 10px; }
   .panel p { margin: 0; }
-  .campo { display: flex; flex-direction: column; gap: .25rem; }
   .campo .row { gap: .4rem; }
+  .campo .row input { flex: 1; }
   .chico { min-height: 44px; padding: 0 .9rem; flex-shrink: 0; }
   .finales { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
   .peligro {
@@ -212,11 +212,6 @@
     min-height: 40px; padding: 0 .9rem;
   }
 
-  input, select {
-    width: 100%; min-height: var(--tap); padding: 0 .85rem; min-width: 0;
-    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
-  }
-  .campo input { min-height: 44px; border-radius: 10px; }
   h2 { font-size: .95rem; }
   .err {
     background: color-mix(in srgb, var(--neg) 14%, transparent);

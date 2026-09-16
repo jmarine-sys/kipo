@@ -112,16 +112,8 @@
   header h1 { font-size: 2.2rem; letter-spacing: -0.035em; font-weight: 750; }
   header p { margin: .15rem 0 0; }
 
-  label { display: flex; flex-direction: column; gap: .3rem; font-size: .85rem; }
-  input {
-    min-height: var(--tap);
-    padding: 0 .85rem;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    width: 100%;
-  }
-  input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  label { display: flex; flex-direction: column; gap: .3rem; }
+  label > span { font-size: .78rem; color: var(--text-dim); }
 
   .code {
     text-align: center;

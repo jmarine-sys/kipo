@@ -95,11 +95,8 @@
 <style>
   .back { font-size: 1.5rem; text-decoration: none; }
   h1 { font-size: 1.15rem; }
-  label { display: flex; flex-direction: column; gap: .3rem; font-size: .85rem; }
-  input {
-    min-height: var(--tap); padding: 0 .85rem; width: 100%;
-    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
-  }
+  label:not(.casilla) { display: flex; flex-direction: column; gap: .3rem; }
+  label > span:first-child { font-size: .78rem; color: var(--text-dim); }
   fieldset { border: none; padding: 0; margin: 0; }
   legend { font-size: .85rem; margin-bottom: .35rem; }
   .opts { display: grid; gap: .5rem; }

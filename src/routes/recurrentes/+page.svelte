@@ -165,12 +165,12 @@
                 <div class="panel stack">
                   <div class="row campos">
                     <label class="campo">
-                      <span class="dim sm">Importe</span>
+                      <span>Importe</span>
                       <input class="monto" inputmode="decimal" bind:value={montoRaw}
                              placeholder={i.amount ? '' : 'cuánto vino'} />
                     </label>
                     <label class="campo">
-                      <span class="dim sm">Se paga con</span>
+                      <span>Se paga con</span>
                       <select bind:value={cuentaElegida}>
                         {#each pagables as a}<option value={a.id}>{a.name}</option>{/each}
                       </select>
@@ -204,39 +204,41 @@
     {#if creando}
       <form class="card stack" onsubmit={crear}>
         <h2>Nueva obligación</h2>
-        <input bind:value={nDesc} required placeholder="Seguro del auto" />
+        <label class="campo"><span>Qué es</span>
+          <input bind:value={nDesc} required placeholder="Seguro del auto" />
+        </label>
 
-        <label class="campo"><span class="dim sm">Categoría</span>
+        <label class="campo"><span>Categoría</span>
           <select bind:value={nCat} required>
             <option value={null} disabled>Elegí una</option>
             {#each hojas as c}<option value={c.id}>{c.name}</option>{/each}
           </select>
         </label>
 
-        <label class="campo"><span class="dim sm">Se paga con</span>
+        <label class="campo"><span>Se paga con</span>
           <select bind:value={nCuenta}>
             <option value={null}>Lo decido cada vez</option>
             {#each pagables as a}<option value={a.id}>{a.name}</option>{/each}
           </select>
         </label>
 
-        <label class="marca-variable">
+        <label class="casilla">
           <input type="checkbox" bind:checked={nVariable} />
           El importe cambia cada período
         </label>
         {#if !nVariable}
-          <label class="campo"><span class="dim sm">Importe</span>
+          <label class="campo"><span>Importe</span>
             <input class="monto" inputmode="decimal" bind:value={nMontoRaw} required placeholder="45000" />
           </label>
         {/if}
 
         <div class="row campos">
-          <label class="campo"><span class="dim sm">Cada cuánto</span>
+          <label class="campo"><span>Cada cuánto</span>
             <select bind:value={nFrec}>
               {#each FRECUENCIAS as f}<option value={f.id}>{f.label}</option>{/each}
             </select>
           </label>
-          <label class="campo"><span class="dim sm">Próxima vez</span>
+          <label class="campo"><span>Próxima vez</span>
             <input type="date" bind:value={nDesde} required />
           </label>
         </div>
@@ -284,18 +286,14 @@
   .panel p { margin: 0; }
   .nota { margin-top: -.2rem; }
   .campos { gap: .5rem; align-items: flex-end; }
-  .campo { display: flex; flex-direction: column; gap: .25rem; flex: 1; min-width: 0; }
+  .campos > .campo { flex: 1; }
   .finales { display: flex; gap: .5rem; }
   .finales button { flex: 1; min-height: 42px; font-size: .85rem; }
   .peligro { color: var(--neg); background: none; border-color: color-mix(in srgb, var(--neg) 35%, transparent); }
 
-  input, select {
-    width: 100%; min-width: 0; min-height: 44px; padding: 0 .7rem;
-    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
-  }
   .monto { text-align: right; }
-  .marca-variable { display: flex; align-items: center; gap: .5rem; font-size: .88rem; min-height: 40px; }
-  .marca-variable input { width: auto; min-height: auto; }
+  /* el botón de cancelar no es un campo: que no pretenda serlo */
+  .link { margin-top: -.35rem; }
 
   .nueva { width: 100%; }
   .link { border: none; background: none; color: var(--accent); min-height: 38px; }

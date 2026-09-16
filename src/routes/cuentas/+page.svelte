@@ -135,7 +135,7 @@
               {#if abierta === b.account_id}
                 <div class="panel stack">
                   <label class="campo">
-                    <span class="dim sm">Nombre</span>
+                    <span>Nombre</span>
                     <span class="row">
                       <input bind:value={nombre} />
                       <button class="btn-primary chico" disabled={busy || nombre.trim() === b.name || !nombre.trim()}
@@ -145,7 +145,7 @@
 
                   {#if g.id === 'balance' && catAjuste}
                     <label class="campo">
-                      <span class="dim sm">¿Cuánto dice en realidad?</span>
+                      <span>¿Cuánto dice en realidad?</span>
                       <input class="monto" inputmode="decimal" bind:value={realRaw}
                              placeholder={String(b.balance).split('.')[0]} />
                     </label>
@@ -201,12 +201,8 @@
   .tag { font-size: .68rem; color: var(--text-dim); margin-left: .4rem; }
 
   .panel { padding: .8rem; margin: .2rem 0 .5rem; background: var(--surface-2); border-radius: 10px; }
-  .campo { display: flex; flex-direction: column; gap: .25rem; }
   .campo .row { gap: .4rem; }
-  input {
-    flex: 1; min-width: 0; min-height: 44px; padding: 0 .7rem;
-    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
-  }
+  .campo .row input { flex: 1; }
   .monto { text-align: right; font-size: 1.05rem; }
   .chico { min-height: 44px; padding: 0 .9rem; flex-shrink: 0; }
   .panel p { margin: 0; }

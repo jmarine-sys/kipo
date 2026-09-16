@@ -109,6 +109,56 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .neg { color: var(--neg); }
 .pos { color: var(--pos); }
 
+/* ---------------------------------------------------------------------------
+   Campos de formulario — UNA definicion para toda la app.
+
+   Antes cada pantalla declaraba la suya: habia seis bloques con cuatro
+   combinaciones distintas de alto y relleno, y la casilla de verificacion
+   heredaba el relleno horizontal de los campos de texto, que es exactamente el
+   padding raro que se veia.
+   --------------------------------------------------------------------------- */
+
+.campo { display: flex; flex-direction: column; gap: .3rem; min-width: 0; }
+.campo > span, .campo > .rotulo { font-size: .78rem; color: var(--text-dim); }
+
+input:not([type='checkbox']):not([type='radio']),
+select,
+textarea {
+  width: 100%;
+  min-width: 0;
+  min-height: var(--tap);
+  padding: 0 .85rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: inherit;
+  font: inherit;
+}
+
+/* Dentro de un panel gris, el campo va sobre --surface para despegarse */
+.panel input, .panel select { background: var(--surface); }
+
+input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* La casilla NO es un campo de texto: ni ancho completo, ni alto de toque, ni
+   relleno horizontal. */
+input[type='checkbox'] {
+  width: 1.15rem; height: 1.15rem;
+  min-height: 0; padding: 0; margin: 0;
+  accent-color: var(--accent);
+  flex-shrink: 0;
+}
+
+/* Una casilla con su texto al lado, alineados y tocables como una sola cosa */
+.casilla {
+  display: flex; align-items: center; gap: .6rem;
+  font-size: .9rem; min-height: var(--tap);
+  cursor: pointer;
+}
+
 /* Numeros de dinero: tabulares, para que las columnas queden alineadas */
 .money { font-variant-numeric: tabular-nums; font-feature-settings: 'tnum'; }
 
