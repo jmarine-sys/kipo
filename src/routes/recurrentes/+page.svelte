@@ -261,7 +261,10 @@
   .proyeccion { margin: 0; font-size: .9rem; }
 
   .list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .4rem; }
-  .card { padding: 0; overflow: hidden; }
+  /* Solo los renglones de la lista van sin relleno, para que el panel llegue al
+     borde. Sin acotarlo, alcanzaba también al <form class="card"> y el
+     formulario quedaba pegado a los bordes de su tarjeta. */
+  .list > li.card { padding: 0; overflow: hidden; }
   /* Lo vencido se marca con el borde, no con el fondo: el fondo rojo sobre una
      lista entera grita, y esto puede ser rutina. */
   .card.alerta { border-color: color-mix(in srgb, var(--neg) 55%, transparent); }

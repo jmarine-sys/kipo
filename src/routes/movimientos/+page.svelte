@@ -220,7 +220,9 @@
   .resumen { font-size: .82rem; margin: 0; }
 
   .list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .4rem; }
-  .card { padding: 0; overflow: hidden; }
+  /* Acotado a los renglones: si mañana esta pantalla tiene una tarjeta que no
+     sea un renglón, no queremos que se quede sin relleno por accidente. */
+  .list > li.card { padding: 0; overflow: hidden; }
   .fila {
     display: grid;
     grid-template-columns: 3.1rem minmax(0, 1fr) auto;
