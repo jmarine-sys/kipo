@@ -9,6 +9,7 @@
   let entries = $state<EntryDetail[]>([]);
   let balances = $state<AccountBalance[]>([]);
   let viene = $state<Upcoming[]>([]);
+  let vieneRoto = $state(false);
   let loading = $state(true);
   let error = $state<string | null>(null);
 
@@ -35,9 +36,19 @@
 
   onMount(async () => {
     try {
-      [entries, balances, viene] = await Promise.all([
-        listEntries(m.from, m.to), listBalances(), listUpcoming()
-      ]);
+      // Lo esencial: sin esto no hay página que mostrar.
+      [entries, balances] = await Promise.all([listEntries(m.from, m.to), listBalances()]);
+
+      // Lo que se viene es accesorio. Si falla —por ejemplo porque falta
+      // aplicar una migración— la página tiene que seguir andando y avisar,
+      // no caerse entera. Un accesorio no puede tirar abajo lo principal.
+      try {
+        viene = await listUpcoming();
+        vieneRoto = false;
+      } catch {
+        viene = [];
+        vieneRoto = true;
+      }
     } catch (e) {
       error = e instanceof Error ? e.message : 'No se pudo cargar';
     } finally {
@@ -98,6 +109,15 @@
            Un numero que parece exacto y no lo es es peor que no tener numero. -->
       <p class="aprox">≈ Saldos estimados: no hay conciliación con el banco</p>
     </section>
+
+    {#if vieneRoto}
+      <section class="card aviso">
+        <p>
+          No se pudo leer lo que se viene. El resto de la página funciona.
+          <span class="dim sm">Suele ser una migración de base sin aplicar.</span>
+        </p>
+      </section>
+    {/if}
 
     {#if pendientes.length}
       <!-- Brief §10: "quiero que la aplicación pueda anticiparme estos gastos".
@@ -190,6 +210,8 @@
   /* mismo distintivo que en Movimientos: la madre es un punto, no texto */
   .punto { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
 
+  .aviso { border-color: color-mix(in srgb, var(--warn) 45%, transparent); }
+  .aviso p { margin: 0; font-size: .86rem; }
   .cab { margin-bottom: .5rem; }
   .cab a { text-decoration: none; font-weight: 600; }
   .vencidos {
