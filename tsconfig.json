@@ -9,6 +9,12 @@
     "skipLibCheck": true,
     "sourceMap": true,
     "strict": true,
-    "moduleResolution": "bundler"
+    "moduleResolution": "bundler",
+    // Los tests corren con `node --test` sobre los .ts directamente (node 22+
+    // los ejecuta quitando los tipos), asi que importan con extension .ts y usan
+    // node:test. Sin estas dos lineas el codigo funciona pero svelte-check
+    // protesta, y un chequeo que protesta por algo que anda se termina ignorando.
+    "allowImportingTsExtensions": true,
+    "types": ["node"]
   }
 }
