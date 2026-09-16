@@ -31,6 +31,8 @@
   let cMonto = $state('');
   let cUnidades = $state('');
   let cBroker = $state('');
+  let cRatio = $state('');
+  let cSubyacente = $state('');
 
   const num = (s: string) => Number(s.replace(/\./g, '').replace(',', '.')) || 0;
   const efectivo = $derived(cuentas.filter((c) => c.valuation === 'balance' && c.kind === 'asset'));
@@ -88,7 +90,9 @@
       await comprarActivo({
         symbol: cSymbol, nombre: cNombre, kind: cKind, moneda: cMoneda,
         decimals: cDecimals, desdeId: cDesde, monto: num(cMonto),
-        unidades: num(cUnidades), broker: cBroker.trim() || null, fecha: today()
+        unidades: num(cUnidades), broker: cBroker.trim() || null, fecha: today(),
+        ratio: cKind === 'cedear' && cRatio ? num(cRatio) : null,
+        subyacente: cKind === 'cedear' ? (cSubyacente.trim() || null) : null
       });
       cSymbol = ''; cNombre = ''; cMonto = ''; cUnidades = ''; comprando = false;
       await load();
@@ -150,6 +154,7 @@
               <span class="sub dim">
                 {Number(p.unidades).toFixed(Math.min(p.decimals, 8))} unidades
                 {#if p.institution}<span class="sep">·</span>{p.institution}{/if}
+                {#if p.fx_source}<span class="sep">·</span>al {p.fx_source.toUpperCase()}{/if}
               </span>
             </span>
             <span class="der">
@@ -255,6 +260,25 @@
             <input bind:value={cBroker} placeholder="Binance" />
           </label>
         </div>
+
+        {#if cKind === 'cedear'}
+          <!-- OD-17: el precio de un CEDEAR en pesos ya lleva el CCL adentro, así
+               que se mide con ese mismo dólar. Eso aísla lo que rindió la acción
+               de lo que se movió el tipo de cambio. -->
+          <div class="row campos">
+            <label class="campo"><span>Ratio</span>
+              <input class="monto" inputmode="decimal" bind:value={cRatio} placeholder="20" />
+            </label>
+            <label class="campo"><span>Acción que representa</span>
+              <input bind:value={cSubyacente} placeholder="AAPL" />
+            </label>
+          </div>
+          <p class="aviso">
+            Los CEDEARs se miden al <b>contado con liqui</b>, no al MEP. Su precio en
+            pesos ya lleva ese dólar adentro, así que usarlo es lo que separa
+            <em>cuánto rindió la acción</em> de <em>cuánto se movió el dólar</em>.
+          </p>
+        {/if}
         <button class="btn-primary" type="submit" disabled={busy || !cSymbol.trim() || !cDesde}>
           Registrar la compra
         </button>
@@ -302,6 +326,11 @@
   .chico { min-height: 48px; padding: 0 .9rem; flex-shrink: 0; }
   .monto { text-align: right; }
   .resumen { margin: 0; padding: .65rem .8rem; border-radius: 10px; background: var(--surface-2); font-size: .86rem; }
+  .aviso {
+    margin: 0; padding: .65rem .8rem; border-radius: 10px; font-size: .82rem;
+    background: color-mix(in srgb, var(--warn) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--warn) 35%, transparent);
+  }
   .nueva { width: 100%; }
   .link { border: none; background: none; color: var(--accent); min-height: 38px; }
   h2 { font-size: .95rem; }

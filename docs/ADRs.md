@@ -44,6 +44,7 @@ decision nobody made is fiction, and an agent will believe it.
 | [ADR-021](#adr-021--el-hosting-es-cloudflare-workers-sirviendo-solo-activos-estáticos) | El hosting es Cloudflare Workers, sirviendo solo activos estáticos | Accepted |
 | [ADR-022](#adr-022--el-patrimonio-incluye-solo-activos-financieros) | El patrimonio incluye solo activos financieros | Accepted |
 | [ADR-023](#adr-023--la-unidad-de-medida-es-un-parámetro-dólares-o-poder-adquisitivo) | La unidad de medida es un parámetro: dólares o poder adquisitivo | Accepted |
+| [ADR-024](#adr-024--un-cedear-se-mide-al-ccl-porque-es-el-dólar-que-su-propio-precio-lleva-adentro) | Un CEDEAR se mide al CCL, porque es el dólar que su propio precio lleva adentro | Accepted |
 
 ---
 
@@ -1082,3 +1083,72 @@ recuperar hacia atras: son dato publico.
 La regla de conversión usa **la última cotización anterior o igual**, no la más cercana: un sábado no
 cotiza, y el valor que regía ese día es el del viernes. Tomar el lunes sería usar información que en
 ese momento no existía.
+
+
+---
+
+## ADR-024 — Un CEDEAR se mide al CCL, porque es el dólar que su propio precio lleva adentro
+
+**Context.** Un CEDEAR cotiza en pesos, pero su precio en pesos no es una decisión del mercado local:
+sale de un arbitraje.
+
+```
+precio_cedear_ARS = (precio_acción_USD / ratio) × CCL
+```
+
+Eso significa que el precio en pesos sube por DOS motivos distintos, y el número no dice cuál fue: o
+subió la acción en dólares, o subió el dólar. Medir esa posición con el MEP —el valor por defecto que
+fijó [ADR-011](#adr-011--la-fuente-de-cotización-es-una-propiedad-de-la-cuenta-no-de-la-fecha)— produce
+una **ganancia fantasma**: la brecha entre MEP y CCL se cuela dentro de lo que la pantalla llama
+"rendimiento del activo". El caso está reproducido en `supabase/tests/13_cedears.sql`: el CCL sube
+40%, la acción no se mueve, y al MEP la posición marca +11% de rendimiento que nadie ganó.
+
+Al revisar esto apareció además que ADR-011 estaba **declarado y no cumplido**: `valor_inversion` y
+`flujo_inversion` llamaban a `convertir()` sin pasarle el `fx_source` de la cuenta, así que TODAS las
+posiciones se medían con la fuente del libro, no con la propia.
+
+**Decision.** Una posición en CEDEARs nace con `fx_source = 'ccl'`, y las vistas de valuación y de
+flujo convierten cada cuenta con SU fuente.
+
+**Consequences.**
+- La división se hace sola. Convertir al CCL cancela el CCL que el precio traía adentro:
+  `valor_USD = precio_ARS × unidades / CCL = (precio_acción_USD / ratio) × unidades`. Lo que queda es
+  exactamente el rendimiento de la acción en dólares, que es la pregunta del usuario.
+- **No hace falta ninguna fuente de precios del exterior, ni el ratio, para medir bien.** El ratio y
+  el símbolo subyacente se guardan como dato informativo —para reconocer el papel— y no entran en la
+  cuenta.
+- **La parte incómoda:** el número deja de responder *"cuántos dólares me llevo si vendo hoy"*. Si el
+  usuario vende el CEDEAR y saca los pesos al MEP, se lleva más (o menos) que lo que la app mostraba.
+  Son dos preguntas distintas y la app contesta la del rendimiento. Cada pantalla de rendimiento dice
+  con qué dólar midió — la lista de posiciones ahora imprime `al CCL` / `al MEP` junto a las unidades.
+- Arrastra un cambio que va más allá de los CEDEARs: cualquier cuenta puede fijar su vara. Una compra
+  de dólar blue se mide al blue sin que eso contamine al resto.
+
+**Rejected alternatives.**
+- *Guardar el precio de la acción en el exterior y el ratio, y valuar con eso*: exige una fuente de
+  precios de EE.UU., mantener el ratio actualizado (cambia por splits y por ajustes del emisor) y
+  tener el papel bien mapeado. Más piezas, más cosas que romper, **y el mismo resultado** que sale de
+  una división que ya está disponible. Descartada por costo sin beneficio.
+- *Registrar el CCL implícito de cada compra a mano*: el usuario ya dijo que no quiere cargar datos
+  que el sistema pueda deducir, y volvería a poner un dato duplicado donde ADR-010 sacó uno.
+- *Dejarlos en MEP y avisar en la pantalla*: una advertencia no arregla un número mal calculado. El
+  usuario miraría el porcentaje, no el cartel.
+
+**Evidence.** `supabase/migrations/20260916170000_cedears.sql`, `supabase/tests/13_cedears.sql`
+(6 aserciones, incluida la de la ganancia fantasma), `src/routes/inversiones/+page.svelte`.
+
+**Verified against what already exists.**
+
+```
+docker: postgres:16 descartable, suite completa -> 107 aserciones ok
+
+ok  un CEDEAR nace midiendose al CCL, no al dolar del libro
+ok  140.000 pesos al CCL de ese dia son 100 dolares invertidos
+ok  en pesos la posicion se duplico: 140.000 a 200.000
+ok  al CCL vale los mismos 100 dolares: la suba era el dolar
+ok  al MEP mostraria 111 dolares: una ganancia fantasma de 11%
+ok  si la accion sube 10%, el CEDEAR marca 110 dolares
+```
+
+La cuarta y la quinta aserción son el ADR entero: **el mismo día, la misma posición, dos varas y una
+diferencia de 11% que no existió.**

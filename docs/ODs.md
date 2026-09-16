@@ -41,7 +41,7 @@ It is the counterpart of [ADRs.md](ADRs.md): there is **what was decided and why
 | OD-01 | Proveedor de base de datos y autenticación | `decision` | DECIDED | **Supabase** → [ADR-007](ADRs.md#adr-007--el-backend-es-supabase). **Reserva:** arrastra dos deudas reales, OD-16 (sin backups) y OD-10 (pausa a los 7 días), y OD-15 sigue sin verificar | — |
 | OD-02 | Framework de frontend y hosting estático | `decision` | DECIDED | **SvelteKit + adapter-static en modo SPA** → [ADR-017](ADRs.md#adr-017--el-frontend-es-sveltekit-con-adapter-static-en-modo-spa). El hosting, que se había dejado abierto a propósito, cerró el 2026-09-15 en **Cloudflare Workers con activos estáticos** → [ADR-021](ADRs.md#adr-021--el-hosting-es-cloudflare-workers-sirviendo-solo-activos-estáticos). **Reserva:** Pages quedó descartado por decisión del propio Cloudflare, no nuestra |
 | OD-03 | Migración del histórico de la planilla | `decision` | DECIDED | **No se migra** → [ADR-015](ADRs.md#adr-015--no-se-migra-el-histórico-de-la-planilla). **Cerrado del todo el 2026-09-15**: el usuario tampoco quiere aportar filas de muestra — *"no quiero tomarla como ejemplo para este nuevo desarrollo"*. **Reserva:** el modelo se valida entonces solo contra los 13 casos de uso de [modelo-de-datos.md](modelo-de-datos.md) §5 y contra el uso real, no contra datos históricos | — |
-| OD-04 | Qué tipo de cambio se usa y si se guarda el real de cada operación | `decision` | DECIDED | El de la operación **se deduce de los montos** → [ADR-010](ADRs.md#adr-010--el-tipo-de-cambio-de-una-operación-se-deduce-de-sus-montos-no-se-guarda). El de valuación **es propiedad de la cuenta** → [ADR-011](ADRs.md#adr-011--la-fuente-de-cotización-es-una-propiedad-de-la-cuenta-no-de-la-fecha). **Reserva:** los CEDEARs no encajan del todo — ver OD-17 | — |
+| OD-04 | Qué tipo de cambio se usa y si se guarda el real de cada operación | `decision` | DECIDED | El de la operación **se deduce de los montos** → [ADR-010](ADRs.md#adr-010--el-tipo-de-cambio-de-una-operación-se-deduce-de-sus-montos-no-se-guarda). El de valuación **es propiedad de la cuenta** → [ADR-011](ADRs.md#adr-011--la-fuente-de-cotización-es-una-propiedad-de-la-cuenta-no-de-la-fecha). Los CEDEARs, que eran la excepción, cerraron en [ADR-024](ADRs.md#adr-024--un-cedear-se-mide-al-ccl-porque-es-el-dólar-que-su-propio-precio-lleva-adentro) — ver OD-17 | — |
 | OD-05 | Qué instrumentos de inversión tiene realmente | `decision` | DECIDED | Inventario 2026-09-15: **CEDEARs** (Balanz), **cripto** (Binance) y **cuentas remuneradas** (Mercado Pago). Son **tres mecánicas distintas**, no tres ejemplos de lo mismo. Abre OD-17 y OD-18 | Etapa 5 — desbloqueada |
 | OD-06 | Precios de activos: carga manual o automática | `decision` | DECIDED | **Automática**, decidido el 2026-09-16. **No aplica a los plazos fijos**: no cotizan, devengan, y su valor final se conoce al constituirlos. Recién hace falta con CEDEARs y cripto. **Abre OD-30**: decidir la fuente, que es lo que realmente cuesta | — |
 | OD-07 | Invariante de suma cero en transacciones multi-moneda | `decision` | DECIDED | **Suma cero por unidad, salvo intercambios**, donde las dos unidades quedan relacionadas por el cociente de sus montos → [ADR-010](ADRs.md#adr-010--el-tipo-de-cambio-de-una-operación-se-deduce-de-sus-montos-no-se-guarda). **Reserva:** vale para exactamente 2 unidades; con 3 o más hay que rechazar la transacción, no suponer que no pasa | Modelo de datos — **desbloqueado** |
@@ -54,7 +54,7 @@ It is the counterpart of [ADRs.md](ADRs.md): there is **what was decided and why
 | OD-14 | El repositorio no tiene remoto ni primer commit | `debt` | DECIDED | **Cerrado el 2026-09-15**: remoto privado en GitHub (`jmarine-sys/kipo`) y 13 commits en `main` con conventional commits. Destraba OD-16. **Reserva:** todavía sin `push` — los commits son locales |
 | OD-15 | ¿Un proyecto Supabase pausado revive solo o exige clic manual? | `risk` | DECIDED | **VERIFICADO 2026-09-15, y es la peor de las dos opciones: la restauración es MANUAL.** Textual de la doc oficial: *"You can restore paused projects from the Supabase dashboard"* — no documenta ningún despertar automático. No cambia [ADR-007](ADRs.md#adr-007--el-backend-es-supabase), cambia cómo se opera: tras 7 días sin uso alguien tiene que entrar al panel | — |
 | OD-16 | Sin backups automáticos en el plan gratuito de Supabase | `debt` | DECIDED | **Cerrado el 2026-09-15, y funcionando de verdad**: el flujo corrió solo, volcó la base, la restauró en una base limpia, comprobó las tablas y commiteó `backups/kipo-2026-09-15.sql.gz` (50 KB). El volcado contiene **las 11 políticas de RLS**, así que restaurar devuelve también el aislamiento. Conserva los últimos 30 días. **Reserva:** el volcado vive en el mismo repositorio; si se perdiera la cuenta de GitHub se pierden ambos |
-| OD-17 | Los CEDEARs mezclan dos fuentes de rendimiento en un solo precio | `decision` | OPEN | Un CEDEAR cotiza en ARS y su precio incorpora el **CCL implícito**: sube si sube la acción en USD **o** si sube el CCL. Valuarlo con MEP ([ADR-011](ADRs.md#adr-011--la-fuente-de-cotización-es-una-propiedad-de-la-cuenta-no-de-la-fecha)) responde *"cuántos dólares saco si vendo"*, no *"cuánto rindió el activo"*. Además tienen **ratio de conversión** que puede cambiar. **Falta decidir** si se modelan con ratio + precio del subyacente o con precio ARS + CCL | Medición honesta del rendimiento de Balanz (etapa 5-6) |
+| OD-17 | Los CEDEARs mezclan dos fuentes de rendimiento en un solo precio | `decision` | DECIDED | Se miden al **CCL**, que es el dólar que su propio precio lleva adentro → [ADR-024](ADRs.md#adr-024--un-cedear-se-mide-al-ccl-porque-es-el-dólar-que-su-propio-precio-lleva-adentro). La división cancela el CCL y deja el rendimiento de la acción, **sin precio del exterior ni ratio**. Al revisarlo apareció que [ADR-011](ADRs.md#adr-011--la-fuente-de-cotización-es-una-propiedad-de-la-cuenta-no-de-la-fecha) estaba declarado y no cumplido: las vistas convertían todo con la fuente del libro. **Reserva:** el número ya no dice cuántos dólares se sacan al vender — esa es otra pregunta | — |
 | OD-18 | Cómo se modela una cuenta remunerada | `decision` | DECIDED | **Es una cuenta bancaria, no una inversión** — corrección del propio usuario → [ADR-013](ADRs.md#adr-013--la-cuenta-remunerada-es-una-cuenta-bancaria-su-interés-es-un-ingreso-mensual). Interés como ingreso mensual. Reencuadró la taxonomía entera → [ADR-012](ADRs.md#adr-012--las-cuentas-se-clasifican-por-cómo-se-valúan-no-por-cómo-las-llama-el-banco). **Reserva:** simplificación deliberada — técnicamente es un FCI con cuotapartes | — |
 | OD-19 | Vencimientos de plazo fijo y gastos recurrentes son la misma funcionalidad | `decision` | DECIDED | **Se unifican** en `scheduled_event` → [ADR-016](ADRs.md#adr-016--los-vencimientos-y-los-gastos-recurrentes-comparten-una-sola-tabla). **Reserva:** `frequency` queda en null para los vencimientos — una columna que no aplica a la mitad de las filas, acotada por `CHECK` | — |
 | OD-20 | Método de costo para la ganancia realizada | `decision` | OPEN | Al vender un activo, la ganancia realizada es precio de venta menos **costo de compra** — pero con compras a distintos precios hay que elegir FIFO o promedio ponderado, y dan números distintos. **No afecta al esquema**: ambos se reconstruyen del historial de entries ([modelo-de-datos.md](modelo-de-datos.md) §5.8). **Falta decidir** cuál, y la app debe poder explicar el número que muestre | Etapa 6 (rendimiento) |
@@ -75,27 +75,28 @@ It is the counterpart of [ADRs.md](ADRs.md): there is **what was decided and why
 
 ## The state of the project, read off the register
 
-Actualizado 2026-09-16 (decimoséptima revisión). Treinta y dos ítems: **19 `DECIDED`**, **13 `OPEN`**,
-**0 `LEANING`** y **0 `NEEDS-INPUT`**.
+Actualizado 2026-09-16 (decimoctava revisión). Treinta y dos ítems: **20 `DECIDED`**,
+**12 `OPEN`**, **0 `LEANING`** y **0 `NEEDS-INPUT`**.
 
-**El MVP está escrito.** Diecinueve decisiones en [ADRs.md](ADRs.md), el esquema en
-[modelo-de-datos.md](modelo-de-datos.md), cinco migraciones verificadas contra PostgreSQL 16, y una
-aplicación SvelteKit con seis pantallas que pasa el chequeo de tipos salvo por las dos variables de
-entorno que faltan. Lo único que impide ejecutarla es que no existe todavía un proyecto de Supabase.
+**Las tres familias de inversión están cerradas.** Veinticuatro decisiones en [ADRs.md](ADRs.md),
+diecisiete migraciones verificadas contra PostgreSQL 16 con 107 aserciones, y una aplicación
+SvelteKit con diez pantallas, en producción y en uso.
 
-OD-13 cerró del todo: además del aviso de saldos estimados, el **ajuste de saldo** ya está en la
-interfaz — la deriva queda medida contra la categoría *Ajustes*, no escondida. OD-21 quedó
-**mitigado a medias**: el formulario muestra el tipo de cambio implícito mientras se tipea, pero
-mostrar no es validar.
+La última en cerrar fue OD-17, la más incómoda de las tres: un CEDEAR no tenía una respuesta obvia
+porque su precio en pesos mezcla la acción con el dólar. La solución no agregó piezas, las sacó —
+medir al CCL cancela el CCL. Y de paso destapó que [ADR-011](ADRs.md#adr-011--la-fuente-de-cotización-es-una-propiedad-de-la-cuenta-no-de-la-fecha)
+estaba escrito pero no ejecutado, que es la forma más cara de tener una decisión.
 
-De los diez `OPEN`, ninguno impide usar la aplicación:
+De los 12 `OPEN`, ninguno impide usar la aplicación:
 
-- **Etapa 5-6, no tocan el esquema (4):** OD-06 precios, OD-17 el CCL de los CEDEARs, OD-20 método de
-  costo, OD-21 plausibilidad del tipo de cambio.
-- **Riesgo solo evaluable con uso real (4):** OD-10 pausa por inactividad, OD-11 la fricción de la
-  tarjeta, OD-12 la apuesta de online-only, OD-22 el reseteo tras la puesta en marcha.
-- **Deuda: ninguna abierta.** OD-14 y OD-16 cerraron el mismo día: hay remoto privado con historia, y
-  el respaldo **corrió solo y dejó su primer volcado verificado**.
+- **Dependen de datos que todavía no existen (4):** OD-20 método de costo, OD-29 gráficos, OD-30
+  fuente de precios, OD-31 la serie que no se puede reconstruir hacia atrás. Los cuatro necesitan
+  meses de uso real antes de poder decidirse con evidencia en vez de con preferencia.
+- **Riesgo solo evaluable con uso real (5):** OD-10 pausa por inactividad, OD-11 la fricción de la
+  tarjeta, OD-21 plausibilidad del tipo de cambio, OD-22 el reseteo tras la puesta en marcha, OD-25
+  el preview que apunta a producción.
+- **Diferidos por el usuario (3):** OD-23 y OD-24 las cuotas, OD-32 los instrumentos UVA.
+- **Deuda: ninguna abierta.**
 
 ---
 

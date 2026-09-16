@@ -78,6 +78,8 @@ export function diasEntre(desde: string, hasta: string): number {
 
 export interface Posicion {
   account_id: string;
+  /** Con qué dólar se mide esta posición. Un CEDEAR nace al CCL (OD-17). */
+  fx_source?: string | null;
   name: string;
   institution: string | null;
   instrument_id: string;
@@ -123,6 +125,10 @@ export interface Compra {
   unidades: number;
   broker?: string | null;
   fecha?: string | null;
+  /** Solo CEDEARs: cuántos equivalen a una acción del exterior */
+  ratio?: number | null;
+  /** Solo CEDEARs: el símbolo de esa acción */
+  subyacente?: string | null;
 }
 
 /** Crea el instrumento y la posición si es la primera compra. */
@@ -137,7 +143,9 @@ export async function comprarActivo(c: Compra): Promise<string> {
     p_monto: c.monto,
     p_unidades: c.unidades,
     p_broker: c.broker ?? null,
-    p_on: c.fecha ?? null
+    p_on: c.fecha ?? null,
+    p_ratio: c.ratio ?? null,
+    p_subyacente: c.subyacente ?? null
   });
   if (error) fallar('No se pudo registrar la compra', error);
   return data as string;
