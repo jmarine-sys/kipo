@@ -1,5 +1,7 @@
 import { supabase } from '$lib/supabase';
-import type { Account, AccountBalance, Category, TransactionInput } from '$lib/types';
+import type {
+  Account, AccountBalance, Category, CategoryUsage, TransactionInput
+} from '$lib/types';
 
 export interface EntryDetail {
   id: string;
@@ -216,4 +218,63 @@ export async function archiveCategory(id: string): Promise<void> {
     .update({ archived_at: new Date().toISOString() })
     .eq('id', id);
   if (error) fail('No se pudo archivar la categoría', error);
+}
+
+
+// ---------------------------------------------------------------------------
+// Renombrar y borrar — brief §20: no destruir información histórica
+//
+// Renombrar es SIEMPRE seguro: los movimientos apuntan al id, no al nombre.
+// Borrar solo se permite si no hay nada colgando, y quien lo impide de verdad
+// no es este código sino la clave foránea: aunque alguien llame a la API a mano,
+// la base rechaza el borrado. Acá solo se traduce ese rechazo a castellano.
+// ---------------------------------------------------------------------------
+
+function esBorradoBloqueado(e: { code?: string; message?: string } | null): boolean {
+  return e?.code === '23503' || /foreign key|llave foránea/i.test(e?.message ?? '');
+}
+
+export async function listCategoryUsage(): Promise<CategoryUsage[]> {
+  const { data, error } = await supabase
+    .from('category_usage')
+    .select('*')
+    .order('sort_order');
+  if (error) fail('No se pudieron leer las categorías', error);
+  return data ?? [];
+}
+
+export async function renameAccount(id: string, name: string): Promise<void> {
+  const { error } = await supabase.from('account').update({ name: name.trim() }).eq('id', id);
+  if (error) fail('No se pudo renombrar la cuenta', error);
+}
+
+export async function deleteAccount(id: string): Promise<void> {
+  const { error } = await supabase.from('account').delete().eq('id', id);
+  if (error) {
+    if (esBorradoBloqueado(error)) {
+      throw new Error(
+        'Esta cuenta tiene movimientos, así que no se puede borrar: archivala. ' +
+        'Borrarla dejaría movimientos sin explicación.'
+      );
+    }
+    fail('No se pudo borrar la cuenta', error);
+  }
+}
+
+export async function renameCategory(id: string, name: string): Promise<void> {
+  const { error } = await supabase.from('category').update({ name: name.trim() }).eq('id', id);
+  if (error) fail('No se pudo renombrar la categoría', error);
+}
+
+export async function deleteCategory(id: string): Promise<void> {
+  const { error } = await supabase.from('category').delete().eq('id', id);
+  if (error) {
+    if (esBorradoBloqueado(error)) {
+      throw new Error(
+        'Esta categoría tiene movimientos, así que no se puede borrar: archivala. ' +
+        'Los movimientos viejos siguen mostrándola.'
+      );
+    }
+    fail('No se pudo borrar la categoría', error);
+  }
 }

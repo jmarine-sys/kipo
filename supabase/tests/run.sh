@@ -4,6 +4,11 @@
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 
+# Una asercion que falla NO puede terminar en "TODO VERDE". Cada bloque escribe
+# aca lo que imprime, y al final se revisa si aparecio algun FALLO.
+FALLOS=$(mktemp); trap 'rm -f "$FALLOS"' EXIT
+mirar() { tee -a "$FALLOS"; }
+
 PORT=${PORT:-55432}
 NAME=kipo-pg-test
 export PGPASSWORD=x
@@ -34,23 +39,31 @@ echo "== casos de uso (modelo-de-datos.md §5) =="
 psql_run supabase/tests/01_use_cases.sql >/dev/null
 
 echo "== saldos y resultado del mes =="
-psql_run supabase/tests/02_assertions.sql 2>&1 | grep -oP '(?<=NOTICE:  ).*'
+psql_run supabase/tests/02_assertions.sql 2>&1 | grep -oP '(?<=NOTICE:  ).*' | mirar
 
 echo "== invariantes: lo que el modelo debe RECHAZAR =="
-psql_run supabase/tests/03_invariants.sql 2>&1 | grep -oP '(?<=NOTICE:  ).*'
+psql_run supabase/tests/03_invariants.sql 2>&1 | grep -oP '(?<=NOTICE:  ).*' | mirar
 
 echo "== aislamiento entre usuarios (RLS) =="
-psql_run supabase/tests/04_rls.sql 2>&1 | grep -oP '(?<=NOTICE:  ).*'
+psql_run supabase/tests/04_rls.sql 2>&1 | grep -oP '(?<=NOTICE:  ).*' | mirar
 
 echo "== escritura atomica de movimientos (RPC) =="
 # no usa ON_ERROR_STOP: los errores son parte del test (deben ocurrir)
 # -tA: sin encabezados ni alineacion, para que los asserts salgan pelados.
 # sin ON_ERROR_STOP: los errores son parte del test (deben ocurrir).
-psql -h localhost -p "$PORT" -U postgres -qtA -f supabase/tests/05_rpc.sql 2>&1 | grep -E '^(ok|FALLO)'
+psql -h localhost -p "$PORT" -U postgres -qtA -f supabase/tests/05_rpc.sql 2>&1 | grep -E '^(ok|FALLO)' | mirar
 
 
 echo "== permisos del Data API (anon vs authenticated) =="
-psql_run supabase/tests/06_grants.sql 2>&1 | grep -oP '(?<=NOTICE:  ).*'
+psql_run supabase/tests/06_grants.sql 2>&1 | grep -oP '(?<=NOTICE:  ).*' | mirar
+
+echo "== renombrar y borrar cuentas y categorias =="
+psql -h localhost -p "$PORT" -U postgres -qtA -f supabase/tests/07_borrado.sql 2>&1 | grep -E '^(ok|FALLO)' | mirar
 
 echo
+if grep -q 'FALLO' "$FALLOS"; then
+  echo "HAY FALLOS:"
+  grep 'FALLO' "$FALLOS" | sed 's/^/  /'
+  exit 1
+fi
 echo "TODO VERDE"

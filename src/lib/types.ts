@@ -41,7 +41,20 @@ export interface AccountBalance {
   valuation: Valuation;
   unit: string;
   is_spendable: boolean;
+  institution: string | null;
   balance: string;
+  /** Cuántos movimientos la usan. Si es 0, se puede borrar; si no, solo archivar. */
+  movimientos: number;
+}
+
+export interface CategoryUsage {
+  category_id: string;
+  name: string;
+  kind: CategoryKind;
+  parent_id: string | null;
+  is_system: boolean;
+  sort_order: number;
+  movimientos: number;
 }
 
 /** Una pata del movimiento. Exactamente uno de account_id / category_id. */
