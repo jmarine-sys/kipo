@@ -4,13 +4,17 @@
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
   import { session, initSession } from '$lib/session.svelte';
+  import { cargarPreferencias } from '$lib/preferencias.svelte';
 
   let { children } = $props();
 
   const isLogin = $derived(page.url.pathname.startsWith('/login'));
   const authed  = $derived(!!session.value);
 
-  onMount(initSession);
+  onMount(() => {
+    cargarPreferencias();
+    initSession();
+  });
 
   $effect(() => {
     if (session.ready && !authed && !isLogin) goto('/login', { replaceState: true });

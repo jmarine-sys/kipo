@@ -4,6 +4,7 @@
   import { money, monthRange } from '$lib/format';
   import { colorCategoria } from '$lib/categorias';
   import { listUpcoming, cuandoFalta, type Upcoming } from '$lib/ledger/recurrentes';
+  import { prefs, alternarPrivado } from '$lib/preferencias.svelte';
   import type { AccountBalance } from '$lib/types';
 
   let entries = $state<EntryDetail[]>([]);
@@ -58,7 +59,19 @@
 </script>
 
 <div class="page stack">
-  <h1 class="cap">{m.label}</h1>
+  <div class="spread encabezado">
+    <h1 class="cap">{m.label}</h1>
+    <button class="ojo" onclick={alternarPrivado}
+            aria-pressed={prefs.privado}
+            aria-label={prefs.privado ? 'Mostrar los importes' : 'Ocultar los importes'}>
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor"
+           stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z" />
+        <circle cx="12" cy="12" r="3.2" />
+        {#if prefs.privado}<path d="M4 20 20 4" />{/if}
+      </svg>
+    </button>
+  </div>
 
   {#if error}
     <p class="err">{error}</p>
@@ -178,6 +191,13 @@
 
 <style>
   .cap { text-transform: capitalize; }
+  .encabezado { align-items: center; }
+  .ojo {
+    border: none; background: none; color: var(--text-dim);
+    min-width: var(--tap); min-height: var(--tap); padding: 0;
+    display: grid; place-items: center;
+  }
+  .ojo[aria-pressed='true'] { color: var(--accent); }
   .result { display: flex; flex-direction: column; gap: .15rem; margin-bottom: .9rem; }
   .big { font-size: 2.1rem; font-weight: 650; letter-spacing: -0.02em; }
   .sm { font-size: .82rem; }

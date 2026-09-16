@@ -7,52 +7,97 @@
 
 :root {
   /* la marca, tal como esta en el archivo original */
-  --menta:  #B6E2D7;   /* el fondo del icono */
-  --verde:  #22616A;   /* el bolsillo */
+  --menta:  #B6E2D7;
+  --verde:  #22616A;
   --verde-claro: #3A8487;
   --verde-oscuro: #194E59;
-  --oro:    #FEC85E;   /* la moneda */
-  --tinta:  #0C161A;   /* el contorno */
+  --oro:    #FEC85E;
+  --tinta:  #0C161A;
 
-  --bg:        #F1F8F5;
-  --surface:   #ffffff;
-  --surface-2: #DFEFE9;
-  --border:    #C7DFD8;
-  --text:      #0C161A;
-  --text-dim:  #5A757C;
-  --accent:    #22616A;
-  --accent-fg: #ffffff;
-  --neg:       #C0392B;   /* gastos, deuda */
-  --pos:       #17714C;   /* ingresos */
-  --warn:      #8A5D00;
-  --radius:    14px;
-  --tap:       48px;      /* area minima tocable */
-
-  /* El boton de registrar lleva color propio, no --accent/--accent-fg.
-     En modo oscuro --accent-fg es casi negro sobre un teal claro, y el '+'
-     se leia gris. Este par garantiza blanco sobre verde en los dos temas. */
-  --fab-bg: #22616A;
-  --fab-fg: #ffffff;
-
+  --radius: 14px;
+  --tap:    48px;      /* area minima tocable */
   color-scheme: light dark;
 }
 
+/* ---------------------------------------------------------------------------
+   Tres estados de tema, no dos.
+
+     sin atributo          sigue al sistema
+     data-tema="claro"     claro siempre
+     data-tema="oscuro"    oscuro siempre
+
+   Por eso los valores oscuros aparecen dos veces: una bajo prefers-color-scheme
+   -acotada con :not([data-tema="claro"]) para que la eleccion explicita gane- y
+   otra bajo el atributo. Sin esa repeticion, elegir "claro" en un sistema oscuro
+   no tendria efecto.
+   --------------------------------------------------------------------------- */
+
+/* CLARO — calido a proposito: marfil y teal. El oro de la moneda es un color
+   tibio, asi que un fondo frio peleaba con la propia marca. */
+:root {
+  --bg:        #F8F5EE;
+  --surface:   #FFFFFF;
+  --surface-2: #F1ECE1;
+  --border:    #E2DBCC;
+  --text:      #1C2B2F;
+  --text-dim:  #6E6559;
+  --accent:    #22616A;
+  --accent-fg: #FFFFFF;
+  --neg:       #B5402F;
+  --pos:       #17714C;
+  --warn:      #8A5D00;
+  --fab-bg:    #22616A;
+  --fab-fg:    #FFFFFF;
+}
+
 @media (prefers-color-scheme: dark) {
-  :root {
-    --bg:        #0C161A;   /* la tinta de la marca */
-    --surface:   #14242A;
-    --surface-2: #1E3840;
-    --border:    #2A4A52;
-    --text:      #E6F1EE;
-    --text-dim:  #8CA5AB;
-    --accent:    #5FB3AC;   /* el verde aclarado, para contrastar sobre la tinta */
+  :root:not([data-tema='claro']) {
+    --bg:        #101B20;
+    --surface:   #17262C;
+    --surface-2: #203840;
+    --border:    #2C4B53;
+    --text:      #E7EEEC;
+    --text-dim:  #93A7AB;
+    --accent:    #5FB3AC;
     --accent-fg: #06131A;
     --neg:       #F0736A;
     --pos:       #4EC98C;
-    --warn:      #FEC85E;   /* el oro de la moneda pide atencion sin gritar */
-    --fab-bg:    #2C7F86;   /* aclarado, para destacarse sobre el fondo oscuro */
-    --fab-fg:    #ffffff;
+    --warn:      #FEC85E;
+    --fab-bg:    #2C7F86;
+    --fab-fg:    #FFFFFF;
   }
+}
+
+:root[data-tema='oscuro'] {
+  --bg:        #101B20;
+  --surface:   #17262C;
+  --surface-2: #203840;
+  --border:    #2C4B53;
+  --text:      #E7EEEC;
+  --text-dim:  #93A7AB;
+  --accent:    #5FB3AC;
+  --accent-fg: #06131A;
+  --neg:       #F0736A;
+  --pos:       #4EC98C;
+  --warn:      #FEC85E;
+  --fab-bg:    #2C7F86;
+  --fab-fg:    #FFFFFF;
+}
+
+/* La mascota necesita fondo claro en los dos temas explicitos */
+:root[data-tema='oscuro'] .ilustracion { background: var(--menta); }
+
+/* ---------------------------------------------------------------------------
+   Modo privado: oculta los importes sin cambiar la maquetacion.
+
+   Se difuminan en vez de reemplazarse por puntos para que la pantalla no salte
+   al activarlo: los anchos quedan iguales y la lista no se reacomoda.
+   --------------------------------------------------------------------------- */
+
+:root[data-privado='si'] .money {
+  filter: blur(8px);
+  user-select: none;
+  transition: filter .12s ease;
 }
 
 * { box-sizing: border-box; }
