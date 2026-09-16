@@ -112,7 +112,10 @@
 <div class="page stack">
   <div class="spread">
     <h1>Cuentas</h1>
-    <a class="add" href="/cuentas/nueva">+ Nueva</a>
+    <div class="row altas">
+      <a class="add" href="/cuentas/plazo-fijo">+ Plazo fijo</a>
+      <a class="add" href="/cuentas/nueva">+ Cuenta</a>
+    </div>
   </div>
 
   {#if error}<p class="err" role="alert">{error}</p>{/if}
@@ -217,7 +220,8 @@
 </div>
 
 <style>
-  .add { text-decoration: none; font-size: .88rem; font-weight: 600; }
+  .altas { gap: .9rem; }
+  .add { text-decoration: none; font-size: .86rem; font-weight: 600; white-space: nowrap; }
   header { margin-bottom: .6rem; }
   header h2 { display: inline; margin-right: .4rem; }
   .sm { font-size: .78rem; }

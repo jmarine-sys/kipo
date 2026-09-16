@@ -7,6 +7,7 @@
     FRECUENCIAS, type Upcoming, type Frecuencia
   } from '$lib/ledger/recurrentes';
   import { colorCategoria } from '$lib/categorias';
+  import { registrarVencimiento } from '$lib/ledger/inversiones';
   import { money, today, shortDate } from '$lib/format';
   import Vacio from '$lib/Vacio.svelte';
   import type { Account, Category } from '$lib/types';
@@ -50,9 +51,18 @@
     if (abierto === i.id) { abierto = null; return; }
     abierto = i.id;
     montoRaw = i.amount ? String(Math.round(Number(i.amount))) : '';
-    cuentaElegida = i.account_id;
+    // en un vencimiento la cuenta es a DÓNDE vuelve, no de dónde sale
+    cuentaElegida = i.kind === 'maturity' ? i.counter_account_id : i.account_id;
     error = null;
   }
+
+  /** En un vencimiento, el interés es lo que vuelve menos lo que hay puesto. */
+  const interesDelVencimiento = $derived.by(() => {
+    const i = items.find((x) => x.id === abierto);
+    if (!i || i.kind !== 'maturity' || !i.capital) return null;
+    const total = montoRaw ? num(montoRaw) : Number(i.amount ?? 0);
+    return total - Number(i.capital);
+  });
 
   async function load() {
     loading = true;
@@ -63,6 +73,24 @@
     } catch (e) {
       error = e instanceof Error ? e.message : 'No se pudo cargar';
     } finally { loading = false; }
+  }
+
+  /**
+   * Un vencimiento no es un gasto recurrente: vuelve capital MÁS interés, y el
+   * interés no se pide, se calcula. Por eso tiene su propio camino.
+   */
+  async function vencer(i: Upcoming) {
+    busy = true; error = null;
+    try {
+      await registrarVencimiento(i.id, {
+        total: montoRaw ? num(montoRaw) : null,
+        haciaId: cuentaElegida
+      });
+      abierto = null;
+      await load();
+    } catch (e) {
+      error = e instanceof Error ? e.message : 'No se pudo registrar';
+    } finally { busy = false; }
   }
 
   async function registrar(i: Upcoming) {
@@ -151,9 +179,13 @@
                     {#if i.category_parent}
                       <i class="punto" style="background:{colorCategoria(i.category_parent)}"></i>
                     {/if}
-                    {i.category_name ?? '—'}
-                    <span class="sep">·</span>{nombreFrecuencia(i.frequency)}
-                    {#if i.account_name}<span class="sep">·</span>{i.account_name}{/if}
+                    {#if i.kind === 'maturity'}
+                      inversión<span class="sep">·</span>{i.account_name ?? '—'}
+                    {:else}
+                      {i.category_name ?? '—'}
+                      <span class="sep">·</span>{nombreFrecuencia(i.frequency)}
+                      {#if i.account_name}<span class="sep">·</span>{i.account_name}{/if}
+                    {/if}
                   </span>
                 </span>
                 <span class="der">
@@ -162,7 +194,39 @@
                 </span>
               </button>
 
-              {#if abierto === i.id}
+              {#if abierto === i.id && i.kind === 'maturity'}
+                <div class="panel stack">
+                  <p class="dim sm nota">
+                    Hay <b class="money">{money(i.capital ?? 0, i.currency)}</b> puestos.
+                    Al registrarlo, el capital vuelve y el interés se anota como ingreso.
+                  </p>
+                  <div class="row campos">
+                    <label class="campo">
+                      <span>Cuánto volvió</span>
+                      <input class="monto" inputmode="decimal" bind:value={montoRaw} />
+                    </label>
+                    <label class="campo">
+                      <span>Vuelve a</span>
+                      <select bind:value={cuentaElegida}>
+                        {#each pagables as a}<option value={a.id}>{a.name}</option>{/each}
+                      </select>
+                    </label>
+                  </div>
+                  {#if interesDelVencimiento !== null}
+                    <p class="sm">
+                      Interés:
+                      <b class="money" class:pos={interesDelVencimiento > 0}
+                                       class:neg={interesDelVencimiento < 0}>
+                        {money(interesDelVencimiento, i.currency)}
+                      </b>
+                    </p>
+                  {/if}
+                  <button class="btn-primary" onclick={() => vencer(i)}
+                          disabled={busy || !montoRaw || !cuentaElegida}>
+                    {busy ? 'Registrando…' : 'Registrar el vencimiento'}
+                  </button>
+                </div>
+              {:else if abierto === i.id}
                 <div class="panel stack">
                   <div class="row campos">
                     <label class="campo">

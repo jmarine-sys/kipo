@@ -31,6 +31,11 @@ export interface Upcoming {
   category_parent: string | null;
   account_id: string | null;
   account_name: string | null;
+  /** solo en vencimientos: a qué cuenta vuelve la plata */
+  counter_account_id: string | null;
+  counter_account_name: string | null;
+  /** solo en vencimientos: cuánto capital hay puesto */
+  capital: string | null;
   dias: number;
   vencido: boolean;
 }
