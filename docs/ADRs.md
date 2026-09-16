@@ -42,6 +42,7 @@ decision nobody made is fiction, and an agent will believe it.
 | [ADR-019](#adr-019--registrar-un-movimiento-es-una-función-de-base-no-dos-inserciones-del-cliente) | Registrar un movimiento es una función de base, no dos inserciones del cliente | Accepted |
 | [ADR-020](#adr-020--los-permisos-del-data-api-son-explícitos-y-anon-no-tiene-ninguno) | Los permisos del Data API son explícitos, y `anon` no tiene ninguno | Accepted |
 | [ADR-021](#adr-021--el-hosting-es-cloudflare-workers-sirviendo-solo-activos-estáticos) | El hosting es Cloudflare Workers, sirviendo solo activos estáticos | Accepted |
+| [ADR-022](#adr-022--el-patrimonio-incluye-solo-activos-financieros) | El patrimonio incluye solo activos financieros | Accepted |
 
 ---
 
@@ -976,3 +977,45 @@ developers.cloudflare.com/workers/static-assets/routing/single-page-application/
 El plan original de esta guia apuntaba a "Workers & Pages" en el panel. Esa
 seccion ya no existe: lo reporto el usuario al no encontrarla.
 ```
+
+
+---
+
+## ADR-022 — El patrimonio incluye solo activos financieros
+
+**Context.** Al planificar la etapa de inversiones apareció la pregunta de si el patrimonio que
+muestra la aplicación debe incluir bienes no financieros —un inmueble, un auto—. Para mucha gente la
+casa es el ítem más grande de su patrimonio, así que excluirla no es un detalle.
+
+El esquema lo permitiría sin cambios: la familia `market` de
+[ADR-012](#adr-012--las-cuentas-se-clasifican-por-cómo-se-valúan-no-por-cómo-las-llama-el-banco)
+admite precio manual (`price.source = 'manual'`) y el tipo de instrumento `'other'` ya existe.
+
+**Decision.** El patrimonio comprende únicamente activos financieros: plata, inversiones y deudas. Los
+bienes no financieros quedan fuera.
+
+**Consequences.**
+- Todo lo que la aplicación suma es **comparable y liquidable a un precio conocido**. Una tasación de
+  un inmueble es una opinión, no un precio, y mezclarla con saldos bancarios da un total que parece
+  exacto y no lo es.
+- Desaparece una pantalla de mantenimiento: nadie tiene que acordarse de actualizar cuánto vale su
+  casa para que el número del mes cierre.
+- **La parte incómoda, y hay que decirla:** si el usuario tiene un inmueble, **el "patrimonio total"
+  de la aplicación no es su patrimonio real**. Es su patrimonio financiero, y va a tener que
+  recordarlo cada vez que mire ese número. La pantalla debería nombrarlo así el día que la diferencia
+  importe.
+- Revertirlo es barato: el esquema ya lo soporta, así que es una pantalla y una decisión de cómo
+  mostrarlo, no una migración.
+
+**Rejected alternatives.**
+- *Incluirlos con precio manual*: técnicamente inmediato. Descartado porque obliga a mantener a mano
+  un número subjetivo, y porque contamina el total con una cifra de naturaleza distinta a las demás.
+- *Incluirlos en una sección aparte, fuera del total*: es la solución de compromiso y sigue
+  disponible. Descartada **por ahora** por no agregar pantalla a algo que el usuario dijo no
+  necesitar.
+
+**Evidence.** Decisión del usuario, 2026-09-16. `porposal.md` §8 y §16 describen el patrimonio en
+términos de cuentas, monedas e inversiones, sin mencionar bienes.
+
+**Verified against what already exists.** *No aplica:* es una decisión de alcance. Se verificó, eso
+sí, que el esquema **no la impone**: revertirla no exige migrar nada.

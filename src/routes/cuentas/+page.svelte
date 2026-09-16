@@ -187,6 +187,7 @@
     {/each}
 
     <p class="aprox">≈ Saldos estimados: no hay conciliación con el banco</p>
+    <a class="link" href="/inversiones">Ver inversiones →</a>
     <a class="link" href="/categorias">Administrar categorías →</a>
 
     <section class="card stack">
