@@ -4,6 +4,7 @@
   import { filasDeMovimientos, totales } from '$lib/ledger/presentacion';
   import { colorCategoria } from '$lib/categorias';
   import { money, monthRange, shortDate, today } from '$lib/format';
+  import Vacio from '$lib/Vacio.svelte';
 
   type Periodo = 'mes' | 'trimestre' | 'semestre' | 'anio' | 'rango';
   const PERIODOS: { id: Periodo; label: string }[] = [
@@ -144,7 +145,18 @@
   {#if loading}
     <p class="dim">Cargando…</p>
   {:else if !rows.length}
-    <p class="dim">{filtrando ? 'Nada coincide con el filtro.' : 'Ningún movimiento en este período.'}</p>
+    {#if filtrando}
+        <!-- Resultado de búsqueda vacío: no hace falta alentar a nadie, hace
+             falta poder quitar el filtro. -->
+        <Vacio conMascota={false}
+               titulo="Nada coincide con el filtro."
+               detalle="Probá con otra categoría o ampliá el período."
+               accion="Quitar filtros" onaccion={() => (madres = [])} />
+      {:else}
+        <Vacio titulo="Ningún movimiento en este período."
+               detalle={periodo === 'mes' ? 'Probá con otro mes.' : null}
+               href="/nuevo" accion="Registrar un movimiento" />
+    {/if}
   {:else}
     <p class="resumen dim">
       {rows.length} movimiento{rows.length === 1 ? '' : 's'}

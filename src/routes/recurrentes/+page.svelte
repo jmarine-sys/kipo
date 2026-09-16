@@ -8,6 +8,7 @@
   } from '$lib/ledger/recurrentes';
   import { colorCategoria } from '$lib/categorias';
   import { money, today, shortDate } from '$lib/format';
+  import Vacio from '$lib/Vacio.svelte';
   import type { Account, Category } from '$lib/types';
 
   let items = $state<Upcoming[]>([]);
@@ -194,11 +195,10 @@
       {/if}
     {/each}
 
-    {#if !items.length}
-      <p class="dim">
-        Todavía no cargaste ninguna obligación recurrente. Sirven para que la app te
-        anticipe impuestos, seguros, servicios y suscripciones.
-      </p>
+    {#if !items.length && !creando}
+      <Vacio titulo="Todavía no cargaste ninguna obligación."
+             detalle="Sirven para que la app te anticipe impuestos, seguros, servicios y suscripciones."
+             accion="Cargar la primera" onaccion={() => (creando = true)} />
     {/if}
 
     {#if creando}
@@ -246,7 +246,9 @@
         <button class="btn-primary" type="submit" disabled={busy || !nDesc.trim() || !nCat}>Crear</button>
         <button type="button" class="link" onclick={() => (creando = false)}>Cancelar</button>
       </form>
-    {:else}
+    {:else if items.length}
+      <!-- Con la lista vacía la acción ya la ofrece el estado vacío: dos botones
+           que hacen lo mismo obligan a elegir entre cosas idénticas. -->
       <button class="btn-primary nueva" onclick={() => (creando = true)}>+ Nueva obligación</button>
     {/if}
   {/if}

@@ -5,6 +5,7 @@
   import { colorCategoria } from '$lib/categorias';
   import { listUpcoming, cuandoFalta, type Upcoming } from '$lib/ledger/recurrentes';
   import { prefs, alternarPrivado } from '$lib/preferencias.svelte';
+  import Vacio from '$lib/Vacio.svelte';
   import type { AccountBalance } from '$lib/types';
 
   let entries = $state<EntryDetail[]>([]);
@@ -180,11 +181,8 @@
         </ul>
       </section>
     {:else}
-      <section class="card empty">
-        <img class="ilustracion" src="/marca/kipo-duda.svg" alt="" width="160" height="150" />
-        <p>Todavía no registraste nada este mes.</p>
-        <a class="btn-primary go" href="/nuevo">Registrar un movimiento</a>
-      </section>
+      <Vacio titulo="Todavía no registraste nada este mes."
+             href="/nuevo" accion="Registrar un movimiento" />
     {/if}
   {/if}
 </div>
@@ -244,9 +242,6 @@
   .cuanto { display: flex; flex-direction: column; align-items: flex-end; gap: .05rem; flex-shrink: 0; }
   .cuanto b { font-size: .92rem; white-space: nowrap; }
 
-  .empty { text-align: center; }
-  .empty img { width: 160px; margin-bottom: .5rem; }
-  .go { display: inline-block; text-decoration: none; padding: .8rem 1.2rem; border-radius: var(--radius); margin-top: .5rem; }
 
   .err {
     background: color-mix(in srgb, var(--neg) 14%, transparent);
