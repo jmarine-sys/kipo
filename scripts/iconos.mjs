@@ -1,95 +1,101 @@
-// Genera los iconos de la PWA desde la marca original.   node scripts/iconos.mjs
+// Genera los iconos y el favicon desde la marca original.  node scripts/iconos.mjs
 //
-// La fuente es static/marca/kipo_.svg, el vector que hizo el disenador.
-// No se redibuja nada: solo se quita el fondo blanco, se recorta al arte y se
-// compone sobre el menta de la marca.
+// La fuente es static/marca/kipo_.svg, el vector del disenador. No se redibuja
+// nada: se separa en dos capas, como funcionan los iconos adaptativos de Android.
 //
-// Android solo instala una WebAPK de verdad -la que va al cajon de aplicaciones y
-// oculta la barra de direcciones- si estos PNG existen y se pueden decodificar.
-// Si faltan, degrada a un acceso directo y no dice por que.
+//   FRENTE  el bolsillo con la moneda, solo
+//   FONDO   el menta, generado aca
+//
+// El archivo original trae las dos cosas fusionadas: un rectangulo blanco que
+// cubre el lienzo, encima un cuadrado menta redondeado, y encima el dibujo. Si se
+// escala tal cual, se escala tambien el fondo, y el dibujo termina ocupando la
+// mitad del icono aunque el archivo llene el cuadro. Por eso se quitan los dos
+// rellenos y se compone de nuevo.
 
 import sharp from 'sharp';
 import { readFileSync, writeFileSync } from 'node:fs';
 
-const MENTA = '#B6E2D7';          // el fondo del icono, tomado del propio SVG
+const MENTA = '#B6E2D7';
 const FUENTE = 'static/marca/kipo_.svg';
+const VB = { w: 1847, h: 2048 };   // el viewBox del original
 
-// El SVG trae un rectangulo blanco de 1847x2048 cubriendo todo. Se quita para que
-// las esquinas queden transparentes: en un lanzador oscuro, ese blanco se veria
-// como cuatro muescas.
-// Se busca por el ATRIBUTO d -el rectangulo que cubre el lienzo entero- y no por
-// el color: es lo unico que identifica al fondo sin ambiguedad.
 const original = readFileSync(FUENTE, 'utf8');
-const FONDO = /<path[^>]*d="M 0 0 L 1847 0 L 1847 2048 L 0 2048 L 0 0 z"[^>]*\/>/;
 
-if (!FONDO.test(original)) {
-  // Antes esto fallaba en silencio y los iconos salian con las esquinas blancas.
-  // Un script que no encuentra lo que busca tiene que gritar, no seguir.
-  throw new Error(
-    'No se encontro el rectangulo de fondo en ' + FUENTE + '. ' +
-    'Si cambio el archivo de marca, hay que actualizar este patron.'
-  );
-}
-
-const sinFondo = original.replace(FONDO, '');
-writeFileSync('static/favicon.svg', sinFondo);
-
-/** Rasteriza y recorta al arte, para que no queden margenes muertos. */
-async function arte(px) {
-  return sharp(Buffer.from(sinFondo), { density: 900 })
-    .resize({ height: px })
-    .trim({ threshold: 1 })       // saca el margen transparente sobrante
-    .png()
-    .toBuffer();
-}
-
-/**
- * @param {number} size   lado del PNG
- * @param {number} escala cuanto ocupa el arte dentro del cuadro (0-1)
- * @param {boolean} sangre  fondo menta a sangre (maskable) o transparente (any)
- */
-async function icono(size, escala, sangre) {
-  const interior = Math.round(size * escala);
-  const arteBuf = await arte(interior);
-  const meta = await sharp(arteBuf).metadata();
-
-  const lienzo = sangre
-    ? sharp({
-        create: { width: size, height: size, channels: 4,
-                  background: MENTA }
-      })
-    : sharp({
-        create: { width: size, height: size, channels: 4,
-                  background: { r: 0, g: 0, b: 0, alpha: 0 } }
-      });
-
-  return lienzo
-    .composite([{
-      input: arteBuf,
-      left: Math.round((size - meta.width) / 2),
-      top: Math.round((size - meta.height) / 2)
-    }])
-    .png({ compressionLevel: 9 })
-    .toBuffer();
-}
-
-const salidas = [
-  // El arte ya trae su propio cuadrado redondeado menta: ocupa casi todo el cuadro.
-  ['static/icon-192.png', 192, 0.98, false],
-  ['static/icon-512.png', 512, 0.98, false],
-  ['static/apple-touch-icon.png', 180, 0.98, false],
-  // Maskable: menta a sangre y el arte al 88%.
-  //
-  // La zona segura del recorte circular es el 80% central del lienzo, pero eso
-  // aplica al DIBUJO, no al arte completo: el arte trae su propio cuadrado menta
-  // y el dibujo ocupa menos de la mitad de ese cuadrado. Al 72% el dibujo quedaba
-  // en el 42% del lienzo y el anillo menta sobrante se leia como un borde claro
-  // alrededor de un icono chico. Al 88% llena el circulo sin rozar el borde.
-  ['static/icon-maskable-512.png', 512, 0.88, true]
+// Se busca cada capa por lo que ES -su geometria y su color-, y se exige que
+// aparezca: un script que no encuentra lo que busca tiene que gritar, no seguir.
+const CAPAS = [
+  ['el rectangulo blanco de fondo', /<path[^>]*d="M 0 0 L 1847 0 L 1847 2048 L 0 2048 L 0 0 z"[^>]*\/>/],
+  ['el cuadrado menta',             /<path[^>]*fill="rgb\(182,\s*226,\s*215\)"[^>]*\/>/]
 ];
 
-for (const [ruta, size, escala, sangre] of salidas) {
-  writeFileSync(ruta, await icono(size, escala, sangre));
-  console.log(`  ${ruta}  ${size}x${size}${sangre ? '  (maskable)' : ''}`);
+let dibujo = original;
+for (const [nombre, patron] of CAPAS) {
+  if (!patron.test(dibujo)) {
+    throw new Error(`No se encontro ${nombre} en ${FUENTE}. Si cambio el archivo de marca, hay que actualizar el patron.`);
+  }
+  dibujo = dibujo.replace(patron, '');
 }
-console.log('  static/favicon.svg  (el mismo vector, sin el fondo blanco)');
+
+/** El contenido del <svg>, sin la etiqueta: para poder reencuadrarlo. */
+const contenido = dibujo.replace(/<\/?svg[^>]*>/g, '').trim();
+
+// ---------------------------------------------------------------------------
+// Donde cae el dibujo dentro del viewBox original. Se mide rasterizando a escala
+// 1:1 con el viewBox, asi los pixeles son unidades de usuario.
+// ---------------------------------------------------------------------------
+const plano = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${VB.w} ${VB.h}" width="${VB.w}" height="${VB.h}">${contenido}</svg>`;
+const { info } = await sharp(Buffer.from(plano))
+  .trim({ threshold: 1 })
+  .toBuffer({ resolveWithObject: true });
+
+const caja = {
+  x: info.trimOffsetLeft ? -info.trimOffsetLeft : 0,
+  y: info.trimOffsetTop ? -info.trimOffsetTop : 0,
+  w: info.width,
+  h: info.height
+};
+console.log(`  el dibujo ocupa ${caja.w}x${caja.h} dentro de ${VB.w}x${VB.h}`);
+
+/**
+ * Compone el icono: menta de fondo y el dibujo centrado, escalado para que su
+ * lado mayor ocupe `parte` del lienzo.
+ * @param {number} parte  0-1
+ * @param {number|null} redondeo  radio de esquina, o null para ir a sangre
+ */
+function componer(parte, redondeo) {
+  const S = 512;
+  const k = (S * parte) / Math.max(caja.w, caja.h);
+  const tx = (S - caja.w * k) / 2 - caja.x * k;
+  const ty = (S - caja.h * k) / 2 - caja.y * k;
+  const fondo = redondeo === null
+    ? `<rect width="${S}" height="${S}" fill="${MENTA}"/>`
+    : `<rect width="${S}" height="${S}" rx="${redondeo}" fill="${MENTA}"/>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${S} ${S}">
+  ${fondo}
+  <g transform="translate(${tx.toFixed(2)} ${ty.toFixed(2)}) scale(${k.toFixed(5)})">${contenido}</g>
+</svg>`;
+}
+
+const ESCALA_ANY = 0.80;   // con esquinas redondeadas queda margen suficiente
+const ESCALA_MASK = 0.68;  // ver la verificacion contra la zona segura mas abajo
+
+const salidas = [
+  ['static/icon-192.png', 192, componer(ESCALA_ANY, 112)],
+  ['static/icon-512.png', 512, componer(ESCALA_ANY, 112)],
+  ['static/apple-touch-icon.png', 180, componer(ESCALA_ANY, 112)],
+  ['static/icon-maskable-512.png', 512, componer(ESCALA_MASK, null)]
+];
+
+for (const [ruta, size, svg] of salidas) {
+  await sharp(Buffer.from(svg), { density: 900 })
+    .resize(size, size)
+    .png({ compressionLevel: 9 })
+    .toFile(ruta);
+  console.log(`  ${ruta}  ${size}x${size}`);
+}
+
+// El favicon: CUADRADO y recortado al dibujo. El original es vertical
+// (1847x2048), y a 16 pixeles en una pestania eso deja aire arriba y abajo que
+// achica el dibujo justo donde menos lugar hay.
+writeFileSync('static/favicon.svg', componer(ESCALA_ANY, 112));
+console.log('  static/favicon.svg  (cuadrado, recortado al dibujo)');
