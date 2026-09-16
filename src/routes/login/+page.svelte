@@ -67,8 +67,9 @@
 
 <div class="page login">
   <header>
-    <h1>kipo</h1>
-    <p class="dim">Finanzas personales</p>
+    <img class="mascota" src="/marca/kipo-saludo.svg" alt="" width="150" height="156" />
+    <h1>Kipo</h1>
+    <p class="dim">Tu dinero, en buenas manos.</p>
   </header>
 
   {#if error}<p class="err" role="alert">{error}</p>{/if}
@@ -105,10 +106,11 @@
 </div>
 
 <style>
-  .login { max-width: 380px; padding-top: 12vh; }
-  header { text-align: center; margin-bottom: 2rem; }
-  header h1 { font-size: 2.2rem; letter-spacing: -0.03em; }
-  header p { margin: .25rem 0 0; }
+  .login { max-width: 380px; padding-top: 5vh; }
+  header { text-align: center; margin-bottom: 1.6rem; }
+  .mascota { display: block; margin: 0 auto .4rem; width: 150px; height: auto; }
+  header h1 { font-size: 2.2rem; letter-spacing: -0.035em; font-weight: 750; }
+  header p { margin: .15rem 0 0; }
 
   label { display: flex; flex-direction: column; gap: .3rem; font-size: .85rem; }
   input {

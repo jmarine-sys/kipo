@@ -107,6 +107,7 @@
       </section>
     {:else}
       <section class="card empty">
+        <img src="/marca/kipo-duda.svg" alt="" width="160" height="150" />
         <p>Todavía no registraste nada este mes.</p>
         <a class="btn-primary go" href="/nuevo">Registrar un movimiento</a>
       </section>
@@ -120,11 +121,23 @@
   .big { font-size: 2.1rem; font-weight: 650; letter-spacing: -0.02em; }
   .sm { font-size: .82rem; }
 
-  .split { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
-  .split.three { grid-template-columns: repeat(3, 1fr); }
-  .split3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: .5rem; }
-  .split > div, .split3 > div { display: flex; flex-direction: column; gap: .1rem; font-size: .82rem; }
-  .split b, .split3 b { font-size: 1.05rem; }
+  /* auto-fit en vez de un numero fijo de columnas: con montos grandes la grilla
+     baja a 2 o 1 columna en vez de dejar que el numero se salga de la tarjeta.
+     El minmax garantiza que una cifra de siete digitos entre entera. */
+  .split, .split3 {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
+    gap: .75rem .6rem;
+  }
+  .split > div, .split3 > div {
+    display: flex; flex-direction: column; gap: .1rem;
+    font-size: .82rem;
+    min-width: 0;   /* sin esto, el contenido que no parte estira la celda */
+  }
+  .split b, .split3 b {
+    font-size: clamp(.95rem, 4vw, 1.05rem);
+    min-width: 0;
+  }
 
   .hint { font-size: .78rem; margin: .9rem 0 0; padding-top: .75rem; border-top: 1px solid var(--border); }
   .aprox { margin: .8rem 0 0; }
@@ -137,6 +150,7 @@
   .punto { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
 
   .empty { text-align: center; }
+  .empty img { display: block; margin: .25rem auto .4rem; width: 160px; height: auto; }
   .go { display: inline-block; text-decoration: none; padding: .8rem 1.2rem; border-radius: var(--radius); margin-top: .5rem; }
 
   .err {
