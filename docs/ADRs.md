@@ -43,6 +43,7 @@ decision nobody made is fiction, and an agent will believe it.
 | [ADR-020](#adr-020--los-permisos-del-data-api-son-explícitos-y-anon-no-tiene-ninguno) | Los permisos del Data API son explícitos, y `anon` no tiene ninguno | Accepted |
 | [ADR-021](#adr-021--el-hosting-es-cloudflare-workers-sirviendo-solo-activos-estáticos) | El hosting es Cloudflare Workers, sirviendo solo activos estáticos | Accepted |
 | [ADR-022](#adr-022--el-patrimonio-incluye-solo-activos-financieros) | El patrimonio incluye solo activos financieros | Accepted |
+| [ADR-023](#adr-023--la-unidad-de-medida-es-un-parámetro-dólares-o-poder-adquisitivo) | La unidad de medida es un parámetro: dólares o poder adquisitivo | Accepted |
 
 ---
 
@@ -1019,3 +1020,65 @@ términos de cuentas, monedas e inversiones, sin mencionar bienes.
 
 **Verified against what already exists.** *No aplica:* es una decisión de alcance. Se verificó, eso
 sí, que el esquema **no la impone**: revertirla no exige migrar nada.
+
+
+---
+
+## ADR-023 — La unidad de medida es un parámetro: dólares o poder adquisitivo
+
+**Context.** [ADR-009](#adr-009--el-rendimiento-de-las-inversiones-se-mide-en-usd) fijó el dólar como
+moneda de medición para no medir en pesos nominales. Al construir la medición, el usuario preguntó
+algo que esa decisión no cubría: *"¿le estamos ganando a la inflación?"*.
+
+**No son la misma pregunta.** Si el dólar sube menos que los precios —atraso cambiario, frecuente en
+Argentina— se puede tener un rendimiento de 0% en dólares y estar **perdiendo poder adquisitivo**. Y
+al revés cuando el dólar se adelanta. Medir en dólares responde *"¿le gano al dólar?"*, que es una
+pregunta legítima pero distinta.
+
+Al buscar la fuente de datos apareció que la serie **UVA** —el índice diario que sigue al IPC— está
+disponible con historia completa, verificada: 3823 valores diarios desde 2016.
+
+**Decision.** La unidad de medida es un parámetro de la función de conversión, no una constante. Se
+admiten `USD` y `UVA`, y el mecanismo es el mismo: **dividir por la vara de la fecha del movimiento**.
+
+**Consequences.**
+- Una sola implementación responde dos preguntas distintas, porque **la unidad de medida es apenas un
+  divisor**: para dólares se divide por la cotización de ese día, para poder adquisitivo por la UVA de
+  ese día.
+- La UVA entra como una fila más en `fx_rate` —"cuántos pesos vale una UVA"— sin tabla nueva, porque
+  es exactamente la misma forma de dato.
+- El usuario puede ver el mismo rendimiento bajo las dos varas y entender **por qué difieren**, que
+  suele ser más informativo que cualquiera de los dos números por separado.
+- **La parte incómoda:** duplica el dato que hay que mantener. Si falta la serie UVA de un período, esa
+  medición no se puede hacer, y ahora hay dos maneras de quedarse sin poder responder en vez de una.
+- Hereda además el principio de
+  [ADR-011](#adr-011--la-fuente-de-cotización-es-una-propiedad-de-la-cuenta-no-de-la-fecha): toda
+  pantalla que muestre un rendimiento tiene que decir con qué vara lo midió.
+
+**Rejected alternatives.**
+- *Solo dólares*: es lo que decía ADR-009 y responde la mitad de la pregunta del usuario. Descartada
+  al aparecer que la otra mitad costaba casi lo mismo.
+- *Agregar también comparaciones contra un plazo fijo o contra el S&P*: responden *"¿elegí bien?"*, no
+  *"¿llegué a mi objetivo?"*. Descartadas por el principio del brief §16: cada visualización existe
+  porque ayuda a decidir algo. Cuatro varas sin saber cuál mirar es peor que dos bien entendidas.
+- *Usar el IPC del INDEC en vez de la UVA*: el IPC es mensual, sale con retraso y se revisa. La UVA es
+  diaria y es la que usan los instrumentos indexados. Descartada por peor dato para el mismo fin.
+
+**Evidence.** `supabase/migrations/20260916140000_medicion.sql`, `supabase/tests/11_medicion.sql`.
+
+**Verified against what already exists.**
+
+```
+api.argentinadatos.com  (2026-09-16)
+  /v1/finanzas/indices/uva          -> 3823 valores diarios, 2016-03-31 a 2026-09-17
+  /v1/cotizaciones/dolares/<casa>/<AAAA>/<MM>/<DD>
+     -> devuelve CUALQUIER fecha pasada, con oficial, blue, bolsa (MEP),
+        mayorista, contadoconliqui (CCL) y cripto
+
+A diferencia de los precios de los activos (OD-31), las cotizaciones SI se pueden
+recuperar hacia atras: son dato publico.
+```
+
+La regla de conversión usa **la última cotización anterior o igual**, no la más cercana: un sábado no
+cotiza, y el valor que regía ese día es el del viernes. Tomar el lunes sería usar información que en
+ese momento no existía.

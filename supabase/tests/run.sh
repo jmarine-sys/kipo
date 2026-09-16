@@ -69,6 +69,9 @@ psql -h localhost -p "$PORT" -U postgres -qtA -f supabase/tests/09_plazos_fijos.
 echo "== posiciones de mercado =="
 psql -h localhost -p "$PORT" -U postgres -qtA -f supabase/tests/10_posiciones.sql 2>&1 | grep -E '^(ok|FALLO)' | mirar
 
+echo "== medicion en dolares y poder adquisitivo =="
+psql -h localhost -p "$PORT" -U postgres -qtA -f supabase/tests/11_medicion.sql 2>&1 | grep -E '^(ok|FALLO)' | mirar
+
 echo
 if grep -q 'FALLO' "$FALLOS"; then
   echo "HAY FALLOS:"
