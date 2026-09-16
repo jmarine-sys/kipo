@@ -70,7 +70,12 @@ Y completalo con lo del paso 2. **`.env` está en `.gitignore`: nunca se sube.**
 
 ## 4. Aplicar las migraciones
 
-Son siete archivos en `supabase/migrations/`, y **hay que aplicarlos en orden**.
+Son todos los archivos de `supabase/migrations/`, **en orden alfabético** — el nombre empieza con
+la fecha justamente para que ordenar por nombre sea ordenar por tiempo.
+
+> **No los enumero acá a propósito.** Esta lista ya se desactualizó una vez y la aplicación rompió en
+> producción con *Could not find the table `public.upcoming`*. Una lista escrita a mano al lado de un
+> directorio que crece se desincroniza siempre; la pregunta es solo cuándo.
 
 ### Opción A — el CLI de Supabase *(recomendada)*
 
@@ -83,15 +88,15 @@ supabase db push
 
 ### Opción B — a mano, desde el panel
 
-En **SQL Editor**, pegá y ejecutá cada archivo **en este orden**:
+En **SQL Editor**, pegá y ejecutá cada archivo en orden alfabético. Si ya tenés una base andando y
+solo faltan las últimas, generá el paquete:
 
-1. `20260915100000_schema.sql` — las 11 tablas
-2. `20260915100100_invariants.sql` — triggers y la vista de saldos
-3. `20260915100200_rls.sql` — el aislamiento entre usuarios
-4. `20260915100300_bootstrap.sql` — el alta de usuario
-5. `20260915110000_rpc.sql` — escritura atómica
-6. `20260915110100_views.sql` — la vista de lectura
-7. `20260915120000_grants.sql` — los permisos del Data API
+```bash
+./scripts/pendientes.sh 20260916140000   # la primera que te falta
+```
+
+Deja `supabase/pendientes.sql` con esas migraciones concatenadas y con la lista en el encabezado.
+Se pega entero y es idempotente: correrlo dos veces no rompe nada.
 
 ## 5. Comprobar que quedó bien
 
