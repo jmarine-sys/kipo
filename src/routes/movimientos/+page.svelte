@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { listEntries, deleteTransaction, toCSV, download, type EntryDetail } from '$lib/ledger/api';
+  import { filasDeMovimientos, totales } from '$lib/ledger/presentacion';
   import { colorCategoria } from '$lib/categorias';
   import { money, monthRange, shortDate, today } from '$lib/format';
 
@@ -57,45 +58,14 @@
     madres = madres.includes(m) ? madres.filter((x) => x !== m) : [...madres, m];
   }
 
-  /**
-   * Una fila por MOVIMIENTO, no por línea: el usuario piensa en movimientos.
-   * Se muestra solo la SUBCATEGORÍA, y la madre va como punto de color (OD-27).
-   */
-  const rows = $derived.by(() => {
-    const byTx = new Map<string, EntryDetail[]>();
-    for (const e of entries) {
-      byTx.set(e.transaction_id, [...(byTx.get(e.transaction_id) ?? []), e]);
-    }
-    return [...byTx.entries()]
-      .map(([id, es]) => {
-        const cat = es.find((e) => e.category_id);
-        const neg = es.find((e) => Number(e.amount) < 0 && e.account_id);
-        const pos = es.find((e) => Number(e.amount) > 0 && e.account_id);
-        const head = es[0];
-        const esIngreso = cat?.category_kind === 'income';
-        return {
-          id,
-          date: head.occurred_on,
-          titulo: cat ? (cat.category_name ?? '—') : `${neg?.account_name ?? '—'} → ${pos?.account_name ?? '—'}`,
-          madre: cat?.category_parent ?? null,
-          cuenta: cat ? (neg?.account_name ?? pos?.account_name ?? null) : null,
-          nota: head.description,
-          monto: cat ? Number(cat.amount) : Math.abs(Number(neg?.amount ?? 0)),
-          unit: cat?.unit ?? neg?.unit ?? 'ARS',
-          // el color del monto ES el mensaje: rojo sale, verde entra, neutro no toca el resultado
-          clase: !cat ? 'neutro' : esIngreso ? 'pos' : 'neg',
-          signo: !cat ? '' : esIngreso ? '+' : '−',
-          esCategoria: !!cat
-        };
-      })
-      .filter((r) => !filtrando || (r.madre !== null && madres.includes(r.madre)));
-  });
-
-  /** Lo que suma lo que estás viendo. Con filtros puestos, es la pregunta obvia. */
-  const totalVisible = $derived(
-    rows.filter((r) => r.esCategoria && r.unit === 'ARS')
-        .reduce((t, r) => t + (r.clase === 'pos' ? -r.monto : r.monto), 0)
+  // La conversión de líneas a filas vive en $lib/ledger/presentacion: una
+  // pantalla pide una fila, nunca interpreta un signo.
+  const rows = $derived(
+    filasDeMovimientos(entries)
+      .filter((r) => !filtrando || (r.madre !== null && madres.includes(r.madre)))
   );
+
+  const suma = $derived(totales(rows));
 
   let abierto = $state<string | null>(null);
 
@@ -178,18 +148,15 @@
   {:else}
     <p class="resumen dim">
       {rows.length} movimiento{rows.length === 1 ? '' : 's'}
-      {#if totalVisible !== 0}
-        · suman <b class="money" class:neg={totalVisible > 0} class:pos={totalVisible < 0}>
-          {money(Math.abs(totalVisible))}
-        </b> {totalVisible > 0 ? 'de gasto' : 'de ingreso'}
-      {/if}
+      {#if suma.gastos}· <b class="money neg">{money(suma.gastos)}</b> en gastos{/if}
+      {#if suma.ingresos}· <b class="money pos">{money(suma.ingresos)}</b> en ingresos{/if}
     </p>
 
     <ul class="list">
       {#each rows as r}
         <li class="card">
           <button class="fila" onclick={() => (abierto = abierto === r.id ? null : r.id)}>
-            <span class="fecha dim">{shortDate(r.date)}</span>
+            <span class="fecha dim">{shortDate(r.fecha)}</span>
             <span class="txt">
               <b>{r.titulo}</b>
               <span class="sub dim">
