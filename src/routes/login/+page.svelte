@@ -67,7 +67,7 @@
 
 <div class="page login">
   <header>
-    <img class="mascota" src="/marca/kipo-saludo.svg" alt="" width="150" height="156" />
+    <img class="ilustracion mascota" src="/marca/kipo-saludo.svg" alt="" width="150" height="156" />
     <h1>Kipo</h1>
     <p class="dim">Tu dinero, en buenas manos.</p>
   </header>
@@ -108,7 +108,7 @@
 <style>
   .login { max-width: 380px; padding-top: 5vh; }
   header { text-align: center; margin-bottom: 1.6rem; }
-  .mascota { display: block; margin: 0 auto .4rem; width: 150px; height: auto; }
+  .mascota { width: 150px; margin-bottom: .5rem; }
   header h1 { font-size: 2.2rem; letter-spacing: -0.035em; font-weight: 750; }
   header p { margin: .15rem 0 0; }
 

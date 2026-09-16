@@ -168,7 +168,7 @@
       </section>
     {:else}
       <section class="card empty">
-        <img src="/marca/kipo-duda.svg" alt="" width="160" height="150" />
+        <img class="ilustracion" src="/marca/kipo-duda.svg" alt="" width="160" height="150" />
         <p>Todavía no registraste nada este mes.</p>
         <a class="btn-primary go" href="/nuevo">Registrar un movimiento</a>
       </section>
@@ -225,7 +225,7 @@
   .cuanto b { font-size: .92rem; white-space: nowrap; }
 
   .empty { text-align: center; }
-  .empty img { display: block; margin: .25rem auto .4rem; width: 160px; height: auto; }
+  .empty img { width: 160px; margin-bottom: .5rem; }
   .go { display: inline-block; text-decoration: none; padding: .8rem 1.2rem; border-radius: var(--radius); margin-top: .5rem; }
 
   .err {

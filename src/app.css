@@ -169,6 +169,31 @@ input[type='checkbox'] {
 
 .page { max-width: 680px; margin: 0 auto; padding: 1rem 1rem 6rem; }
 
+/* ---------------------------------------------------------------------------
+   Ilustraciones de la mascota.
+
+   Estan dibujadas para fondo claro: su contorno es #081324 y el fondo del tema
+   oscuro es #0C161A, practicamente el mismo color. Sin un fondo propio, en modo
+   oscuro la silueta se funde y los ojos quedan flotando.
+
+   La solucion es la que usa la propia marca en sus iconos: apoyarla sobre el
+   menta. En tema claro alcanza con una insinuacion; en oscuro tiene que ser el
+   menta entero para que el dibujo se lea.
+   --------------------------------------------------------------------------- */
+
+.ilustracion {
+  display: block;
+  margin-inline: auto;
+  background: color-mix(in srgb, var(--menta) 55%, transparent);
+  border-radius: 26%;
+  padding: .55rem;
+  height: auto;
+}
+
+@media (prefers-color-scheme: dark) {
+  .ilustracion { background: var(--menta); }
+}
+
 /* Aviso de que los saldos son estimados — ADR-005 / OD-13.
    No es decorativo: la app no puede mostrar un numero que parece exacto y no lo es. */
 .aprox {
