@@ -45,6 +45,7 @@ decision nobody made is fiction, and an agent will believe it.
 | [ADR-022](#adr-022--el-patrimonio-incluye-solo-activos-financieros) | El patrimonio incluye solo activos financieros | Accepted |
 | [ADR-023](#adr-023--la-unidad-de-medida-es-un-parámetro-dólares-o-poder-adquisitivo) | La unidad de medida es un parámetro: dólares o poder adquisitivo | Accepted |
 | [ADR-024](#adr-024--un-cedear-se-mide-al-ccl-porque-es-el-dólar-que-su-propio-precio-lleva-adentro) | Un CEDEAR se mide al CCL, porque es el dólar que su propio precio lleva adentro | Accepted |
+| [ADR-025](#adr-025--los-precios-se-traen-solos-todos-los-días-porque-el-de-hoy-no-se-recupera-mañana) | Los precios se traen solos todos los días, porque el de hoy no se recupera mañana | Accepted |
 
 ---
 
@@ -1152,3 +1153,78 @@ ok  si la accion sube 10%, el CEDEAR marca 110 dolares
 
 La cuarta y la quinta aserción son el ADR entero: **el mismo día, la misma posición, dos varas y una
 diferencia de 11% que no existió.**
+
+
+---
+
+## ADR-025 — Los precios se traen solos todos los días, porque el de hoy no se recupera mañana
+
+**Context.** OD-06 decía **DECIDED: carga automática** desde el 2026-09-16, y nadie la había
+construido: los precios se cargaban a mano, uno por uno, desde `/inversiones`. Una decisión escrita y
+no ejecutada es la peor clase de decisión, porque figura como resuelta.
+
+Lo que la volvió urgente no fue la comodidad, sino OD-31. Las cotizaciones del dólar **se piden hacia
+atrás** —son dato público— así que si un día falla el flujo, al día siguiente se recupera. Los precios
+de los activos **no**:
+
+```
+data912.com/historical/*  -> 404          (2026-09-16)
+data912.com/hist/*        -> 404
+data912.com/live/...?date=2026-09-01 -> 200, pero devuelve el precio de HOY
+```
+
+El precio de hoy que no se guarda hoy no se recupera nunca. Cada día sin guardar es un hueco
+permanente en el gráfico de evolución que todavía no existe. **Es barato hoy e imposible después.**
+
+**Decision.** Un flujo diario trae el precio de cada instrumento activo: CEDEARs y acciones de BYMA
+en pesos, cripto de Binance en USDT. Se pregunta a la base qué instrumentos hay y se piden solo esos.
+
+**Consequences.**
+- Se deja de pedir al usuario que cargue precios a mano. La carga manual **queda**: es el respaldo
+  para lo que ninguna fuente cubre, y la pantalla dice cuáles son.
+- **`underlying_symbol` dejó de ser informativo**: es la llave con la que se le pide el precio a la
+  fuente. Un CEDEAR se llama `AAPL-CEDEAR` en el libro y `AAPL` en BYMA. ADR-024 sigue siendo cierto
+  —medir al CCL no necesita ese campo— pero ahora el campo tiene un segundo trabajo.
+- **La parte incómoda:** un CEDEAR cargado sin ese símbolo **no recibe precio y no se rompe nada**.
+  Se queda quieto, que es la peor forma de fallar. Por eso el formulario lo pide, la lista marca
+  *a mano* las posiciones que no cotizan solas, y el flujo avisa cuántas quedaron sin precio.
+- Se aceptan dos aproximaciones, ambas por el mismo criterio —no sumar una dependencia más para
+  corregir décimas—: **USDT se trata como USD** (flota unas décimas alrededor), y de los dos plazos
+  de liquidación de BYMA se toma siempre el mismo (difieren menos del 0,1%).
+- Cripto se pide a **Binance y no a un índice global** a propósito: el usuario opera ahí, así que ese
+  es el precio que efectivamente obtendría. Un índice sería más neutral y menos cierto.
+
+**Rejected alternatives.**
+- *data912.com*: un GET simple contra un POST con cabeceras, y la misma data. Descartada por ser un
+  intermediario: es una pieza más que puede desaparecer entre BYMA y nosotros. Queda anotada como
+  respaldo si BYMA cierra el endpoint público.
+- *Pedir la rueda entera y filtrar en SQL*: 2196 filas por día para quedarse con tres o cuatro.
+- *Guardar solo el último precio en vez de la serie diaria*: responde *"¿gano o pierdo?"* pero no
+  *"¿cómo evolucionó?"*, y la segunda no se puede contestar retroactivamente. Es la mitad de OD-30 y
+  la razón entera de OD-31.
+
+**Evidence.** `scripts/precios.mjs`, `.github/workflows/precios.yml`,
+`supabase/migrations/20260916190000_llave_de_precio.sql`.
+
+**Verified against what already exists.**
+
+```
+Probado de punta a punta contra un postgres descartable con las migraciones y
+los datos de prueba cargados:
+
+  instrumentos en la base -> cedear AAPL-CEDEAR AAPL ARS
+                             crypto BTC         BTC  USD
+  node scripts/precios.mjs -> 2 de 2 precios listos
+  psql -f precios.sql      -> AAPL-CEDEAR 26440 ARS byma
+                              BTC         75784 USD binance
+
+BYMA devuelve el JSON CORTADO si no se pide comprimido: 2196 filas con
+--compressed, y un "Unterminated string" sin el. Un parse que falla es ruidoso
+y por eso es seguro; lo grave habria sido que parseara a medias. El script pide
+comprimido, reintenta y rechaza cualquier respuesta con menos de 100 filas.
+
+Cada simbolo aparece DOS veces, uno por plazo de liquidacion (AAPL a 26540 y a
+26520), y ademas cotiza en USD (AAPLD) y en cable (AAPLC). Filtrar por
+denominationCcy = 'ARS' no es un detalle: sin eso se valuaria una posicion en
+pesos con un numero en dolares.
+```

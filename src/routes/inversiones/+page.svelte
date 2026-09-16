@@ -37,6 +37,21 @@
   const num = (s: string) => Number(s.replace(/\./g, '').replace(',', '.')) || 0;
   const efectivo = $derived(cuentas.filter((c) => c.valuation === 'balance' && c.kind === 'asset'));
 
+  /**
+   * Si esta posición recibe precio automático.
+   *
+   * Tiene que decir lo MISMO que `scripts/precios.mjs`, que es quien de verdad
+   * los trae. Si las dos reglas se separan, la pantalla miente: dice "cotiza
+   * sola" sobre algo que nadie va a cotizar.
+   */
+  function cotizaSola(p: Posicion) {
+    if (p.kind === 'crypto') return p.quote_currency === 'USD' || p.quote_currency === 'USDT';
+    if (['cedear', 'stock', 'etf'].includes(p.kind)) {
+      return p.quote_currency === 'ARS' && !!(p.underlying_symbol ?? p.symbol);
+    }
+    return false;
+  }
+
   /** Los totales solo suman lo que tiene precio: de lo demás no sabemos. */
   const conPrecio = $derived(posiciones.filter((p) => p.valor !== null));
   const sinPrecio = $derived(posiciones.filter((p) => p.valor === null));
@@ -155,6 +170,7 @@
                 {Number(p.unidades).toFixed(Math.min(p.decimals, 8))} unidades
                 {#if p.institution}<span class="sep">·</span>{p.institution}{/if}
                 {#if p.fx_source}<span class="sep">·</span>al {p.fx_source.toUpperCase()}{/if}
+                {#if !cotizaSola(p)}<span class="sep">·</span><span class="manual">a mano</span>{/if}
               </span>
             </span>
             <span class="der">
@@ -180,6 +196,17 @@
                           disabled={busy || !precioRaw}>Guardar</button>
                 </span>
               </label>
+              {#if !cotizaSola(p)}
+                <p class="dim sm nota">
+                  Esta posición <b>no cotiza sola</b>: hay que cargarle el precio acá.
+                  {#if p.kind === 'cedear'}
+                    Le falta el símbolo de la acción que representa, que es con el que
+                    se le pide el precio a BYMA.
+                  {:else}
+                    No hay fuente automática configurada para {p.kind} en {p.quote_currency}.
+                  {/if}
+                </p>
+              {/if}
               {#if p.precio_al}
                 <p class="dim sm nota">
                   Último precio del {shortDate(p.precio_al)}
@@ -270,13 +297,17 @@
               <input class="monto" inputmode="decimal" bind:value={cRatio} placeholder="20" />
             </label>
             <label class="campo"><span>Acción que representa</span>
-              <input bind:value={cSubyacente} placeholder="AAPL" />
+              <input bind:value={cSubyacente} placeholder="AAPL" required />
             </label>
           </div>
           <p class="aviso">
             Los CEDEARs se miden al <b>contado con liqui</b>, no al MEP. Su precio en
             pesos ya lleva ese dólar adentro, así que usarlo es lo que separa
             <em>cuánto rindió la acción</em> de <em>cuánto se movió el dólar</em>.
+          </p>
+          <p class="aviso">
+            El símbolo de la acción es además <b>cómo se le pide el precio a BYMA</b>.
+            Sin él la posición no cotiza sola y hay que cargarle el precio a mano.
           </p>
         {/if}
         <button class="btn-primary" type="submit" disabled={busy || !cSymbol.trim() || !cDesde}>
@@ -326,6 +357,7 @@
   .chico { min-height: 48px; padding: 0 .9rem; flex-shrink: 0; }
   .monto { text-align: right; }
   .resumen { margin: 0; padding: .65rem .8rem; border-radius: 10px; background: var(--surface-2); font-size: .86rem; }
+  .manual { color: var(--warn); }
   .aviso {
     margin: 0; padding: .65rem .8rem; border-radius: 10px; font-size: .82rem;
     background: color-mix(in srgb, var(--warn) 12%, transparent);

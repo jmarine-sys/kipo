@@ -80,6 +80,10 @@ export interface Posicion {
   account_id: string;
   /** Con qué dólar se mide esta posición. Un CEDEAR nace al CCL (OD-17). */
   fx_source?: string | null;
+  /** Cuántos CEDEARs son una acción. Informativo: ADR-024 no lo usa para medir. */
+  ratio?: number | null;
+  /** El símbolo en la fuente de precios. Sin esto no cotiza sola (ADR-025). */
+  underlying_symbol?: string | null;
   name: string;
   institution: string | null;
   instrument_id: string;

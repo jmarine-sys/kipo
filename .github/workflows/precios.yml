@@ -1,0 +1,78 @@
+# Carga diaria del precio de los activos que hay en el libro.
+#
+# POR QUE ES DIARIO Y NO SE PUEDE POSPONER (OD-31): a diferencia de las
+# cotizaciones del dolar, que son dato publico y se piden hacia atras, los
+# precios de los activos solo se publican el dia de la rueda. Verificado el
+# 2026-09-16: data912 no expone endpoint historico y BYMA publica la rueda del
+# dia. El precio de hoy que no se guarda hoy no se recupera nunca. Un dia que
+# falle este flujo es un hueco permanente en el grafico de evolucion.
+#
+# Usa el mismo secreto que el respaldo: SUPABASE_DB_URL (session pooler).
+
+name: Precios
+
+on:
+  schedule:
+    - cron: '00 21 * * 1-5'   # dias habiles 21:00 UTC (~18:00 en Argentina, cerrada la rueda)
+  workflow_dispatch:
+
+concurrency:
+  group: precios
+  cancel-in-progress: false
+
+jobs:
+  cargar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # Se pregunta a la base que instrumentos hay en vez de pedirle a la fuente
+      # sus 2196 filas: de esas, interesan las tres o cuatro que tenes. El tercer
+      # campo es el simbolo en la fuente, que puede no ser el del libro.
+      - name: Preguntar que instrumentos hay
+        env:
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          docker run --rm postgres:17-alpine psql "$DB_URL" -At -F $'\t' -c "
+            select kind, symbol, coalesce(underlying_symbol, symbol), quote_currency
+              from instrument
+             where archived_at is null
+               and kind in ('cedear','crypto','stock','etf')
+             order by kind, symbol
+          " > /tmp/instrumentos.tsv
+          echo "instrumentos activos: $(wc -l < /tmp/instrumentos.tsv)"
+
+      - name: Traer los precios
+        run: |
+          node scripts/precios.mjs < /tmp/instrumentos.tsv > /tmp/precios.sql
+          echo "precios generados: $(grep -c 'insert into price' /tmp/precios.sql || echo 0)"
+
+      - name: Guardarlos
+        env:
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          if [ ! -s /tmp/precios.sql ]; then
+            echo "::warning::Ningun precio para guardar. Ese dia no se recupera."
+            exit 0
+          fi
+          docker run --rm -i -v /tmp/precios.sql:/precios.sql:ro postgres:17-alpine \
+            psql "$DB_URL" -v ON_ERROR_STOP=1 -q -f /precios.sql
+          echo "aplicados"
+
+      # Se comprueba contra lo que se PEDIA, no contra un numero fijo: si tenes
+      # cuatro instrumentos y entraron dos, eso es un hueco aunque dos sea > 0.
+      - name: Comprobar que no quedaron huecos
+        env:
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          pedidos=$(wc -l < /tmp/instrumentos.tsv)
+          guardados=$(docker run --rm postgres:17-alpine psql "$DB_URL" -tAc \
+            "select count(distinct instrument_id) from price
+              where on_date = current_date and source in ('byma','binance')")
+          echo "instrumentos: $pedidos — con precio de hoy: $guardados"
+          if [ "$guardados" -lt "$pedidos" ]; then
+            echo "::warning::$((pedidos - guardados)) instrumento/s sin precio de hoy. Ese dia no se recupera."
+          fi
