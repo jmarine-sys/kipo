@@ -170,7 +170,17 @@ En GitHub: **Settings → Secrets and variables → Actions → New repository s
 - Nombre: `SUPABASE_DB_URL`
 - Valor: la cadena completa del session pooler
 
-### 8.3 Probarlo
+### 8.3 Las cotizaciones usan el mismo secreto
+
+El flujo **Cotizaciones** guarda a diario el dólar y la UVA, que es lo que permite
+medir el rendimiento en dólares o en poder adquisitivo. Usa el mismo
+`SUPABASE_DB_URL`, así que no hace falta configurar nada más.
+
+**Una vez, al empezar**, conviene cargar el histórico: pestaña **Actions →
+Cotizaciones → Run workflow**, y en *desde* poné la fecha de tu movimiento de
+inversión más viejo. Trae todas las fechas intermedias.
+
+### 8.4 Probarlo
 
 Pestaña **Actions → Respaldo de la base → Run workflow**.
 

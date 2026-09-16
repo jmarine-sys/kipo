@@ -1,0 +1,64 @@
+# Carga diaria de cotizaciones del dolar y de la UVA.
+#
+# Sin esto no se puede medir el rendimiento en dolares ni en poder adquisitivo:
+# cada movimiento hay que valuarlo con la vara de SU fecha, y esa vara tiene que
+# estar guardada.
+#
+# Usa el mismo secreto que el respaldo: SUPABASE_DB_URL (session pooler).
+#
+# A diferencia de los precios de los activos, estas cotizaciones SI se pueden
+# recuperar hacia atras -son dato publico- asi que si un dia falla no se pierde
+# nada: al dia siguiente se puede volver a pedir esa fecha.
+
+name: Cotizaciones
+
+on:
+  schedule:
+    - cron: '30 21 * * 1-5'   # dias habiles 21:30 UTC (~18:30 en Argentina, cerrado el mercado)
+  workflow_dispatch:
+    inputs:
+      desde:
+        description: 'Cargar desde esta fecha (AAAA-MM-DD). Vacio = solo hoy'
+        required: false
+
+concurrency:
+  group: cotizaciones
+  cancel-in-progress: false
+
+jobs:
+  cargar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Traer las cotizaciones
+        run: |
+          if [ -n "${{ inputs.desde }}" ]; then
+            node scripts/cotizaciones.mjs desde "${{ inputs.desde }}" > /tmp/cot.sql
+          else
+            node scripts/cotizaciones.mjs hoy > /tmp/cot.sql
+          fi
+          echo "generadas $(grep -c 'insert into fx_rate' /tmp/cot.sql) cotizaciones"
+
+      - name: Guardarlas
+        env:
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          docker run --rm -i -v /tmp/cot.sql:/cot.sql:ro postgres:17-alpine \
+            psql "$DB_URL" -v ON_ERROR_STOP=1 -q -f /cot.sql
+          echo "aplicadas"
+
+      - name: Comprobar que la medicion quedo al dia
+        env:
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          faltan=$(docker run --rm postgres:17-alpine psql "$DB_URL" -tAc \
+            "select count(*) from fx_rate where on_date = current_date")
+          echo "cotizaciones de hoy en la base: $faltan"
+          # 7 = seis dolares + UVA. Menos que eso es que alguna fuente fallo.
+          if [ "$faltan" -lt 5 ]; then
+            echo "::warning::Solo $faltan cotizaciones de hoy. Alguna fuente pudo fallar."
+          fi
