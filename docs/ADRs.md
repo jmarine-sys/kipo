@@ -46,6 +46,7 @@ decision nobody made is fiction, and an agent will believe it.
 | [ADR-023](#adr-023--la-unidad-de-medida-es-un-parámetro-dólares-o-poder-adquisitivo) | La unidad de medida es un parámetro: dólares o poder adquisitivo | Accepted |
 | [ADR-024](#adr-024--un-cedear-se-mide-al-ccl-porque-es-el-dólar-que-su-propio-precio-lleva-adentro) | Un CEDEAR se mide al CCL, porque es el dólar que su propio precio lleva adentro | Accepted |
 | [ADR-025](#adr-025--los-precios-se-traen-solos-todos-los-días-porque-el-de-hoy-no-se-recupera-mañana) | Los precios se traen solos todos los días, porque el de hoy no se recupera mañana | Accepted |
+| [ADR-026](#adr-026--el-portafolio-es-el-borde-es-flujo-solo-lo-que-lo-cruza) | El portafolio es el borde: es flujo solo lo que lo cruza | Accepted |
 
 ---
 
@@ -1228,3 +1229,77 @@ Cada simbolo aparece DOS veces, uno por plazo de liquidacion (AAPL a 26540 y a
 denominationCcy = 'ARS' no es un detalle: sin eso se valuaria una posicion en
 pesos con un numero en dolares.
 ```
+
+
+---
+
+## ADR-026 — El portafolio es el borde: es flujo solo lo que lo cruza
+
+**Context.** El usuario miró la pantalla de inversiones y dijo que esos elementos deberían pertenecer
+a un portafolio —Binance, Balanz— y que **lo que importa es el valor del portafolio**. Se verificó
+contra `flujo_inversion`, que unía solo cuentas `market` y `accrual`, y la observación resultó ser
+más grave de lo enunciado. Tres agujeros, todos el mismo error:
+
+1. **El efectivo quieto en el broker no existía.** Vendés ETH, dejás los dólares ahí: el portafolio
+   marcaba cero. La cuenta de efectivo del broker es `valuation = 'balance'` y quedaba fuera.
+2. **La plata depositada que espera no penalizaba.** El aporte se fechaba en la COMPRA, no en el
+   depósito. Si la plata entró en enero y se compró en julio, seis meses ociosos desaparecían **y el
+   rendimiento salía mejor de lo que fue.**
+3. **Comprar adentro contaba como aporte nuevo.** Cambiar USDT por ETH no es plata que entró: es la
+   misma plata cambiando de forma.
+
+**Decision.** Un portafolio agrupa cuentas. Su valor son sus posiciones **más su efectivo**, y es
+flujo únicamente lo que tiene la contraparte fuera del portafolio.
+
+**Consequences.**
+- Una sola condición cierra los tres agujeros, sin ningún caso especial:
+  `where contraparte.portfolio_id is distinct from p.id`.
+- **Una contraparte sin cuenta es una categoría, y no es flujo.** El interés que paga el broker no
+  es plata que aportaste: es rendimiento generado adentro. Sube el valor, no el aporte.
+- Se mide sobre la pata de AFUERA, no la de adentro: cuando comprás un CEDEAR con pesos, lo que cruzó
+  son los pesos, y los pesos se convierten con la cotización del día. Convertir la pata de adentro
+  exigiría el precio del activo en esa fecha, que puede no existir.
+- **Generaliza hacia arriba:** tu patrimonio entero es el portafolio que contiene todo. *"¿Le gané a
+  la inflación?"* es la misma cuenta con el borde corrido. Y el rendimiento por posición es la misma
+  función con el borde en una sola cuenta. **Una máquina, tres preguntas.**
+- Pertenecer es **opcional**, y ahí está la diferencia con agrupar por institución: la cuenta
+  remunerada de Mercado Pago no tiene por qué entrar, aunque Mercado Pago también sea una
+  institución. [ADR-013](#adr-013--la-cuenta-remunerada-es-una-cuenta-bancaria-su-interés-es-un-ingreso-mensual)
+  ya había decidido que eso es un banco, no una inversión.
+- El portafolio fija su propio dólar: Balanz al CCL, Binance al cripto. La cuenta manda sobre el
+  portafolio y el portafolio sobre el libro — tres niveles, un solo `coalesce`.
+- **La parte incómoda:** hay un campo más que llenar al crear una cuenta, y una cuenta que se olvida
+  de apuntar a su portafolio **no rompe nada**: mide mal en silencio. Es el mismo modo de falla que
+  ADR-025 y se mitiga igual, diciéndolo en la pantalla.
+- `valor_inversion` dejó de ser una vista propia y pasó a ser un recorte de `valor_cuenta`. Ahora hay
+  **una sola definición de cuánto vale una cuenta**. La lección ya había aparecido tres veces en este
+  proyecto: cuando algo se define en seis lugares, los seis dejan de coincidir.
+
+**Rejected alternatives.**
+- *Agrupar por `institution`, que ya existe*: cero cambios de esquema y funcionaba hoy mismo.
+  Descartada por dos razones concretas: es texto libre —`Binance` y `binance` serían dos portafolios—
+  y arrastra adentro TODA cuenta de esa institución, incluida la remunerada que ADR-013 excluyó.
+- *Medir solo el patrimonio global*: contesta la pregunta central y es gratis, pero no deja comparar
+  Binance contra Balanz ni ver cuál de los dos arrastra al otro.
+- *Una tabla `holding` con las posiciones adentro*: vuelve a introducir el objeto que el modelo ya
+  había eliminado —una posición es una cuenta— para resolver algo que se resuelve agrupando.
+
+**Evidence.** `supabase/migrations/20260916200000_portafolios.sql`, `supabase/tests/14_portafolios.sql`.
+
+**Verified against what already exists.**
+
+```
+docker: postgres:16 descartable, suite completa -> 115 aserciones ok
+
+ok  el deposito desde el banco es un aporte de 1000 dolares
+ok  el efectivo quieto en el broker VALE: 1000 dolares
+ok  comprar ADENTRO no es un aporte nuevo: sigue habiendo 1 flujo
+ok  el portafolio vale efectivo MAS posiciones: 500 + 600
+ok  el interes que paga el broker NO es aporte: es rendimiento
+ok  pero SI sube el valor del portafolio: 1100 a 1120
+ok  el retiro cruza el borde: aporte neto 1000 - 300 = 700
+ok  el aporte lleva la fecha del DEPOSITO, no la de la compra
+```
+
+La tercera y la octava son el ADR entero: **la plata cambió de forma cinco veces adentro y el aporte
+sigue siendo uno solo, con la fecha en que cruzó.**

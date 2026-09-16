@@ -78,6 +78,9 @@ psql -h localhost -p "$PORT" -U postgres -qtA -f supabase/tests/12_cartera.sql 2
 echo "== CEDEARs: rendimiento del activo vs movimiento del dolar =="
 psql -h localhost -p "$PORT" -U postgres -qtA -f supabase/tests/13_cedears.sql 2>&1 | grep -E '^(ok|FALLO)' | mirar
 
+echo "== el portafolio es el borde: que cuenta como aporte y que no =="
+psql -h localhost -p "$PORT" -U postgres -qtA -f supabase/tests/14_portafolios.sql 2>&1 | grep -E '^(ok|FALLO)' | mirar
+
 echo
 if grep -q 'FALLO' "$FALLOS"; then
   echo "HAY FALLOS:"
