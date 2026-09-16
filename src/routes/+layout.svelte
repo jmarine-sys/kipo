@@ -17,10 +17,14 @@
     if (session.ready && authed && isLogin) goto('/', { replaceState: true });
   });
 
+  // Cuatro destinos. 'Agenda' existe porque sin ella los gastos recurrentes eran
+  // inalcanzables: la única puerta era una tarjeta de Inicio que solo aparece
+  // cuando ya cargaste alguno, y para cargar el primero había que entrar ahí.
   const tabs = [
-    { href: '/',            label: 'Inicio',      icon: '◧' },
-    { href: '/movimientos', label: 'Movimientos', icon: '≡' },
-    { href: '/cuentas',     label: 'Cuentas',     icon: '▤' }
+    { href: '/',             label: 'Inicio',      icon: 'casa' },
+    { href: '/movimientos',  label: 'Movimientos', icon: 'lista' },
+    { href: '/recurrentes',  label: 'Agenda',      icon: 'agenda' },
+    { href: '/cuentas',      label: 'Cuentas',     icon: 'cuentas' }
   ];
 </script>
 
@@ -33,7 +37,7 @@
     <nav class="tabbar">
       {#each tabs as t}
         <a href={t.href} class:active={page.url.pathname === t.href}>
-          <span class="ic" aria-hidden="true">{t.icon}</span>
+          {@render icono(t.icon)}
           <span class="lb">{t.label}</span>
         </a>
       {/each}
@@ -48,6 +52,30 @@
     </nav>
   {/if}
 {/if}
+
+<!-- Dibujados y no caracteres Unicode: los simbolos geometricos se ven distintos
+     en cada telefono, y algunos ni se dibujan. -->
+{#snippet icono(cual: string)}
+  <svg class="ic" viewBox="0 0 24 24" width="22" height="22" fill="none"
+       stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+       stroke-linejoin="round" aria-hidden="true" focusable="false">
+    {#if cual === 'casa'}
+      <path d="M3 10.5 12 3l9 7.5" />
+      <path d="M5.5 9.5V20h13V9.5" />
+      <path d="M9.5 20v-6h5v6" />
+    {:else if cual === 'lista'}
+      <path d="M4 7h16M4 12h16M4 17h10" />
+    {:else if cual === 'agenda'}
+      <rect x="3.2" y="5" width="17.6" height="15.5" rx="2.5" />
+      <path d="M8 3v4M16 3v4M3.2 10h17.6" />
+      <circle cx="8.5" cy="14" r="1.1" fill="currentColor" stroke="none" />
+    {:else}
+      <rect x="3" y="6" width="18" height="13" rx="2.5" />
+      <path d="M3 10h18" />
+      <circle cx="16.5" cy="14.5" r="1.2" fill="currentColor" stroke="none" />
+    {/if}
+  </svg>
+{/snippet}
 
 <style>
   .boot { display: grid; place-items: center; min-height: 60vh; }
@@ -71,7 +99,7 @@
     font-size: .72rem;
   }
   .tabbar a.active { color: var(--accent); }
-  .ic { font-size: 1.1rem; line-height: 1; }
+  .ic { display: block; }
 
   /* El boton de registrar es el mas grande y el mas a mano: es el 90% del uso. */
   .fab {
