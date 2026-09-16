@@ -82,3 +82,33 @@ select case when round(uva, 2) = 428.57
   from valor_inversion where account_id = :'pos';
 
 reset role;
+
+-- ---- lo cerrado sigue contando ---------------------------------------------
+set role rls_probe;
+select set_config('test.uid','11111111-1111-1111-1111-111111111111', false);
+
+-- comprar y vender ENTERO con ganancia: la posicion se archiva
+select comprar_activo('ADA','Cardano','crypto','USDT',8,
+                      (select id from account where name='Binance USDT'),
+                      300, 1000, 'Binance', current_date - 200) as cerr \gset
+select vender_activo(:'cerr', 1000,
+                     (select id from account where name='Binance USDT'),
+                     450, current_date);
+
+select case when cerrada and valor_nativo = 0 and usd = 0
+            then 'ok  una posicion vendida entera vale cero, no desaparece'
+            else format('FALLO  cerrada=%s valor=%s', cerrada, valor_nativo) end
+  from valor_inversion where account_id = :'cerr';
+
+select case when count(*) = 2 and round(sum(usd)) = 150
+            then 'ok  sus flujos siguen: -300 y +450, la ganancia no se borra'
+            else format('FALLO  %s flujos, suman %s', count(*), round(sum(usd))) end
+  from flujo_inversion where account_id = :'cerr';
+
+-- y sin precio cargado nunca, igual vale cero: no hace falta precio para saber
+-- que una posicion sin unidades no vale nada
+select case when usd = 0 then 'ok  no necesita precio para valer cero'
+            else format('FALLO  dio %s', usd) end
+  from valor_inversion where account_id = :'cerr';
+
+reset role;

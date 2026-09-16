@@ -19,6 +19,8 @@ export interface ValorInversion {
   valuation: 'market' | 'accrual';
   institution: string | null;
   matures_on: string | null;
+  /** true si ya se vendió o venció. Vale cero pero sus flujos siguen contando. */
+  cerrada: boolean;
   symbol: string | null;
   kind: string | null;
   quote_currency: string | null;
@@ -113,3 +115,8 @@ export const GRUPOS = [
   { id: 'bursatil', label: 'Bursátil',    test: (v: ValorInversion) => v.valuation === 'market' && v.kind !== 'crypto' },
   { id: 'plazos',  label: 'Plazos fijos', test: (v: ValorInversion) => v.valuation === 'accrual' }
 ] as const;
+
+/** Cuántas de estas inversiones ya se cerraron. */
+export function cerradas(valores: ValorInversion[]): number {
+  return valores.filter((v) => v.cerrada).length;
+}

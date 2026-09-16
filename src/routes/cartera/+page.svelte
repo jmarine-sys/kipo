@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import {
-    cargarCartera, calcular, GRUPOS,
+    cargarCartera, calcular, cerradas, GRUPOS,
     type FlujoInversion, type ValorInversion, type Faltante
   } from '$lib/ledger/cartera';
   import { prefs, elegirMedida, elegirObjetivo } from '$lib/preferencias.svelte';
@@ -34,6 +34,8 @@
     anual === null || objetivo <= 0 ? 0 : Math.max(0, Math.min(1.35, anual / objetivo))
   );
 
+  const yaCerradas = $derived(cerradas(valores));
+  const vivas = $derived(valores.length - yaCerradas);
   const sinDato = $derived(faltantes.filter((f) => f.sin_dolar || f.sin_uva).length);
   const desfasado = $derived(faltantes.filter((f) => f.dolar_viejo || f.uva_viejo).length);
 
@@ -132,7 +134,16 @@
           </div>
         </div>
         {#if total.dias}
-          <p class="dim sm nota">Medido sobre {total.dias} días desde tu primer aporte.</p>
+          <p class="dim sm nota">
+            Medido sobre {total.dias} días desde tu primer aporte.
+            {#if yaCerradas}
+              <!-- Importante que se diga: el número incluye lo que ya vendiste, y
+                   eso es lo que lo convierte en tu historial de inversión y no
+                   solo una foto de lo que tenés hoy. -->
+              Incluye {yaCerradas} {yaCerradas === 1 ? 'inversión ya cerrada' : 'inversiones ya cerradas'}
+              además de {vivas === 1 ? 'la que tenés' : `las ${vivas} que tenés`} abierta{vivas === 1 ? '' : 's'}.
+            {/if}
+          </p>
         {/if}
       </section>
     {/if}
