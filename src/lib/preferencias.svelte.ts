@@ -14,12 +14,19 @@ const CLAVE = 'kipo:prefs';
 
 export const prefs = $state({
   tema: 'auto' as Tema,
-  privado: false
+  privado: false,
+  /** Objetivo de rendimiento anual, en porcentaje. La vara contra la que se compara. */
+  objetivo: 10,
+  /** Con qué se mide el rendimiento: dólares o poder adquisitivo (ADR-023). */
+  medida: 'USD' as 'USD' | 'UVA'
 });
 
 function guardar() {
   try {
-    localStorage.setItem(CLAVE, JSON.stringify({ tema: prefs.tema, privado: prefs.privado }));
+    localStorage.setItem(CLAVE, JSON.stringify({
+      tema: prefs.tema, privado: prefs.privado,
+      objetivo: prefs.objetivo, medida: prefs.medida
+    }));
   } catch {
     /* modo privado del navegador: se pierde la preferencia, no la funcionalidad */
   }
@@ -42,6 +49,8 @@ export function cargarPreferencias() {
       const o = JSON.parse(crudo) as Partial<typeof prefs>;
       if (o.tema === 'claro' || o.tema === 'oscuro' || o.tema === 'auto') prefs.tema = o.tema;
       if (typeof o.privado === 'boolean') prefs.privado = o.privado;
+      if (typeof o.objetivo === 'number') prefs.objetivo = o.objetivo;
+      if (o.medida === 'USD' || o.medida === 'UVA') prefs.medida = o.medida;
     }
   } catch { /* sin memoria: quedan los valores por defecto */ }
   aplicar();
@@ -50,6 +59,16 @@ export function cargarPreferencias() {
 export function elegirTema(t: Tema) {
   prefs.tema = t;
   aplicar();
+  guardar();
+}
+
+export function elegirMedida(m: 'USD' | 'UVA') {
+  prefs.medida = m;
+  guardar();
+}
+
+export function elegirObjetivo(n: number) {
+  prefs.objetivo = n;
   guardar();
 }
 

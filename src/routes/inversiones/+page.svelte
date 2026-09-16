@@ -103,7 +103,7 @@
   <div class="spread">
     <a href="/cuentas" class="back" aria-label="Volver">←</a>
     <h1>Inversiones</h1>
-    <span></span>
+    <a href="/cartera" class="rend">Rendimiento →</a>
   </div>
 
   {#if error}<p class="err" role="alert">{error}</p>{/if}
@@ -268,6 +268,7 @@
 
 <style>
   .back { font-size: 1.5rem; text-decoration: none; }
+  .rend { text-decoration: none; font-size: .86rem; font-weight: 600; white-space: nowrap; }
   h1 { font-size: 1.15rem; }
   .sm { font-size: .78rem; }
 
