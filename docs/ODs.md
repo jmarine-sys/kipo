@@ -107,7 +107,7 @@ De los 8 `OPEN`, ninguno impide usar la aplicación:
 - **Riesgo solo evaluable con uso real (4):** OD-10 pausa por inactividad, OD-11 la fricción de la
   tarjeta, OD-22 el reseteo tras la puesta en marcha, OD-25 el preview que apunta a producción.
 - **Diferido por el usuario (1):** OD-32, el plazo fijo UVA.
-- **Deuda: una.** OD-46, lo común copiado en cada pantalla: primera pasada hecha, falta el resto.
+- **Deuda (1):** OD-46, lo común copiado en cada pantalla — primera pasada hecha, falta el resto.
 
 **Ningún `NEEDS-INPUT` abierto.** Los dos que hubo —OD-41 y OD-43— cerraron el mismo día que se
 plantearon: los dos esperaban una decisión que solo podía tomar el usuario, y la tomó.
