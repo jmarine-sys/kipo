@@ -1,7 +1,8 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import {
-    misLibros, cambiarLibro, crearInvitacion, aceptarInvitacion, crearLibro, type Libro
+    misLibros, cambiarLibro, crearInvitacion, aceptarInvitacion, crearLibro,
+    archivarLibro, eliminarLibro, type Libro
   } from '$lib/ledger/libros';
 
   let libros = $state<Libro[]>([]);
@@ -86,6 +87,26 @@
               <span class="dim sm">cambiar →</span>
             {/if}
           </button>
+
+          <!-- Solo el dueño, y nunca el último que te queda: sin ningún libro la
+               app no tiene nada que mostrar y no hay forma de volver. -->
+          {#if l.role === 'owner' && libros.length > 1}
+            <div class="sacar">
+              {#if l.movimientos === 0}
+                <button class="peligro chico" disabled={busy}
+                        onclick={() => { if (confirm(`¿Borrar "${l.name}"? No tiene movimientos, así que no se pierde nada.`)) correr(() => eliminarLibro(l.ledger_id)); }}>
+                  Borrar
+                </button>
+                <span class="dim sm">No tiene movimientos</span>
+              {:else}
+                <button class="peligro chico" disabled={busy}
+                        onclick={() => { if (confirm(`¿Archivar "${l.name}"? Sus ${l.movimientos} movimientos quedan intactos, pero el libro deja de aparecer.`)) correr(() => archivarLibro(l.ledger_id)); }}>
+                  Archivar
+                </button>
+                <span class="dim sm">{l.movimientos} movimientos: no se puede borrar</span>
+              {/if}
+            </div>
+          {/if}
         </li>
       {/each}
     </ul>
@@ -179,6 +200,10 @@
     min-height: var(--tap); color: inherit;
   }
   .txt { display: flex; flex-direction: column; gap: .15rem; }
+  .sacar {
+    display: flex; align-items: center; gap: .55rem; flex-wrap: wrap;
+    padding: 0 .85rem .7rem;
+  }
   .marca {
     font-size: .7rem; padding: .12rem .45rem; border-radius: 999px;
     background: var(--accent); color: var(--accent-fg); white-space: nowrap;

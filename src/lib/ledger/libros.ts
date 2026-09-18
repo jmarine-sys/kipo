@@ -13,6 +13,8 @@ export interface Libro {
   role: 'owner' | 'member';
   activo: boolean;
   miembros: number;
+  /** Cuántos movimientos tiene. Decide si se puede borrar o solo archivar. */
+  movimientos: number;
   joined_at: string;
 }
 
@@ -89,4 +91,21 @@ export async function aportarALibro(o: {
     p_detalle: o.detalle ?? null
   });
   if (error) fallar('No se pudo pasar la plata', error);
+}
+
+/**
+ * Sacar un libro de en medio.
+ *
+ * Misma regla que para cuentas y categorías, y por eso es fácil de explicar: se
+ * BORRA lo que no tiene historia y se ARCHIVA lo que sí. Un libro con
+ * movimientos no se borra ni pidiendo por favor — es lo que ADR-018 protege.
+ */
+export async function archivarLibro(id: string): Promise<void> {
+  const { error } = await supabase.rpc('archivar_libro', { p_ledger: id });
+  if (error) fallar('No se pudo archivar', error);
+}
+
+export async function eliminarLibro(id: string): Promise<void> {
+  const { error } = await supabase.rpc('eliminar_libro', { p_ledger: id });
+  if (error) fallar('No se pudo borrar', error);
 }

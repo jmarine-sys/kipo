@@ -3,6 +3,8 @@
   import { listEntries, deleteTransaction, toCSV, download, type EntryDetail } from '$lib/ledger/api';
   import { filasDeMovimientos, totales } from '$lib/ledger/presentacion';
   import { colorCategoria } from '$lib/categorias';
+  import Cuenta from '$lib/Cuenta.svelte';
+  import { nombresRepetidos, esAmbigua } from '$lib/ledger/tipos';
   import { money, monthRange, shortDate, today } from '$lib/format';
   import Vacio from '$lib/Vacio.svelte';
 
@@ -65,6 +67,12 @@
     filasDeMovimientos(entries)
       .filter((r) => !filtrando || (r.madre !== null && madres.includes(r.madre)))
   );
+
+  /** Los nombres repetidos de TODO lo que se está viendo, para aclarar el banco
+      solo donde hace falta. */
+  const repetidos = $derived(nombresRepetidos(
+    rows.flatMap((r) => [r.cuenta, r.desde, r.hacia].filter(Boolean) as { name: string }[])
+  ));
 
   const suma = $derived(totales(rows));
 
@@ -170,10 +178,23 @@
           <button class="fila" onclick={() => (abierto = abierto === r.id ? null : r.id)}>
             <span class="fecha dim">{shortDate(r.fecha)}</span>
             <span class="txt">
-              <b>{r.titulo}</b>
+              <!-- Una transferencia se lee como lo que es: de dónde a dónde. Las
+                   dos cuentas con su moneda, igual que en todas las pantallas. -->
+              {#if r.desde || r.hacia}
+                <b class="mov">
+                  {#if r.desde}<Cuenta cuenta={r.desde} ambigua={esAmbigua(r.desde, repetidos)} />{/if}
+                  <span class="flecha" aria-hidden="true">→</span>
+                  {#if r.hacia}<Cuenta cuenta={r.hacia} ambigua={esAmbigua(r.hacia, repetidos)} />{/if}
+                </b>
+              {:else}
+                <b>{r.titulo}</b>
+              {/if}
               <span class="sub dim">
                 {#if r.madre}<i class="punto" style="background:{colorCategoria(r.madre)}"></i>{r.madre}{/if}
-                {#if r.cuenta}<span class="sep">·</span>{r.cuenta}{/if}
+                {#if r.cuenta}
+                  <span class="sep">·</span>
+                  <Cuenta cuenta={r.cuenta} ambigua={esAmbigua(r.cuenta, repetidos)} />
+                {/if}
                 {#if r.nota}<span class="sep">·</span>{r.nota}{/if}
               </span>
             </span>
@@ -244,6 +265,8 @@
   .fecha { font-size: .72rem; line-height: 1.2; }
   .txt { display: flex; flex-direction: column; min-width: 0; gap: .1rem; }
   .txt b { font-size: .95rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mov { display: inline-flex; align-items: baseline; gap: .35rem; flex-wrap: wrap; }
+  .flecha { opacity: .5; }
   .sub { font-size: .74rem; display: flex; align-items: center; gap: .3rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .sep { opacity: .5; }
   .punto { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; display: inline-block; }

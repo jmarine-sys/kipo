@@ -209,3 +209,59 @@ select case when count(*) = 0
  where e.ledger_id <> t.ledger_id;
 
 reset role;
+
+-- ---------------------------------------------------------------------------
+-- Sacar un libro: la misma regla que para cuentas y categorias.
+--   se BORRA lo que no tiene historia; se ARCHIVA lo que si la tiene.
+-- ---------------------------------------------------------------------------
+set role rls_probe;
+select set_config('test.uid','11111111-1111-1111-1111-111111111111', false);
+
+select crear_libro('Para borrar') as vacio \gset
+
+select case when count(*) = 3 then 'ok  tres libros antes de sacar ninguno'
+            else format('FALLO  hay %s', count(*)) end
+  from mi_libro;
+
+-- Uno vacio se borra entero: no se pierde nada.
+select eliminar_libro(:'vacio');
+select case when count(*) = 2 then 'ok  un libro sin movimientos se borra'
+            else format('FALLO  quedaron %s', count(*)) end
+  from mi_libro;
+
+-- Uno con historia NO se borra ni pidiendo por favor.
+do $$
+begin
+  perform eliminar_libro((select ledger_id from mi_libro where name = 'Casa'));
+  raise notice 'FALLO  borro un libro con movimientos';
+exception when others then
+  raise notice 'ok  un libro con movimientos NO se borra: se archiva';
+end $$;
+
+select archivar_libro((select ledger_id from mi_libro where name = 'Casa'));
+
+select case when count(*) = 1 then 'ok  archivado, desaparece de la lista'
+            else format('FALLO  se ven %s', count(*)) end
+  from mi_libro;
+
+-- Desde afuera del rol de cliente: ADR-020 le niega la tabla `ledger`, asi que
+-- ni para comprobar esto puede verla. Que el propio test se choque con eso es
+-- una confirmacion, no un estorbo.
+reset role;
+select case when count(*) > 0
+            then 'ok  pero su historia queda entera en la base'
+            else 'FALLO GRAVE  se perdieron los movimientos del libro archivado' end
+  from transaction t join ledger l on l.id = t.ledger_id where l.archived_at is not null;
+set role rls_probe;
+select set_config('test.uid','11111111-1111-1111-1111-111111111111', false);
+
+-- Y no te podes quedar sin ninguno.
+do $$
+begin
+  perform archivar_libro((select ledger_id from mi_libro limit 1));
+  raise notice 'FALLO  te dejo sin ningun libro';
+exception when others then
+  raise notice 'ok  no se puede archivar el unico libro que te queda';
+end $$;
+
+reset role;

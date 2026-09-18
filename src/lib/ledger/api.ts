@@ -12,6 +12,8 @@ export interface EntryDetail {
   account_id: string | null;
   account_name: string | null;
   account_kind: 'asset' | 'liability' | null;
+  /** Dónde está la cuenta. Hace falta para distinguir dos que se llamen igual. */
+  account_institution: string | null;
   category_id: string | null;
   category_name: string | null;
   category_kind: 'income' | 'expense' | null;

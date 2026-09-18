@@ -217,9 +217,11 @@
                   <!-- La misma ficha que en el resto de la app: nombre, moneda,
                        y el banco solo cuando hay otra cuenta que se llama igual. -->
                   <Cuenta cuenta={b} ambigua={esAmbigua(b, repetidos)} />
-                  <!-- El tipo se deduce de lo que ES, nunca del nombre: renombrar
-                       una cuenta no puede cambiar cómo se la trata. -->
-                  <span class="tag tipo">{tipoDeCuenta(b)}</span>
+                  <!-- El tipo va DEBAJO y en su propia línea, no al lado: al lado
+                       se colapsaba cuando no entraba, y quedaba a veces arriba y
+                       a veces abajo. Una lista se lee por su forma, y la forma no
+                       puede depender del largo del nombre. -->
+                  <span class="tipo dim">{tipoDeCuenta(b)}</span>
                 </span>
                 <b class="money" class:neg={Number(b.balance) < 0}>{money(b.balance, b.unit)}</b>
               </button>
@@ -351,8 +353,8 @@
   .cuotas .meses li { align-items: baseline; gap: .5rem; }
   .cuotas .cap { text-transform: capitalize; }
   .cuotas p { margin: 0; }
-  .nom { display: flex; align-items: baseline; gap: .4rem; flex-wrap: wrap; }
-  .nom .tag.tipo { font-size: .66rem; opacity: .7; }
+  .nom { display: flex; flex-direction: column; align-items: flex-start; gap: .1rem; min-width: 0; }
+  .nom .tipo { font-size: .72rem; }
   .vistas { display: grid; grid-template-columns: 1fr 1fr; gap: .4rem; margin-bottom: .2rem; }
   .vistas button { min-height: 40px; font-size: .85rem; }
   .vistas button.on {
@@ -370,7 +372,6 @@
   .acc { width: 100%; border: none; background: none; padding: .45rem 0; min-height: 42px; text-align: left; gap: .6rem; }
   .nom { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .acc b { white-space: nowrap; }
-  .tag { font-size: .68rem; color: var(--text-dim); margin-left: .4rem; }
 
   .panel { padding: .8rem; margin: .2rem 0 .5rem; background: var(--surface-2); border-radius: 10px; }
   .campo .row { gap: .4rem; }

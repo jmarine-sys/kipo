@@ -84,6 +84,7 @@ const fila = (o: Partial<EntryDetail> & { transaction_id: string }): EntryDetail
   id: crypto.randomUUID(),
   ledger_id: 'l', amount: '0', unit: 'ARS',
   account_id: null, account_name: null, account_kind: null, account_valuation: null,
+  account_institution: null,
   category_id: null, category_name: null, category_kind: null,
   category_is_system: false, category_role: null, category_parent: null,
   occurred_on: '2026-10-15', description: null, tx_kind: 'expense',

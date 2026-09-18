@@ -13,12 +13,36 @@ import type { EntryDetail } from './api';
  * vive una sola vez, igual que el convenio de signos vive una sola vez en
  * `entries.ts`. Una pantalla pide una fila; nunca interpreta un signo.
  */
+/** Lo mínimo para nombrar una cuenta igual en toda la app. Ver Cuenta.svelte. */
+export interface CuentaRef {
+  name: string;
+  unit: string;
+  kind: string | null;
+  institution: string | null;
+}
+
+const refDe = (e: EntryDetail | undefined): CuentaRef | null =>
+  e?.account_name
+    ? { name: e.account_name, unit: e.unit, kind: e.account_kind ?? null,
+        institution: e.account_institution ?? null }
+    : null;
+
 export interface Fila {
   id: string;
-  fecha: string;
+  /** Texto plano, para buscar y como respaldo. Lo que se dibuja son las refs. */
   titulo: string;
+  fecha: string;
   madre: string | null;
-  cuenta: string | null;
+  /**
+   * Las cuentas involucradas, como objetos y no como nombres sueltos.
+   *
+   * Antes era un string con el nombre pelado, y en la lista de movimientos no se
+   * podía saber si «Caja de ahorro» era la de pesos o la de dólares, ni si el
+   * gasto había ido a una tarjeta. OD-42.
+   */
+  cuenta: CuentaRef | null;
+  desde: CuentaRef | null;
+  hacia: CuentaRef | null;
   nota: string | null;
   /** SIEMPRE positivo. El sentido lo llevan `signo` y `clase`. */
   monto: number;
@@ -50,7 +74,9 @@ export function filasDeMovimientos(lineas: EntryDetail[]): Fila[] {
         ? (cat.category_name ?? '—')
         : `${neg?.account_name ?? '—'} → ${pos?.account_name ?? '—'}`,
       madre: cat?.category_parent ?? null,
-      cuenta: cat ? (neg?.account_name ?? pos?.account_name ?? null) : null,
+      cuenta: cat ? (refDe(neg) ?? refDe(pos)) : null,
+      desde: cat ? null : refDe(neg),
+      hacia: cat ? null : refDe(pos),
       nota: cab.description,
       // El valor absoluto es la clave del arreglo: en pantalla el signo se
       // dibuja aparte, así que el número no puede traerlo adentro.
