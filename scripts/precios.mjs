@@ -30,7 +30,25 @@ const BYMA = 'https://open.bymadata.com.ar/vanoms-be-core/rest/api/bymadata/free
 const BINANCE = 'https://api.binance.com/api/v3/ticker/price';
 const BINANCE_HIST = 'https://api.binance.com/api/v3/klines';
 
-const hoy = new Date().toISOString().slice(0, 10);
+/**
+ * La fecha DEL MERCADO, no la del reloj del servidor.
+ *
+ * Los cron de GitHub llegan tarde: el respaldo esta programado 06:17 UTC y
+ * aterriza cerca de las 11:45. Con ese retraso, una corrida de las 21:00 UTC
+ * puede ejecutarse pasada la medianoche y estampar el precio con la fecha del
+ * dia SIGUIENTE, corriendo la serie entera un dia sin que nada falle.
+ *
+ * En hora argentina eso no pasa: las 02:00 UTC son las 23:00 del dia anterior,
+ * que es el dia de la rueda al que ese precio pertenece.
+ */
+function fechaLocal(d = new Date()) {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Argentina/Buenos_Aires',
+    year: 'numeric', month: '2-digit', day: '2-digit'
+  }).format(d);
+}
+
+const hoy = fechaLocal();
 const desde = process.argv[2] === 'desde' ? process.argv[3] : null;
 
 /** Lee el TSV de la entrada estandar. */
@@ -148,7 +166,7 @@ async function deBinance(pedidos) {
           if (!precio) continue;
           out.push({
             ...p, precio, moneda: p.moneda, fuente: 'binance',
-            fecha: new Date(v[0]).toISOString().slice(0, 10)
+            fecha: fechaLocal(new Date(v[0]))
           });
         }
       } else {

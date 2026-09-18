@@ -25,8 +25,19 @@ const CASAS = {
 const modo = process.argv[2] ?? 'hoy';
 const desde = process.argv[3] ?? null;
 
+/**
+ * La fecha en hora argentina, no la del reloj del servidor.
+ *
+ * Los cron de GitHub llegan tarde -el respaldo esta programado 06:17 UTC y
+ * aterriza cerca de las 11:45-. Con ese retraso una corrida de las 21:30 UTC
+ * puede ejecutarse pasada la medianoche y guardar la cotizacion con la fecha
+ * del dia siguiente, corriendo la serie sin que nada falle.
+ */
 function iso(d) {
-  return d.toISOString().slice(0, 10);
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Argentina/Buenos_Aires',
+    year: 'numeric', month: '2-digit', day: '2-digit'
+  }).format(d);
 }
 
 /** Todas las fechas entre dos, inclusive. */
