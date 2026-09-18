@@ -1,11 +1,21 @@
--- kipo · BORRA TODOS LOS DATOS del libro y vuelve a sembrar las categorias.
+-- kipo · DEJA TU LIBRO COMO RECIEN CREADO.
 --
--- SOLO para la etapa de prueba, ANTES de la puesta en marcha (ADR-018).
--- Despues de esa linea los datos son historia y esta ruta deja de estar permitida:
--- ahi se remapea y se archiva. Ver docs/modelo-de-datos.md §9.
+-- Borra TODO lo que vos cargaste y vuelve a sembrar lo minimo, llamando a la
+-- MISMA funcion que usa el alta de un usuario nuevo (sembrar_libro). Antes este
+-- archivo tenia su propia copia de la siembra y habia quedado vieja: resetear
+-- para "probar desde cero" te dejaba en un cero que ya no existia.
 --
---   psql ... -v reset_confirm=BORRAR_TODO -f supabase/reset_ledger.sql
+-- SOLO para la etapa de prueba, ANTES de la puesta en marcha (ADR-018). Despues
+-- de esa linea los datos son historia y esta ruta deja de estar permitida.
 --
+--   psql "$DB" -v reset_confirm=BORRAR_TODO -f supabase/reset_ledger.sql
+--
+-- QUE NO BORRA, y por que: las cotizaciones del dolar y de la UVA (`fx_rate`).
+-- No son algo que hayas cargado vos, son una copia de datos publicos que el
+-- flujo diario mantiene solo. Borrarlas dejaria la medicion muda hasta la
+-- proxima corrida, sin ganar nada. Si igual las queres afuera, descomenta su
+-- linea mas abajo.
+
 \if :{?reset_confirm}
 \else
 \warn 'ABORTADO: falta -v reset_confirm=BORRAR_TODO'
@@ -15,61 +25,38 @@
 \set ON_ERROR_STOP on
 begin;
 
--- entry cae por cascada desde transaction, pero se borra explicito para no depender de eso
+-- El orden importa: primero lo que referencia, despues lo referenciado.
 delete from entry;
 delete from transaction;
 delete from scheduled_event;
 delete from budget;
 delete from price;
-delete from fx_rate;
-delete from account;
+delete from account;        -- incluye las posiciones y los plazos fijos
 delete from instrument;
+delete from portfolio;
 delete from category;
+delete from ledger_invite;  -- codigos de invitacion a medio usar
 
--- se vuelven a sembrar las categorias y la cuenta minima, igual que en el alta
+-- delete from fx_rate;     -- descomentar para empezar tambien sin cotizaciones
+
 do $$
-declare v_ledger uuid; v_parent uuid;
+declare v_ledger uuid; v_cats int; v_cuentas int;
 begin
   select id into v_ledger from ledger limit 1;
+  perform sembrar_libro(v_ledger);
 
-  insert into category (ledger_id, name, kind, is_system, sort_order) values
-    (v_ledger,'Sueldo','income',false,10),
-    (v_ledger,'Intereses','income',true,20),
-    (v_ledger,'Dividendos','income',false,30),
-    (v_ledger,'Otros ingresos','income',false,40);
+  select count(*) into v_cats    from category;
+  select count(*) into v_cuentas from account;
 
-  insert into category (ledger_id,name,kind,sort_order)
-    values (v_ledger,'Gastos fijos','expense',10) returning id into v_parent;
-  insert into category (ledger_id,parent_id,name,kind,sort_order) values
-    (v_ledger,v_parent,'Alquiler / Expensas','expense',11),
-    (v_ledger,v_parent,'Servicios','expense',12),
-    (v_ledger,v_parent,'Seguros','expense',13),
-    (v_ledger,v_parent,'Impuestos','expense',14),
-    (v_ledger,v_parent,'Suscripciones','expense',15);
+  -- Se comprueba en vez de confiar: si maniana la siembra cambia y esto no se
+  -- entera, el mensaje mentiria sobre el estado en el que te deja.
+  if v_cats <> 6 or v_cuentas <> 0 then
+    raise exception 'El reseteo dejo % categorias y % cuentas; se esperaban 6 y 0',
+      v_cats, v_cuentas;
+  end if;
 
-  insert into category (ledger_id,name,kind,sort_order)
-    values (v_ledger,'Gastos variables','expense',20) returning id into v_parent;
-  insert into category (ledger_id,parent_id,name,kind,sort_order) values
-    (v_ledger,v_parent,'Supermercado','expense',21),
-    (v_ledger,v_parent,'Restaurantes','expense',22),
-    (v_ledger,v_parent,'Transporte','expense',23),
-    (v_ledger,v_parent,'Entretenimiento','expense',24),
-    (v_ledger,v_parent,'Compras','expense',25),
-    (v_ledger,v_parent,'Salud','expense',26);
-
-  insert into category (ledger_id,name,kind,sort_order)
-    values (v_ledger,'Caridad','expense',30) returning id into v_parent;
-  insert into category (ledger_id,parent_id,name,kind,sort_order)
-    values (v_ledger,v_parent,'Donaciones','expense',31);
-
-  insert into category (ledger_id,name,kind,is_system,sort_order)
-    values (v_ledger,'Ajustes','expense',true,90);
-
-  insert into account (ledger_id,name,kind,valuation,unit,is_spendable)
-    values (v_ledger,'Efectivo ARS','asset','balance','ARS',true);
-
-  raise notice 'Libro vaciado y resembrado: % categorias, % cuenta',
-    (select count(*) from category), (select count(*) from account);
+  raise notice 'Libro como recien creado: % categorias, ninguna cuenta.', v_cats;
+  raise notice 'Al entrar a la app te va a recibir la puesta en marcha.';
 end $$;
 
 commit;
