@@ -21,7 +21,8 @@ export interface CuentaDePortafolio {
   valuation: string;
   institution: string | null;
   unit: string;
-  portfolio_id: string | null;
+  /** En qué carteras está. Desde OD-40 puede estar en varias, o en ninguna. */
+  carteras: string[];
 }
 
 function fallar(contexto: string, error: { message: string } | null): never {
@@ -46,15 +47,24 @@ export async function listarPortafolios(): Promise<Portafolio[]> {
  * acaba de trazar.
  */
 export async function cuentasAsignables(): Promise<CuentaDePortafolio[]> {
-  const { data, error } = await supabase
-    .from('account')
-    .select('id, name, valuation, institution, unit, portfolio_id, is_spendable, kind')
-    .is('archived_at', null)
-    .eq('kind', 'asset')
-    .eq('is_spendable', false)
-    .order('name');
-  if (error) fallar('No se pudieron leer las cuentas', error);
-  return (data ?? []) as CuentaDePortafolio[];
+  const [c, m] = await Promise.all([
+    supabase
+      .from('account')
+      .select('id, name, valuation, institution, unit, is_spendable, kind')
+      .is('archived_at', null)
+      .eq('kind', 'asset')
+      .eq('is_spendable', false)
+      .order('name'),
+    supabase.from('portfolio_account').select('portfolio_id, account_id')
+  ]);
+  if (c.error) fallar('No se pudieron leer las cuentas', c.error);
+  if (m.error) fallar('No se pudo leer qué cuenta está en qué cartera', m.error);
+
+  const porCuenta = new Map<string, string[]>();
+  for (const r of m.data ?? []) {
+    porCuenta.set(r.account_id, [...(porCuenta.get(r.account_id) ?? []), r.portfolio_id]);
+  }
+  return (c.data ?? []).map((a) => ({ ...a, carteras: porCuenta.get(a.id) ?? [] })) as CuentaDePortafolio[];
 }
 
 export async function crearPortafolio(name: string, fx_source: string | null): Promise<void> {
@@ -62,13 +72,28 @@ export async function crearPortafolio(name: string, fx_source: string | null): P
   if (error) fallar('No se pudo crear el portafolio', error);
 }
 
-/** Mover una cuenta a un portafolio, o sacarla pasando null. */
-export async function asignarCuenta(accountId: string, portfolioId: string | null): Promise<void> {
-  const { error } = await supabase
-    .from('account')
-    .update({ portfolio_id: portfolioId })
-    .eq('id', accountId);
-  if (error) fallar('No se pudo mover la cuenta', error);
+/**
+ * Sumar o sacar una cuenta de una cartera.
+ *
+ * Ya no es "mover": una cuenta puede estar en varias a la vez (OD-40), así que
+ * cada cartera se marca o se desmarca por su cuenta.
+ */
+export async function asignarCuenta(
+  accountId: string, portfolioId: string, dentro: boolean
+): Promise<void> {
+  if (dentro) {
+    const { error } = await supabase
+      .from('portfolio_account')
+      .insert({ account_id: accountId, portfolio_id: portfolioId });
+    if (error) fallar('No se pudo sumar la cuenta a la cartera', error);
+  } else {
+    const { error } = await supabase
+      .from('portfolio_account')
+      .delete()
+      .eq('account_id', accountId)
+      .eq('portfolio_id', portfolioId);
+    if (error) fallar('No se pudo sacar la cuenta de la cartera', error);
+  }
 }
 
 export async function renombrarPortafolio(id: string, name: string): Promise<void> {

@@ -51,6 +51,7 @@ decision nobody made is fiction, and an agent will believe it.
 | [ADR-028](#adr-028--el-libro-activo-vive-en-la-base-y-compartir-uno-se-hace-por-código) | El libro activo vive en la base, y compartir uno se hace por código | Accepted |
 | [ADR-029](#adr-029--la-fuente-de-precios-locales-es-data912-con-byma-de-respaldo-y-el-precio-se-guarda-como-se-cotiza) | La fuente de precios locales es data912, con BYMA de respaldo, y el precio se guarda como se cotiza | Accepted |
 | [ADR-030](#adr-030--qué-tipo-es-cómo-se-llama-y-dónde-está-son-tres-preguntas-distintas) | Qué tipo es, cómo se llama y dónde está son tres preguntas distintas | Accepted |
+| [ADR-031](#adr-031--una-cuenta-puede-estar-en-varias-carteras-y-la-del-broker-se-arma-sola) | Una cuenta puede estar en varias carteras, y la del broker se arma sola | Accepted |
 
 ---
 
@@ -1611,3 +1612,77 @@ No hizo falta ni una migracion: lo que faltaba era preguntarlo.
 
 **Ningún cambio de esquema.** El modelo distinguía las cinco cosas desde el primer día; la interfaz
 preguntaba por dos.
+
+
+---
+
+## ADR-031 — Una cuenta puede estar en varias carteras, y la del broker se arma sola
+
+**Context.** El usuario preguntó cómo se relacionan institución y cartera, y al explicárselo aparecieron
+dos huecos. `account.portfolio_id` era **un campo**, así que AAPL podía estar en *"Todo"* o en
+*"Tecnología"*, nunca en las dos. Y **no se creaba ninguna cartera sola**: había que armarla y tildar
+cuenta por cuenta, y hasta hacerlo el rendimiento se medía mal **en silencio** —
+[ADR-026](#adr-026--el-portafolio-es-el-borde-es-flujo-solo-lo-que-lo-cruza) dice que una cuenta suelta
+hace que comprar con ese efectivo cuente como aporte nuevo.
+
+**Decision.** La pertenencia pasa a una tabla `portfolio_account`, y una cuenta de broker entra sola a
+la cartera de su institución.
+
+**Consequences.**
+- **Lo que parecía una contradicción es la respuesta correcta.** Con carteras que se solapan, la misma
+  compra puede ser aporte en una y movimiento interno en otra:
+
+  ```
+  "Binance"      tiene la posición Y el efectivo del broker
+  "Solo cripto"  tiene solo la posición
+
+  comprar LTC con dólares de Binance:
+    para "Binance"      las dos patas adentro  -> NO es aporte
+    para "Solo cripto"  la plata vino de afuera -> SÍ es aporte, de 500
+  ```
+
+  Las dos son ciertas porque **los bordes son distintos**, y ADR-026 define el flujo por borde, no por
+  operación. No hubo que cambiar la regla: hubo que dejar de suponer un solo borde por cuenta.
+- **Lo que sí se rompía era la fuente de cotización.** `valor_cuenta` resolvía cuenta → cartera →
+  libro, y con varias carteras *"la cartera"* es ambiguo. Se bajó un nivel: la **cuenta** se mide con
+  su propia fuente o la del libro, y la de la cartera se aplica al valuar **esa** cartera. Cada borde
+  convierte con su vara, que es lo que [ADR-023](#adr-023--la-unidad-de-medida-es-un-parámetro-dólares-o-poder-adquisitivo)
+  ya decía.
+- **La cartera del broker se arma sola** por `institution`: una posición o un efectivo **no gastable**
+  que diga dónde está entra a la cartera de ese lugar, creándola si hace falta. Sale gratis porque
+  `comprar_activo` ya guardaba el broker ahí.
+- **Una caja de ahorro NO crea cartera.** Tener plata en el Macro no es invertir, y meterla adentro
+  haría que mover plata del banco al broker dejara de contarse como aporte.
+- **La parte incómoda:** aparecen carteras que nadie pidió. Se acepta porque la alternativa era medir
+  mal hasta que el usuario se acordara de tildar, y eso no avisa.
+- `carteras` reemplaza al campo nulo para saber si una cuenta está suelta: ahora es un contador en
+  cero.
+
+**Rejected alternatives.**
+- *Dejar un solo portafolio por cuenta y agregar solo la cartera por defecto*: la mitad del pedido, y
+  la mitad que no resuelve querer mirar los mismos activos agrupados de otra forma.
+- *Crear la cartera por defecto dentro de `comprar_activo`*: habría que copiar esa función entera para
+  no perderle nada. Con el trigger la regla vale para cualquier alta de cuenta.
+- *Agrupar por `institution` directamente, sin tabla de carteras*: vuelve a mezclar **dónde está** con
+  **qué se mide junto**, que [ADR-026](#adr-026--el-portafolio-es-el-borde-es-flujo-solo-lo-que-lo-cruza)
+  ya había separado.
+
+**Evidence.** `supabase/migrations/20260918190000_carteras_multiples.sql`,
+`supabase/tests/14_portafolios.sql`.
+
+**Verified against what already exists.**
+
+```
+docker: postgres:16 descartable, suite completa -> 158 aserciones ok
+
+ok  una posicion puede estar en dos carteras a la vez
+ok  el broker entero sigue viendo 2 flujos: deposito y retiro
+ok  para la cartera tematica esa compra SI fue un aporte de 500
+ok  y vale solo la posicion: 600, sin el efectivo del broker
+ok  una cuenta de broker crea sola la cartera de su institucion
+ok  y queda adentro sin tildar nada
+ok  la segunda cuenta del mismo broker reusa la cartera
+ok  una caja de ahorro NO crea cartera: tener plata no es invertir
+```
+
+La tercera y la segunda juntas son el ADR entero: **la misma compra, dos lecturas, las dos ciertas.**

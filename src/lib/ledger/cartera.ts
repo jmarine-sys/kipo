@@ -19,8 +19,8 @@ export interface FlujoInversion {
 
 export interface ValorInversion {
   account_id: string;
-  /** A qué portafolio pertenece. null = se mide por su cuenta (ADR-026). */
-  portfolio_id: string | null;
+  /** En cuántas carteras está. 0 = se mide por su cuenta (ADR-026 / OD-40). */
+  carteras: number;
   name: string;
   valuation: 'market' | 'accrual';
   institution: string | null;
@@ -185,7 +185,7 @@ export function calcularTodo(
 ): Resultado {
   const campo = medida === 'USD' ? 'usd' : 'uva';
 
-  const sueltas = valores.filter((v) => !v.portfolio_id);
+  const sueltas = valores.filter((v) => !v.carteras);
   const usables = sueltas.filter((v) => v[campo] !== null);
   const carteras = portafolios.filter((p) => p[campo] !== null);
 

@@ -12,13 +12,17 @@ insert into fx_rate (ledger_id, on_date, base, quote, rate, source) values
 on conflict (ledger_id, on_date, base, quote, source) do update set rate = excluded.rate;
 
 insert into portfolio (ledger_id, name, fx_source)
-values (my_ledger(), 'Mi Binance', 'cripto');
-select id as pf from portfolio where name = 'Mi Binance' \gset
+values (my_ledger(), 'Kraken', 'cripto');
+select id as pf from portfolio where name = 'Kraken' \gset
 
 -- El efectivo del broker: una cuenta comun, pero ADENTRO del portafolio.
-insert into account (ledger_id, name, kind, valuation, unit, is_spendable, institution, portfolio_id)
-values (my_ledger(), 'Binance efectivo', 'asset', 'balance', 'USD', false, 'Binance', :'pf');
-select id as bin from account where name = 'Binance efectivo' \gset
+insert into account (ledger_id, name, kind, valuation, unit, is_spendable, institution)
+values (my_ledger(), 'Kraken efectivo', 'asset', 'balance', 'USD', false, 'Kraken');
+select id as bin from account where name = 'Kraken efectivo' \gset
+-- Redundante a proposito: el trigger ya la metio por su institucion. Se deja
+-- para que el test siga siendo legible sin depender de ese detalle.
+insert into portfolio_account (portfolio_id, account_id, ledger_id)
+  values (:'pf', :'bin', my_ledger()) on conflict do nothing;
 
 -- El banco de afuera, desde donde sale la plata de verdad.
 insert into account (ledger_id, name, kind, valuation, unit, is_spendable, institution)
@@ -57,9 +61,10 @@ select case when round(usd) = 1000
 -- flujos donde tenia que haber uno, y el portafolio valuado en 1407.
 -- ---------------------------------------------------------------------------
 select comprar_activo('LTC','Litecoin','crypto','USD',8, :'bin',
-                      500, 0.01, 'Binance', current_date - 60) as btc \gset
+                      500, 0.01, 'Kraken', current_date - 60) as btc \gset
 
-update account set portfolio_id = :'pf' where id = :'btc';
+insert into portfolio_account (portfolio_id, account_id, ledger_id)
+  values (:'pf', :'btc', my_ledger()) on conflict do nothing;
 
 select case when count(*) = 1
             then 'ok  comprar ADENTRO no es un aporte nuevo: sigue habiendo 1 flujo'
@@ -117,3 +122,89 @@ select case when min(fecha) = current_date - 200
             then 'ok  el aporte lleva la fecha del DEPOSITO, no la de la compra'
             else format('FALLO  el primer flujo es del %s', min(fecha)) end
   from flujo_portafolio where portfolio_id = :'pf' and usd < 0;
+
+-- ---------------------------------------------------------------------------
+-- Carteras que se solapan — OD-40.
+--
+-- La misma compra es movimiento interno para una cartera y aporte para otra.
+-- Suena a contradiccion y es lo correcto: los bordes son distintos.
+-- ---------------------------------------------------------------------------
+set role rls_probe;
+select set_config('test.uid','11111111-1111-1111-1111-111111111111', false);
+
+insert into portfolio (ledger_id, name, fx_source)
+values (my_ledger(), 'Solo cripto', 'cripto');
+select id as solo from portfolio where name = 'Solo cripto' \gset
+
+-- La MISMA posicion, ahora tambien en la segunda cartera. El efectivo del broker
+-- queda afuera de esta: es una vista tematica, no el broker entero.
+insert into portfolio_account (portfolio_id, account_id, ledger_id)
+  values (:'solo', :'btc', my_ledger());
+
+select case when count(*) = 2
+            then 'ok  una posicion puede estar en dos carteras a la vez'
+            else format('FALLO  esta en %s', count(*)) end
+  from portfolio_account where account_id = :'btc';
+
+-- Para "Mi Binance" la compra fue interna: el efectivo tambien esta adentro.
+select case when count(*) = 2
+            then 'ok  el broker entero sigue viendo 2 flujos: deposito y retiro'
+            else format('FALLO  ve %s flujos', count(*)) end
+  from flujo_portafolio where portfolio_id = :'pf';
+
+-- Para "Solo cripto" esa misma compra SI cruzo el borde: la plata vino de una
+-- cuenta que no pertenece a esta cartera.
+select case when count(*) = 1 and round(min(usd)) = -500
+            then 'ok  para la cartera tematica esa compra SI fue un aporte de 500'
+            else format('FALLO  %s flujos, usd %s', count(*), round(min(usd))) end
+  from flujo_portafolio where portfolio_id = :'solo';
+
+select case when round(usd) = 600
+            then 'ok  y vale solo la posicion: 600, sin el efectivo del broker'
+            else format('FALLO  vale %s', round(usd)) end
+  from valor_portafolio where portfolio_id = :'solo';
+
+reset role;
+
+-- ---------------------------------------------------------------------------
+-- La cartera por defecto: la del broker.  OD-40.
+-- ---------------------------------------------------------------------------
+set role rls_probe;
+select set_config('test.uid','11111111-1111-1111-1111-111111111111', false);
+
+-- Una cuenta comitente nueva, diciendo donde esta.
+insert into account (ledger_id, name, kind, valuation, unit, is_spendable, institution)
+values (my_ledger(), 'IOL pesos', 'asset', 'balance', 'ARS', false, 'IOL');
+
+select case when count(*) = 1
+            then 'ok  una cuenta de broker crea sola la cartera de su institucion'
+            else format('FALLO  hay %s carteras IOL', count(*)) end
+  from portfolio where name = 'IOL';
+
+select case when count(*) = 1
+            then 'ok  y queda adentro sin tildar nada'
+            else format('FALLO  la cuenta quedo en %s carteras', count(*)) end
+  from portfolio_account pa
+  join account a on a.id = pa.account_id
+  join portfolio p on p.id = pa.portfolio_id
+ where a.name = 'IOL pesos' and p.name = 'IOL';
+
+-- Una segunda cuenta del MISMO broker reutiliza la cartera, no crea otra.
+insert into account (ledger_id, name, kind, valuation, unit, is_spendable, institution)
+values (my_ledger(), 'IOL dolares', 'asset', 'balance', 'USD', false, 'IOL');
+
+select case when count(*) = 1
+            then 'ok  la segunda cuenta del mismo broker reusa la cartera'
+            else format('FALLO  ahora hay %s carteras IOL', count(*)) end
+  from portfolio where name = 'IOL';
+
+-- Una caja de ahorro NO es una cartera de inversion.
+insert into account (ledger_id, name, kind, valuation, unit, is_spendable, institution)
+values (my_ledger(), 'Caja Macro', 'asset', 'balance', 'ARS', true, 'Banco Macro');
+
+select case when count(*) = 0
+            then 'ok  una caja de ahorro NO crea cartera: tener plata no es invertir'
+            else 'FALLO  creo una cartera para el banco' end
+  from portfolio where name = 'Banco Macro';
+
+reset role;

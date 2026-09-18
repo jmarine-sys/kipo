@@ -17,7 +17,7 @@
   let creando = $state(false);
 
   /** Las que quedaron afuera de todo portafolio. Son las que miden mal en silencio. */
-  const sueltas = $derived(cuentas.filter((c) => !c.portfolio_id));
+  const sueltas = $derived(cuentas.filter((c) => !c.carteras.length));
 
   async function load() {
     const [p, c] = await Promise.all([listarPortafolios(), cuentasAsignables()]);
@@ -41,7 +41,7 @@
     });
   }
 
-  const deQuien = (p: Portafolio) => cuentas.filter((c) => c.portfolio_id === p.id);
+  const deQuien = (p: Portafolio) => cuentas.filter((c) => c.carteras.includes(p.id));
 
   onMount(async () => {
     try { await load(); }
@@ -88,13 +88,15 @@
         </div>
 
         <ul class="cuentas">
+          <!-- Todas, no solo las libres: desde OD-40 una cuenta puede estar en
+               varias carteras, así que ya no hay "ocupadas". -->
           {#each cuentas as c (c.id)}
-            {#if c.portfolio_id === p.id || !c.portfolio_id}
+            {#if true}
               <li>
                 <label class="casilla">
-                  <input type="checkbox" checked={c.portfolio_id === p.id} disabled={busy}
+                  <input type="checkbox" checked={c.carteras.includes(p.id)} disabled={busy}
                          onchange={(e) => correr(() =>
-                           asignarCuenta(c.id, e.currentTarget.checked ? p.id : null))} />
+                           asignarCuenta(c.id, p.id, e.currentTarget.checked))} />
                   <span>
                     {c.name}
                     <span class="dim sm">

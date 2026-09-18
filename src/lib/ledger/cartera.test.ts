@@ -23,7 +23,7 @@ const pf = (o: Partial<ValorPortafolio> = {}): ValorPortafolio => ({
 });
 
 const inv = (o: Partial<ValorInversion> = {}): ValorInversion => ({
-  account_id: 'a1', portfolio_id: 'p1', name: 'BTC', valuation: 'market',
+  account_id: 'a1', carteras: 1, name: 'BTC', valuation: 'market',
   institution: 'Binance', matures_on: null, cerrada: false, symbol: 'BTC',
   kind: 'crypto', quote_currency: 'USD', saldo: '0.01', valor_nativo: '600',
   moneda: 'USD', precio_al: hoy, usd: '600', uva: '270', ...o
@@ -47,7 +47,7 @@ test('una posición dentro de un portafolio no se cuenta dos veces', () => {
 });
 
 test('una inversión suelta sí se suma al total', () => {
-  const suelta = inv({ account_id: 'a2', portfolio_id: null, usd: '300' });
+  const suelta = inv({ account_id: 'a2', carteras: 0, usd: '300' });
   const r = calcularTodo([pf()], [inv(), suelta], [fp()], [fi()], 'USD');
   assert.equal(r.valor, 1400);
 });
@@ -61,7 +61,7 @@ test('el aporte del portafolio reemplaza al de la posición de adentro', () => {
 });
 
 test('sin portafolios el total es el de siempre', () => {
-  const suelta = inv({ portfolio_id: null });
+  const suelta = inv({ carteras: 0 });
   const r = calcularTodo([], [suelta], [], [fi()], 'USD');
   assert.equal(r.valor, 600);
   assert.equal(r.invertido, 500);
