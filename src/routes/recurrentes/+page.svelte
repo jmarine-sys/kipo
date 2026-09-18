@@ -47,6 +47,15 @@
   /** Lo de más adelante arranca cerrado: verlo siempre es ruido. */
   let verMasAdelante = $state(false);
 
+  /**
+   * Tenés cosas agendadas, pero ninguna cae este mes.
+   *
+   * No es lo mismo que no tener nada —eso ya lo dice el estado vacío— y sin
+   * decirlo la pantalla queda en blanco justo cuando la respuesta es buena:
+   * no te falta cargar nada, no te toca pagar nada.
+   */
+  const mesLibre = $derived(!!items.length && !vencidos.length && !esteMes.length);
+
   let nuevaFecha = $state('');
   let nuevoMonto = $state('');
 
@@ -307,6 +316,20 @@
       {/if}
     {/each}
 
+    {#if mesLibre}
+      <section class="card libre">
+        <b>Este mes no te queda nada por pagar.</b>
+        <span class="dim sm">
+          {#if masAdelante.length}
+            Lo próximo cae el {shortDate(masAdelante[0].next_on)}
+            {#if masAdelante[0].description}, {masAdelante[0].description.toLowerCase()}{/if}.
+          {:else}
+            Y no hay nada agendado más adelante.
+          {/if}
+        </span>
+      </section>
+    {/if}
+
     {#if masAdelante.length}
       <section class="card adelante">
         <button class="cabecera" onclick={() => (verMasAdelante = !verMasAdelante)}>
@@ -391,6 +414,7 @@
 
   .nueva { width: 100%; }
   h2 { font-size: .95rem; }
+  .libre { display: flex; flex-direction: column; gap: .2rem; }
   .adelante { padding: 0; }
   .adelante .cabecera {
     width: 100%; display: flex; justify-content: space-between; align-items: center;
