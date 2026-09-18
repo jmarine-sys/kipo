@@ -44,7 +44,7 @@ jobs:
             select kind, symbol, coalesce(underlying_symbol, symbol), quote_currency
               from instrument
              where archived_at is null
-               and kind in ('cedear','crypto','stock','etf')
+               and kind in ('cedear','crypto','stock','etf','bond')
              order by kind, symbol
           " > /tmp/instrumentos.tsv
           echo "instrumentos activos: $(wc -l < /tmp/instrumentos.tsv)"

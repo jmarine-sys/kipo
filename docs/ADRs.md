@@ -49,6 +49,7 @@ decision nobody made is fiction, and an agent will believe it.
 | [ADR-026](#adr-026--el-portafolio-es-el-borde-es-flujo-solo-lo-que-lo-cruza) | El portafolio es el borde: es flujo solo lo que lo cruza | Accepted |
 | [ADR-027](#adr-027--el-alta-siembra-estructura-no-taxonomía-y-la-puesta-en-marcha-pregunta-el-resto) | El alta siembra estructura, no taxonomía, y la puesta en marcha pregunta el resto | Accepted |
 | [ADR-028](#adr-028--el-libro-activo-vive-en-la-base-y-compartir-uno-se-hace-por-código) | El libro activo vive en la base, y compartir uno se hace por código | Accepted |
+| [ADR-029](#adr-029--la-fuente-de-precios-locales-es-data912-con-byma-de-respaldo-y-el-precio-se-guarda-como-se-cotiza) | La fuente de precios locales es data912, con BYMA de respaldo, y el precio se guarda como se cotiza | Accepted |
 
 ---
 
@@ -1460,3 +1461,78 @@ ok  ni una sola cuenta ajena
 ```
 
 Las dos últimas son el ADR entero: **el mismo usuario, dos libros, y cero filtración entre ellos.**
+
+
+---
+
+## ADR-029 — La fuente de precios locales es data912, con BYMA de respaldo, y el precio se guarda como se cotiza
+
+**Context.** [ADR-025](#adr-025--los-precios-se-traen-solos-todos-los-días-porque-el-de-hoy-no-se-recupera-mañana)
+eligió BYMA y descartó data912 por ser *"un intermediario más"*. El usuario pegó su cartera real
+—dieciséis papeles— y eso alcanzó para dar vuelta la decisión:
+
+```
+BYMA /cedears          SPY QQQ MSFT META GOOGL GLD      6 de 16
+BYMA /leading-equity   YPFD PAMP BMA ECOG               existe, sin usar
+BYMA /public-bonds     AL30 AL29                        existe, sin usar
+BYMA (ninguno)         TLCTO PN43O IRCPO DNC7O          no las publica
+
+data912  arg_cedears · arg_stocks · arg_bonds · arg_corp  -> los 16
+```
+
+**BYMA no publica obligaciones negociables en su API libre** (`corporate-bonds` y
+`negotiable-obligations` devuelven 401). No es una preferencia: con BYMA sola, cuatro papeles de la
+cartera del usuario no tienen precio y nunca lo van a tener.
+
+Y apareció algo peor mientras se verificaba: **un bono no cotiza por unidad, cotiza por cada 100
+nominales.** `AL30` vale `85100`, y eso es por 100 VN. Guardarlo como precio unitario haría que una
+tenencia de 10.000 nominales valiera **cien veces de más** — y no fallaría: mostraría un patrimonio
+enorme y perfectamente creíble.
+
+**Decision.** data912 es la fuente principal para todo el mercado local y BYMA queda de respaldo real.
+El precio se guarda **tal como se cotiza**, y el instrumento declara a cuántas unidades corresponde
+(`quote_size`).
+
+**Consequences.**
+- *"BYMA para lo que puede y data912 para el resto"* se descartó por ser lo peor de las dos: **dos
+  fuentes para el mismo trabajo son dos formas de romperse y dos formatos que mantener.** data912 va
+  primero para todo; si desaparece, BYMA cubre CEDEARs, acciones y bonos públicos, y solo se pierden
+  las ON. Verificado apuntando el script a un host inválido.
+- **La lámina vive en el modelo, no en el script.** Si la división por 100 estuviera en
+  `precios.mjs`, quien cargue un precio a mano escribiría el `85100` que ve en su broker y volvería a
+  estar cien veces arriba. `valor = saldo × precio / quote_size`, y un trigger la fija en 100 para los
+  bonos —un bono con lámina 1 siempre está mal, así que corregir ese caso no pisa ninguna intención.
+- **La parte incómoda:** se depende de un intermediario. data912 es el proyecto de un tercero y puede
+  cerrar mañana; BYMA es la fuente. Se acepta porque la alternativa no es *"depender de BYMA"* sino
+  *"no medir cuatro de mis papeles"*.
+
+**Rejected alternatives.**
+- *Solo BYMA*: es la decisión que esto revierte. Deja sin precio a las obligaciones negociables, para
+  siempre.
+- *Las dos fuentes en paralelo, cada una para lo suyo*: el doble de superficie de falla para el mismo
+  resultado.
+- *Dividir por 100 al ingerir el precio*: más simple y rompe la carga manual en silencio.
+
+**Evidence.** `scripts/precios.mjs`, `supabase/migrations/20260918170000_lamina.sql`,
+`supabase/tests/10_posiciones.sql`.
+
+**Verified against what already exists.**
+
+```
+Los 16 papeles reales del usuario, contra el script:
+  16 precios de 16 instrumento/s
+
+Con data912 apuntando a un host invalido (prueba de mutacion):
+  SPY   20210  byma
+  YPFD   8670  byma
+  AL30  85010  byma
+  sin precio  TLCTO — ninguna fuente lo cotiza hoy
+
+Y la lamina, contra postgres:
+  ok  un bono nace cotizando por 100 nominales
+  ok  10.000 nominales a 85.100 por cien valen 8.510.000
+  ok  y la lista de posiciones dice lo mismo
+  ok  una accion sigue cotizando por unidad
+```
+
+Sin la lámina, esa tenencia habría valido **851.000.000** en vez de 8.510.000.

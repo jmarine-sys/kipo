@@ -26,7 +26,18 @@
 // El tercer campo es coalesce(underlying_symbol, symbol): un CEDEAR se puede
 // llamar "AAPL-CEDEAR" en tu libro y "AAPL" en BYMA.
 
-const BYMA = 'https://open.bymadata.com.ar/vanoms-be-core/rest/api/bymadata/free/cedears';
+const BYMA = 'https://open.bymadata.com.ar/vanoms-be-core/rest/api/bymadata/free';
+const DATA912 = 'https://data912.com/live';
+
+// Que endpoint tiene cada familia. Se consultan TODOS y se busca el simbolo en
+// el que le corresponde primero: los simbolos no se repiten entre familias, pero
+// preferir la propia evita una coincidencia desafortunada el dia que pase.
+const FAMILIAS = {
+  cedear: ['arg_cedears'],
+  etf:    ['arg_cedears'],
+  stock:  ['arg_stocks'],
+  bond:   ['arg_bonds', 'arg_corp']
+};
 const BINANCE = 'https://api.binance.com/api/v3/ticker/price';
 const BINANCE_HIST = 'https://api.binance.com/api/v3/klines';
 
@@ -96,44 +107,111 @@ async function pedir(url, opciones = {}, intentos = 3) {
 }
 
 /**
- * CEDEARs y acciones de BYMA, en pesos.
+ * El mercado local: CEDEARs, acciones, bonos y obligaciones negociables.
  *
- * Cada simbolo aparece DOS veces, una por plazo de liquidacion. Se prefiere el
- * '1' y se cae al '2': la diferencia entre ambos es de menos del 0,1% y lo que
- * importa es elegir siempre el mismo, no cual.
+ * FUENTE PRINCIPAL data912, RESPALDO BYMA, y el orden es al reves del que decidio
+ * ADR-025. La razon es dura y verificada el 2026-09-18 contra la cartera real:
+ * BYMA no publica las OBLIGACIONES NEGOCIABLES en su API libre. De los 16 papeles
+ * del usuario, BYMA cubria 12 y data912 los 16.
  *
- * Se filtra por denominationCcy = 'ARS' a proposito: los mismos papeles cotizan
- * ademas en USD (sufijo D) y en cable (sufijo C). Mezclarlos seria valuar una
- * posicion en pesos con un precio en dolares.
+ * Elegir "BYMA para lo que puede y data912 para el resto" seria peor: dos fuentes
+ * para el mismo trabajo son dos formas de romperse y dos formatos que mantener.
+ * Asi que data912 va primero para todo, y BYMA queda de respaldo REAL para las
+ * familias que si publica — si data912 desaparece, solo se pierden las ON.
+ *
+ * El precio se guarda TAL COMO SE COTIZA. Un bono cotiza por cada 100 nominales
+ * y eso NO se corrige aca: lo sabe el instrumento (`quote_size`), porque si la
+ * division viviera en este script, un precio cargado a mano entraria cien veces
+ * arriba.
  */
-async function deBYMA(pedidos) {
+async function deMercadoLocal(pedidos) {
   if (!pedidos.length) return [];
-  const cruda = await pedir(BYMA, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ excludeZeroPxAndQty: true, T1: false, T0: false })
-  });
-  const filas = Array.isArray(cruda) ? cruda : (cruda.data ?? []);
-  if (filas.length < 100) throw new Error(`BYMA devolvio ${filas.length} filas: respuesta incompleta`);
 
-  const porSimbolo = new Map();
-  for (const f of filas) {
-    if (f.denominationCcy !== 'ARS') continue;
-    const previo = porSimbolo.get(f.symbol);
-    if (!previo || String(f.settlementType) < String(previo.settlementType)) {
-      porSimbolo.set(f.symbol, f);
+  const mapas = new Map();
+  const caidos = [];
+  for (const ep of new Set(Object.values(FAMILIAS).flat())) {
+    try {
+      const filas = await pedir(`${DATA912}/${ep}`);
+      const m = new Map();
+      for (const f of filas ?? []) {
+        const precio = Number(f.c) || Number(f.px_bid) || 0;
+        if (f.symbol && precio) m.set(f.symbol, precio);
+      }
+      mapas.set(ep, m);
+    } catch (e) {
+      caidos.push(`${ep}: ${e.message}`);
     }
   }
 
   const out = [];
+  const sinResolver = [];
   for (const p of pedidos) {
-    const f = porSimbolo.get(p.feed);
-    if (!f) { p.falta = 'no esta en la rueda de BYMA'; continue; }
+    const donde = FAMILIAS[p.kind] ?? Object.values(FAMILIAS).flat();
+    let precio = 0;
+    for (const ep of donde) { precio = mapas.get(ep)?.get(p.feed) ?? 0; if (precio) break; }
+    if (precio) out.push({ ...p, precio, moneda: 'ARS', fuente: 'data912' });
+    else sinResolver.push(p);
+  }
+
+  // Respaldo: lo que data912 no resolvio y BYMA si publica.
+  if (sinResolver.length) {
+    const deBYMA = await deBymaRespaldo(sinResolver);
+    out.push(...deBYMA);
+  }
+
+  if (!out.length && caidos.length) {
+    throw new Error(`ninguna fuente respondio (${caidos.join('; ')})`);
+  }
+  return out;
+}
+
+/**
+ * BYMA, solo para lo que data912 no pudo.
+ *
+ * Tres endpoints, uno por familia. No publica obligaciones negociables: probados
+ * el 2026-09-18, `corporate-bonds` y `negotiable-obligations` devuelven 401.
+ *
+ * Cada simbolo aparece DOS veces, una por plazo de liquidacion: se prefiere el
+ * menor y da igual cual, lo que importa es elegir siempre el mismo. Y se filtra
+ * por denominationCcy = 'ARS' porque los mismos papeles cotizan ademas en USD
+ * (sufijo D) y en cable (sufijo C): mezclarlos seria valuar una posicion en pesos
+ * con un precio en dolares.
+ */
+async function deBymaRespaldo(pedidos) {
+  const ENDPOINTS = { cedear: 'cedears', etf: 'cedears', stock: 'leading-equity', bond: 'public-bonds' };
+  const cache = new Map();
+  const out = [];
+
+  for (const p of pedidos) {
+    const ep = ENDPOINTS[p.kind];
+    if (!ep) { p.falta = `${p.kind}: BYMA no publica esa familia`; continue; }
+
+    if (!cache.has(ep)) {
+      try {
+        const cruda = await pedir(`${BYMA}/${ep}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ excludeZeroPxAndQty: true, T1: false, T0: false })
+        });
+        const filas = Array.isArray(cruda) ? cruda : (cruda.data ?? []);
+        const m = new Map();
+        for (const f of filas) {
+          if (f.denominationCcy !== 'ARS') continue;
+          const previo = m.get(f.symbol);
+          if (!previo || String(f.settlementType) < String(previo.settlementType)) m.set(f.symbol, f);
+        }
+        cache.set(ep, m);
+      } catch (e) {
+        cache.set(ep, new Map());
+      }
+    }
+
+    const f = cache.get(ep).get(p.feed);
     // settlementPrice es el ultimo operado. Si el papel no opero hoy viene en 0
     // y se usa el cierre anterior: un precio viejo es peor que uno nuevo, pero
     // infinitamente mejor que inventar uno.
-    const precio = Number(f.settlementPrice) || Number(f.previousClosingPrice) || 0;
-    if (!precio) { p.falta = 'sin precio ni cierre anterior'; continue; }
+    const precio = f ? (Number(f.settlementPrice) || Number(f.previousClosingPrice) || 0) : 0;
+    if (!precio) { p.falta = 'ninguna fuente lo cotiza hoy'; continue; }
     out.push({ ...p, precio, moneda: 'ARS', fuente: 'byma' });
   }
   return out;
@@ -209,7 +287,7 @@ if (!pedidos.length) {
 
 // Un precio en la moneda equivocada es peor que ningun precio: valuaria una
 // posicion en pesos con un numero en dolares y nadie lo notaria.
-const enPesos = pedidos.filter((p) => ['cedear', 'stock', 'etf'].includes(p.kind) && p.moneda === 'ARS');
+const enPesos = pedidos.filter((p) => ['cedear', 'stock', 'etf', 'bond'].includes(p.kind) && p.moneda === 'ARS');
 const enDolares = pedidos.filter((p) => p.kind === 'crypto' && ['USD', 'USDT'].includes(p.moneda));
 
 for (const p of pedidos) {
@@ -225,11 +303,11 @@ const errores = [];
 // es mejor que intentarlo y guardar el precio de HOY con fecha de ayer, que es
 // la forma silenciosa de arruinar una serie.
 if (desde && enPesos.length) {
-  for (const p of enPesos) p.falta = `${p.kind} no se puede recuperar hacia atras: BYMA solo publica la rueda del dia`;
+  for (const p of enPesos) p.falta = `${p.kind} no se puede recuperar hacia atras: solo se publica la rueda del dia`;
 }
 
 for (const [nombre, fn, lote] of [
-  ['BYMA', deBYMA, desde ? [] : enPesos],
+  ['Mercado local', deMercadoLocal, desde ? [] : enPesos],
   ['Binance', deBinance, enDolares]
 ]) {
   if (!lote.length) continue;

@@ -90,3 +90,53 @@ select case when coalesce(sum(amount),0) = 0 then 'ok  queda en cero unidades'
   from entry where account_id = :'pos';
 
 reset role;
+
+-- ---------------------------------------------------------------------------
+-- La lamina: un bono cotiza por 100 nominales, no por uno.  OD-39.
+--
+-- Sin esto una tenencia de 10.000 nominales valdria CIEN VECES de mas, y no
+-- fallaria: mostraria un patrimonio enorme y perfectamente creible.
+-- ---------------------------------------------------------------------------
+set role rls_probe;
+select set_config('test.uid','11111111-1111-1111-1111-111111111111', false);
+
+insert into account (ledger_id, name, kind, valuation, unit, is_spendable)
+values (my_ledger(), 'Broker bonos', 'asset', 'balance', 'ARS', false);
+
+-- 10.000 nominales de un bono, pagando 8.000.000 de pesos.
+select comprar_activo('AL30','Bonar 2030','bond','ARS',0,
+                      (select id from account where name='Broker bonos'),
+                      8000000, 10000, 'Balanz', current_date) as bono \gset
+
+select case when quote_size = 100
+            then 'ok  un bono nace cotizando por 100 nominales'
+            else format('FALLO  nacio con lamina %s', quote_size) end
+  from instrument where symbol = 'AL30';
+
+-- El broker muestra 85.100. Eso es por CADA 100 nominales.
+insert into price (instrument_id, ledger_id, on_date, price, currency, source)
+select (select id from instrument where symbol='AL30'), my_ledger(),
+       current_date, 85100, 'ARS', 'manual';
+
+-- 10.000 x 85.100 / 100 = 8.510.000. Sin dividir daria 851.000.000.
+select case when valor_nativo = 8510000
+            then 'ok  10.000 nominales a 85.100 por cien valen 8.510.000'
+            else format('FALLO  dio %s', valor_nativo) end
+  from valor_inversion where account_id = :'bono';
+
+select case when valor = 8510000
+            then 'ok  y la lista de posiciones dice lo mismo'
+            else format('FALLO  la posicion dice %s', valor) end
+  from posicion where account_id = :'bono';
+
+-- Contraprueba: una accion cotiza por unidad y no se toca.
+select comprar_activo('YPFD','YPF','stock','ARS',0,
+                      (select id from account where name='Broker bonos'),
+                      87350, 10, 'Balanz', current_date) as accion \gset
+
+select case when quote_size = 1
+            then 'ok  una accion sigue cotizando por unidad'
+            else format('FALLO  la accion nacio con lamina %s', quote_size) end
+  from instrument where symbol = 'YPFD';
+
+reset role;
