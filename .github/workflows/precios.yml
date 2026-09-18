@@ -15,6 +15,10 @@ on:
   schedule:
     - cron: '00 21 * * 1-5'   # dias habiles 21:00 UTC (~18:00 en Argentina, cerrada la rueda)
   workflow_dispatch:
+    inputs:
+      desde:
+        description: 'Recuperar desde esta fecha (AAAA-MM-DD). Solo cripto; los CEDEARs no tienen historico'
+        required: false
 
 concurrency:
   group: precios
@@ -47,7 +51,11 @@ jobs:
 
       - name: Traer los precios
         run: |
-          node scripts/precios.mjs < /tmp/instrumentos.tsv > /tmp/precios.sql
+          if [ -n "${{ inputs.desde }}" ]; then
+            node scripts/precios.mjs desde "${{ inputs.desde }}" < /tmp/instrumentos.tsv > /tmp/precios.sql
+          else
+            node scripts/precios.mjs < /tmp/instrumentos.tsv > /tmp/precios.sql
+          fi
           echo "precios generados: $(grep -c 'insert into price' /tmp/precios.sql || echo 0)"
 
       - name: Guardarlos
@@ -78,6 +86,10 @@ jobs:
         env:
           DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
+          if [ -n "${{ inputs.desde }}" ]; then
+            echo "corrida de recuperacion: el conteo de hoy no aplica"
+            exit 0
+          fi
           pedidos=$(wc -l < /tmp/instrumentos.tsv)
           guardados=$(docker run --rm postgres:17-alpine psql "$DB_URL" -tAc \
             "select count(distinct instrument_id) from price
