@@ -24,7 +24,9 @@ done
   echo "-- GENERADO POR scripts/pendientes.sh — no editar a mano."
   echo "--"
   echo "-- Migraciones desde $desde, en orden. Pegar entero en el SQL Editor de"
-  echo "-- Supabase. Es idempotente: se puede correr dos veces sin romper nada."
+  echo "-- Supabase, en orden. Los ALTER llevan IF NOT EXISTS y los CREATE VIEW van"
+  echo "-- precedidos de DROP, asi que volver a correrlo no rompe nada; un INSERT de"
+  echo "-- datos semilla si podria duplicar, y por eso se avisa en vez de prometer."
   echo "--"
   for f in "${archivos[@]}"; do echo "--   $(basename "$f")"; done
   echo

@@ -9,7 +9,7 @@
 
 -- A donde vuelve la plata al vencer. Para un recurrente no aplica; para un
 -- vencimiento es la otra punta del movimiento.
-alter table scheduled_event add column counter_account_id uuid;
+alter table scheduled_event add column if not exists counter_account_id uuid;
 alter table scheduled_event add constraint sched_counter_same_ledger
   foreign key (counter_account_id, ledger_id) references account(id, ledger_id);
 

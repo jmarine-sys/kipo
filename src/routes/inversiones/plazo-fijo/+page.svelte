@@ -67,7 +67,7 @@
 
   <form class="card stack" onsubmit={crear}>
     <label class="campo"><span>Cómo lo llamás</span>
-      <input bind:value={nombre} required placeholder="Plazo fijo 90 días" />
+      <input bind:value={nombre} required maxlength="36" placeholder="Plazo fijo 90 días" />
     </label>
 
     <label class="campo"><span>Sale de</span>

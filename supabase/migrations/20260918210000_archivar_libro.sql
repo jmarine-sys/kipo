@@ -9,7 +9,7 @@
 -- Un libro con movimientos no se borra ni pidiendo por favor: es exactamente lo
 -- que ADR-018 vino a proteger.
 
-alter table ledger add column archived_at timestamptz;
+alter table ledger add column if not exists archived_at timestamptz;
 
 comment on column ledger.archived_at is
   'Un libro archivado deja de aparecer y deja de poder ser el activo, pero su '

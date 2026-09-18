@@ -7,7 +7,7 @@
     listResumenTarjeta, type ResumenTarjeta
   } from '$lib/ledger/api';
   import { adjustment } from '$lib/ledger/entries';
-  import { tipoDeCuenta, nombresRepetidos, esAmbigua } from '$lib/ledger/tipos';
+  import { tipoDeCuenta } from '$lib/ledger/tipos';
   import Cuenta from '$lib/Cuenta.svelte';
   import { money, today } from '$lib/format';
   import type { AccountBalance, Category } from '$lib/types';
@@ -114,8 +114,6 @@
   let banco = $state('');
 
   /** Los bancos ya usados, para que 'Macro' y 'macro' no sean dos grupos. */
-  const repetidos = $derived(nombresRepetidos(balances));
-
   const bancosUsados = $derived(
     [...new Set(balances.map((b) => b.institution?.trim()).filter(Boolean) as string[])].sort()
   );
@@ -213,7 +211,10 @@
                 <span class="nom">
                   <!-- La misma ficha que en el resto de la app: nombre, moneda,
                        y el banco solo cuando hay otra cuenta que se llama igual. -->
-                  <Cuenta cuenta={b} ambigua={esAmbigua(b, repetidos)} />
+                  <!-- Sin «tarjeta»: el subtítulo de abajo ya dice qué es, y
+                       repetirlo gasta el poco ancho que hay. El banco SIEMPRE,
+                       porque es lo que distingue dos cuentas que se llaman igual. -->
+                  <Cuenta cuenta={b} tarjeta={false} banco="siempre" />
                   <!-- El tipo va DEBAJO y en su propia línea, no al lado: al lado
                        se colapsaba cuando no entraba, y quedaba a veces arriba y
                        a veces abajo. Una lista se lee por su forma, y la forma no
@@ -247,7 +248,7 @@
                   <label class="campo">
                     <span>Nombre</span>
                     <span class="row">
-                      <input bind:value={nombre} />
+                      <input bind:value={nombre} maxlength="36" />
                       <button class="btn-primary chico" disabled={busy || nombre.trim() === b.name || !nombre.trim()}
                               onclick={guardarNombre}>Guardar</button>
                     </span>
@@ -325,7 +326,7 @@
   .cuotas .meses li { align-items: baseline; gap: .5rem; }
   .cuotas .cap { text-transform: capitalize; }
   .cuotas p { margin: 0; }
-  .nom { display: flex; flex-direction: column; align-items: flex-start; gap: .1rem; min-width: 0; }
+  .nom { display: flex; flex-direction: column; align-items: flex-start; gap: .1rem; min-width: 0; flex: 1 1 auto; }
   .nom .tipo { font-size: .72rem; }
   .vistas { display: grid; grid-template-columns: 1fr 1fr; gap: .4rem; margin-bottom: .2rem; }
   .vistas button { min-height: 40px; font-size: .85rem; }

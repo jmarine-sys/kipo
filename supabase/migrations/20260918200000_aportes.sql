@@ -29,7 +29,7 @@
 -- `is_system` decia que no se puede borrar; nunca dijo PARA QUE es.
 -- ---------------------------------------------------------------------------
 
-alter table category add column system_role text
+alter table category add column if not exists system_role text
   check (system_role in ('ajuste', 'interes', 'aporte_enviado', 'aporte_recibido'));
 
 create unique index category_system_role_idx
@@ -125,7 +125,7 @@ grant execute on function crear_libro(text) to authenticated;
 -- como lo que son: las dos mitades de una misma cosa.
 -- ---------------------------------------------------------------------------
 
-alter table transaction add column cross_ref uuid;
+alter table transaction add column if not exists cross_ref uuid;
 
 create index transaction_cross_ref_idx on transaction (cross_ref) where cross_ref is not null;
 

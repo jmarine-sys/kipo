@@ -21,7 +21,7 @@
 -- invariante dependiendo de que nadie se olvide.
 
 alter table scheduled_event
-  add column month_end boolean not null default false;
+  add column if not exists month_end boolean not null default false;
 
 comment on column scheduled_event.month_end is
   'true = vence el ULTIMO dia del mes, sea 28, 30 o 31. Sin esto la fecha se '

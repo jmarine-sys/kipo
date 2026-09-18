@@ -31,7 +31,7 @@ create table portfolio (
 -- institución: tu cuenta remunerada de Mercado Pago no tiene por qué entrar,
 -- aunque Mercado Pago también sea una institución. ADR-013 ya había decidido que
 -- una cuenta remunerada es un banco, no una inversión.
-alter table account add column portfolio_id uuid;
+alter table account add column if not exists portfolio_id uuid;
 
 -- Compuesta contra (id, ledger_id): garantiza en el esquema que una cuenta no
 -- pueda apuntar a un portafolio de OTRO libro. Sin triggers.

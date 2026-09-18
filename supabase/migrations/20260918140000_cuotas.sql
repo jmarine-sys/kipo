@@ -17,7 +17,7 @@
 -- el modelo igual no usa, porque la proyeccion es por MES.
 
 alter table transaction
-  add column installments int
+  add column if not exists installments int
   check (installments is null or installments between 2 and 60);
 
 comment on column transaction.installments is

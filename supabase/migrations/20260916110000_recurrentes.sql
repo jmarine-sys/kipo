@@ -14,7 +14,7 @@ alter table scheduled_event add constraint scheduled_event_id_ledger_uk
   unique (id, ledger_id);
 
 alter table transaction
-  add column scheduled_event_id uuid,
+  add column if not exists scheduled_event_id uuid,
   add constraint transaction_sched_same_ledger
     foreign key (scheduled_event_id, ledger_id)
     references scheduled_event(id, ledger_id) on delete set null;

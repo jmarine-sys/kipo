@@ -17,7 +17,7 @@
 -- corresponde.
 
 alter table instrument
-  add column quote_size numeric(38,18) not null default 1
+  add column if not exists quote_size numeric(38,18) not null default 1
   check (quote_size > 0);
 
 comment on column instrument.quote_size is

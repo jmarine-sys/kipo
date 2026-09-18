@@ -8,35 +8,53 @@
    * el mismo nombre en bancos distintos.
    *
    * QUÉ SE MUESTRA Y POR QUÉ:
-   *   la moneda   siempre, porque cambia lo que significa el número que escribís
-   *   «tarjeta»   siempre que sea un pasivo: ahí gastar AUMENTA el saldo
-   *   el banco    solo cuando hace falta para distinguirla de otra igual
+   *   la moneda   SIEMPRE, porque cambia lo que significa el número que escribís
+   *   «tarjeta»   cuando es un pasivo y la pantalla no lo dice de otra forma:
+   *               ahí gastar AUMENTA el saldo, y eso hay que avisarlo
+   *   el banco    depende de la pantalla, y por eso es un parámetro
    *
-   * Lo último es deliberado. Poner el banco en todas alarga cada ficha y hace más
-   * lento leer la lista, que es el camino rápido de la app; ponerlo solo cuando
-   * hay ambigüedad resuelve el problema justo donde existe.
+   * Lo del banco es la parte discutida. En la lista de cuentas va siempre: es
+   * donde vas a distinguir una de otra. En el camino rápido —elegir cuenta al
+   * registrar— va solo cuando dos se llaman igual, porque ahí cada carácter de
+   * más hace más lenta la lectura, y ese camino es el criterio de éxito del MVP.
    */
   let {
     cuenta,
-    ambigua = false
+    ambigua = false,
+    tarjeta = true,
+    banco = 'ambigua'
   }: {
     cuenta: { name: string; unit: string; kind?: string | null; institution?: string | null };
     /** true cuando otra cuenta comparte su nombre. Lo decide quien arma la lista. */
     ambigua?: boolean;
+    /** Mostrar «tarjeta». Se apaga donde el tipo ya está escrito debajo. */
+    tarjeta?: boolean;
+    /** Cuándo mostrar el banco. En la lista de cuentas, siempre. */
+    banco?: 'ambigua' | 'siempre' | 'nunca';
   } = $props();
+
+  const muestraBanco = $derived(
+    banco === 'siempre' ? !!cuenta.institution
+    : banco === 'nunca' ? false
+    : ambigua && !!cuenta.institution
+  );
 </script>
 
 <span class="cuenta">
   <span class="nombre">{cuenta.name}</span>
   <span class="tag unidad">{cuenta.unit}</span>
-  {#if cuenta.kind === 'liability'}<span class="tag">tarjeta</span>{/if}
-  {#if ambigua && cuenta.institution}<span class="tag banco">{cuenta.institution}</span>{/if}
+  {#if tarjeta && cuenta.kind === 'liability'}<span class="tag">tarjeta</span>{/if}
+  {#if muestraBanco}<span class="tag banco">{cuenta.institution}</span>{/if}
 </span>
 
 <style>
-  .cuenta { display: inline-flex; align-items: baseline; gap: .3rem; min-width: 0; }
-  .nombre { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* El nombre se achica y las etiquetas nunca: si la fila no entra, lo que se
+     recorta es el nombre —que se puede adivinar— y no la moneda ni el banco, que
+     son justo lo que distingue una cuenta de otra. */
+  .cuenta { display: inline-flex; align-items: baseline; gap: .3rem; min-width: 0; max-width: 100%; }
+  .nombre { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 0 1 auto; }
   .tag {
+    flex: 0 0 auto;
     font-size: .66rem; padding: .05rem .3rem; border-radius: 4px;
     background: color-mix(in srgb, currentColor 14%, transparent);
     white-space: nowrap; opacity: .85; font-weight: 500;

@@ -76,7 +76,14 @@
 
 <form class="stack" onsubmit={save}>
   <label><span class="dim">Nombre</span>
-    <input bind:value={name} required placeholder="Caja de ahorro Santander" /></label>
+    <!-- Limitado en el ORIGEN además de recortado en pantalla: recortar evita que
+         la fila se rompa, pero un nombre que nunca se ve entero tampoco sirve. -->
+    <input bind:value={name} required maxlength="36"
+           placeholder="Caja de ahorro Santander" />
+    {#if name.length > 28}
+      <span class="dim sm">{36 - name.length} caracteres. Los nombres cortos se leen mejor en la lista.</span>
+    {/if}
+  </label>
 
   <fieldset>
     <legend class="dim">Qué tipo de cuenta es</legend>
