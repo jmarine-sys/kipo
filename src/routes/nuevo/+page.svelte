@@ -4,10 +4,11 @@
   import { listAccounts, listCategories, createTransaction, cotizacionesVigentes } from '$lib/ledger/api';
   import { plausibilidad, type Cotizacion } from '$lib/ledger/plausibilidad';
   import { misLibros, cuentasDeLibro, aportarALibro } from '$lib/ledger/libros';
+  import { createScheduled, FRECUENCIAS, type Frecuencia } from '$lib/ledger/recurrentes';
   import { nombresRepetidos, esAmbigua } from '$lib/ledger/tipos';
   import Cuenta from '$lib/Cuenta.svelte';
   import { expense, income, transfer, exchange, impliedRate } from '$lib/ledger/entries';
-  import { money, today } from '$lib/format';
+  import { money, today, shortDate } from '$lib/format';
   import { bump, byUse } from '$lib/frequent';
   import type { Account, Category } from '$lib/types';
 
@@ -114,6 +115,37 @@
   // aritmeticamente valido- asi que el unico lugar donde se puede mirar es acá,
   // mientras se tipea. La REGLA vive en plausibilidad.ts, no en esta pantalla.
   let cuotas = $state(1);
+
+  /**
+   * «Esto se repite» — OD-43.
+   *
+   * Una casilla y no un cuarto modo. Registrar dice lo que YA PASÓ; una regla
+   * programa lo que VA A PASAR. Son actos distintos, y ponerlos a la misma
+   * altura en la fila de modos alargaría el camino de tres toques, que es el
+   * criterio de éxito del MVP.
+   *
+   * Como casilla, en cambio, sigue el flujo natural: pagué el alquiler, y esto
+   * se repite. Un solo acto para vos, dos registros para la app.
+   */
+  let repite = $state(false);
+  let frecuencia = $state<Frecuencia>('monthly');
+
+  /** El último día de su mes: entonces la regla es «fin de mes», no «el 31». */
+  const esFinDeMes = $derived.by(() => {
+    const d = new Date(date + 'T12:00:00');
+    return new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate() === d.getDate();
+  });
+
+  /** La próxima vez, que es una después de la que acabás de cargar. */
+  const proxima = $derived.by(() => {
+    const d = new Date(date + 'T12:00:00');
+    const saltos: Record<string, number> = {
+      weekly: 0, monthly: 1, bimonthly: 2, quarterly: 3, biannual: 6, yearly: 12
+    };
+    if (frecuencia === 'weekly') d.setDate(d.getDate() + 7);
+    else d.setMonth(d.getMonth() + saltos[frecuencia]);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  });
   let cotizaciones = $state<Cotizacion[]>([]);
   let rateOk = $state(false);           // "ya lo miré, es correcto"
 
@@ -175,7 +207,7 @@
   });
 
   function setMode(m: Mode) {
-    mode = m; categoryId = null; toAccountId = null; raw2 = ''; cuotas = 1;
+    mode = m; categoryId = null; toAccountId = null; raw2 = ''; cuotas = 1; repite = false;
     showAllCats = false; search = '';
     recall();
   }
@@ -233,6 +265,27 @@
         : transfer({ fromId: accountId, toId: toAccountId!, amount, unit, ...common });
 
       await createTransaction(input);
+
+      // Y la regla, si dijiste que se repite. Va DESPUÉS del movimiento a
+      // propósito: si fallara, quedó registrado lo que pasó, que es lo que no
+      // se puede perder. Una regla se vuelve a crear; un gasto olvidado, no.
+      if (repite && mode === 'expense' && categoryId) {
+        try {
+          await createScheduled({
+            description: note?.trim() || categories.find((c) => c.id === categoryId)?.name || 'Gasto fijo',
+            category_id: categoryId,
+            account_id: accountId,
+            amount,
+            currency: unit,
+            frequency: frecuencia,
+            next_on: proxima,
+            month_end: esFinDeMes && frecuencia !== 'weekly'
+          });
+        } catch {
+          // No se cancela el movimiento por esto: se avisa y listo.
+          error = 'Se registró el gasto, pero no se pudo agendar la repetición.';
+        }
+      }
       remember(accountId);
       if (categoryId) bump(categoryId);
       goto('/');
@@ -341,6 +394,31 @@
             </div>
             <button class="link" onclick={() => { showAllCats = false; search = ''; }}>Cerrar</button>
           </div>
+        {/if}
+
+        {#if mode === 'expense'}
+          <label class="repite">
+            <input type="checkbox" bind:checked={repite} />
+            <span>
+              Esto se repite
+              <span class="dim sm bloque">
+                Además de registrarlo, queda agendado para la próxima.
+              </span>
+            </span>
+          </label>
+
+          {#if repite}
+            <div class="wrap frec">
+              {#each FRECUENCIAS as f}
+                <button class="chip chico" class:on={frecuencia === f.id}
+                        onclick={() => (frecuencia = f.id)}>{f.label}</button>
+              {/each}
+            </div>
+            <p class="dim sm">
+              La próxima cae el <b>{shortDate(proxima)}</b>{#if esFinDeMes && frecuencia !== 'weekly'}, y como hoy es fin de mes va a seguir cayendo el último día de cada mes{/if}.
+              Lo podés cambiar en <a href="/recurrentes">Agenda</a>.
+            </p>
+          {/if}
         {/if}
       </section>
     {/if}
@@ -518,6 +596,9 @@
     border: 1px solid color-mix(in srgb, var(--warn) 40%, transparent);
   }
   .salida a { display: inline-block; margin-top: .3rem; }
+  .repite { display: flex; align-items: flex-start; gap: .6rem; margin-top: .8rem; }
+  .bloque { display: block; }
+  .frec { margin-top: .5rem; }
   .cuotas { margin-top: .7rem; display: flex; flex-direction: column; gap: .35rem; }
   .cuotas .chip.chico { min-height: 36px; padding: 0 .7rem; font-size: .82rem; }
   .cuotas p { margin: 0; }

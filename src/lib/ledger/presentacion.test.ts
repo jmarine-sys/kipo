@@ -8,7 +8,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { filasDeMovimientos, summarize, totales } from './presentacion.ts';
+import { filasDeMovimientos, totales, summarize } from './presentacion.ts';
 import type { EntryDetail } from './api.ts';
 
 let n = 0;
@@ -156,4 +156,41 @@ test('el ajuste de saldo sigue siendo un ajuste', () => {
   ]);
   assert.equal(s.adjustments, 3000);
   assert.equal(s.expense, 0);
+});
+
+// ---------------------------------------------------------------------------
+// Ajustes de saldo: la dirección sale del SIGNO, no del tipo de categoría.
+//
+// Un ajuste se imputa a una categoría de GASTO en los dos sentidos. Si el saldo
+// real era mayor, el monto de esa categoría es NEGATIVO: encontraste plata. Con
+// la regla vieja -«categoría de gasto ⇒ salió»- eso se mostraba en rojo y con un
+// menos adelante, diciendo lo contrario de lo que pasó.
+// ---------------------------------------------------------------------------
+
+const ajuste = (tx: string, delta: number) => [
+  fila({ transaction_id: tx, amount: String(delta), account_id: 'a', account_name: 'Caja',
+         tx_kind: 'adjustment' }),
+  fila({ transaction_id: tx, amount: String(-delta), category_id: 'aj',
+         category_name: 'Ajuste de saldo', category_kind: 'expense',
+         category_is_system: true, category_role: 'ajuste', tx_kind: 'adjustment' })
+];
+
+test('un ajuste hacia ARRIBA se muestra como que entró plata', () => {
+  const [f] = filasDeMovimientos(ajuste('t1', 5000));
+  assert.equal(f.signo, '+');
+  assert.equal(f.clase, 'pos');
+  assert.equal(f.monto, 5000);
+});
+
+test('un ajuste hacia ABAJO se muestra como que salió', () => {
+  const [f] = filasDeMovimientos(ajuste('t2', -3000));
+  assert.equal(f.signo, '−');
+  assert.equal(f.clase, 'neg');
+  assert.equal(f.monto, 3000);
+});
+
+test('y los totales lo cuentan del lado correcto', () => {
+  const t = totales([...filasDeMovimientos(ajuste('t1', 5000))]);
+  assert.equal(t.ingresos, 5000);
+  assert.equal(t.gastos, 0);
 });

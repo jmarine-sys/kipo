@@ -51,6 +51,10 @@ export interface Fila {
   clase: 'pos' | 'neg' | 'neutro';
   /** true = toca el resultado del mes. Una transferencia no. */
   afectaResultado: boolean;
+  /** true = la plata ENTRÓ. Sale del signo, no del tipo de categoría. */
+  entra: boolean;
+  /** true = la categoría es de ingreso. No es lo mismo que `entra`: un ajuste
+      hacia arriba entra y su categoría es de gasto. */
   esIngreso: boolean;
 }
 
@@ -67,6 +71,20 @@ export function filasDeMovimientos(lineas: EntryDetail[]): Fila[] {
     const cab = es[0];
     const esIngreso = cat?.category_kind === 'income';
 
+    /**
+     * Si esta plata ENTRÓ, y sale del SIGNO — no del tipo de categoría.
+     *
+     * Por el tipo funcionaba mientras un gasto fuera siempre salida, y deja de
+     * funcionar con los ajustes de saldo: se imputan a una categoría de gasto en
+     * los DOS sentidos, y cuando el saldo real era mayor el monto es negativo.
+     * Con la regla vieja, encontrar plata se mostraba en rojo y con un menos
+     * adelante, diciendo lo contrario de lo que pasó.
+     *
+     * El convenio de signos (modelo-de-datos.md §1) ya lo decía: la línea de la
+     * categoría es el espejo de la de la cuenta. Negativa acá es positiva allá.
+     */
+    const entra = cat ? Number(cat.amount) < 0 : false;
+
     return {
       id,
       fecha: cab.occurred_on,
@@ -82,10 +100,11 @@ export function filasDeMovimientos(lineas: EntryDetail[]): Fila[] {
       // dibuja aparte, así que el número no puede traerlo adentro.
       monto: Math.abs(Number(cat ? cat.amount : (neg?.amount ?? 0))),
       unit: cat?.unit ?? neg?.unit ?? 'ARS',
-      signo: !cat ? '' : esIngreso ? '+' : '−',
+      signo: !cat ? '' : entra ? '+' : '−',
       // el color ES el mensaje: rojo sale, verde entra, neutro no toca el resultado
-      clase: !cat ? 'neutro' : esIngreso ? 'pos' : 'neg',
+      clase: !cat ? 'neutro' : entra ? 'pos' : 'neg',
       afectaResultado: !!cat,
+      entra,
       esIngreso
     };
   });
@@ -97,7 +116,7 @@ export function totales(filas: Fila[], unit = 'ARS') {
   let gastos = 0;
   for (const f of filas) {
     if (!f.afectaResultado || f.unit !== unit) continue;
-    if (f.esIngreso) ingresos += f.monto;
+    if (f.entra) ingresos += f.monto;
     else gastos += f.monto;
   }
   return { ingresos, gastos };
