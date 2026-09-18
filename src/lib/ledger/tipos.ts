@@ -81,3 +81,24 @@ export function tipoDeCuenta(a: { kind: string; valuation: string; is_spendable:
   if (a.kind === 'liability') return 'Tarjeta de crédito';
   return a.is_spendable ? 'Caja de ahorro o efectivo' : 'Cuenta de inversión';
 }
+
+/**
+ * Los nombres de cuenta que se repiten dentro de una lista.
+ *
+ * Sirve para decidir cuándo hace falta mostrar el banco: una «Caja de ahorro»
+ * sola no necesita aclaración, dos sí. Se compara sin distinguir mayúsculas ni
+ * espacios de más, porque «Caja de ahorro» y «caja de ahorro » son la misma para
+ * quien las lee.
+ */
+export function nombresRepetidos(cuentas: { name: string }[]): Set<string> {
+  const vistos = new Map<string, number>();
+  for (const c of cuentas) {
+    const k = c.name.trim().toLowerCase();
+    vistos.set(k, (vistos.get(k) ?? 0) + 1);
+  }
+  return new Set([...vistos].filter(([, n]) => n > 1).map(([k]) => k));
+}
+
+/** Si esta cuenta necesita que se aclare dónde está. */
+export const esAmbigua = (c: { name: string }, repetidos: Set<string>) =>
+  repetidos.has(c.name.trim().toLowerCase());

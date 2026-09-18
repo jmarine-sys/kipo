@@ -1,12 +1,8 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import {
-    misLibros, cambiarLibro, crearInvitacion, aceptarInvitacion, crearLibro,
-    cuentasDeLibro, aportarALibro, type Libro, type CuentaDeOtroLibro
+    misLibros, cambiarLibro, crearInvitacion, aceptarInvitacion, crearLibro, type Libro
   } from '$lib/ledger/libros';
-  import { listAccounts } from '$lib/ledger/api';
-  import { money, today } from '$lib/format';
-  import type { Account } from '$lib/types';
 
   let libros = $state<Libro[]>([]);
   let loading = $state(true);
@@ -24,29 +20,6 @@
   let creando = $state(false);
   let nombreNuevo = $state('');
 
-  // ---- pasar plata a otro libro -------------------------------------------
-  let pasando = $state(false);
-  let destino = $state('');
-  let cuentaOrigen = $state('');
-  let cuentaDestino = $state('');
-  let montoRaw = $state('');
-  let detalle = $state('');
-  let misCuentas = $state<Account[]>([]);
-  let cuentasAlla = $state<CuentaDeOtroLibro[]>([]);
-
-  const monto = $derived(Number(montoRaw.replace(/\./g, '').replace(',', '.')) || 0);
-  const origen = $derived(misCuentas.find((c) => c.id === cuentaOrigen) ?? null);
-
-  // Solo cuentas de la misma moneda: un aporte no es un cambio. Si hiciera falta
-  // cambiar de moneda, son dos operaciones distintas y conviene que se vean.
-  const destinosPosibles = $derived(cuentasAlla.filter((c) => !origen || c.unit === origen.unit));
-
-  const listoParaPasar = $derived(!!destino && !!cuentaOrigen && !!cuentaDestino && monto > 0);
-
-  async function elegirDestino(id: string) {
-    destino = id; cuentaDestino = '';
-    cuentasAlla = id ? await cuentasDeLibro(id) : [];
-  }
   const soyDuenio = $derived(activo?.role === 'owner');
 
   async function correr(fn: () => Promise<void>) {
@@ -142,65 +115,11 @@
     {/if}
 
     {#if otros.length}
-      <section class="card stack">
-        <h2>Pasar plata a otro libro</h2>
-        <p class="dim sm">
-          En <em>{activo?.name}</em> sale como <b>gasto</b>: esa plata ya no la
-          podés usar sola. En el otro libro entra como ingreso.
-        </p>
-
-        {#if pasando}
-          <label class="campo"><span>¿A qué libro?</span>
-            <select value={destino} onchange={(e) => elegirDestino(e.currentTarget.value)}>
-              <option value="">Elegí uno</option>
-              {#each otros as l}<option value={l.ledger_id}>{l.name}</option>{/each}
-            </select>
-          </label>
-
-          <label class="campo"><span>Sale de</span>
-            <select bind:value={cuentaOrigen}>
-              <option value="">Elegí una cuenta</option>
-              {#each misCuentas as c}<option value={c.id}>{c.name} · {c.unit}</option>{/each}
-            </select>
-          </label>
-
-          <label class="campo"><span>Entra en</span>
-            <select bind:value={cuentaDestino} disabled={!destino}>
-              <option value="">{destino ? 'Elegí una cuenta' : 'Primero elegí el libro'}</option>
-              {#each destinosPosibles as c}<option value={c.id}>{c.name} · {c.unit}</option>{/each}
-            </select>
-            {#if destino && origen && !destinosPosibles.length}
-              <span class="dim sm">Ese libro no tiene ninguna cuenta en {origen.unit}.</span>
-            {/if}
-          </label>
-
-          <label class="campo"><span>Cuánto</span>
-            <input class="monto" inputmode="decimal" bind:value={montoRaw} placeholder="0" />
-          </label>
-
-          <label class="campo"><span>Para qué (opcional)</span>
-            <input bind:value={detalle} placeholder="Gastos de la casa" />
-          </label>
-
-          <div class="row">
-            <button type="button" class="chico" onclick={() => (pasando = false)}>Cancelar</button>
-            <button class="btn-primary" disabled={busy || !listoParaPasar}
-                    onclick={() => correr(async () => {
-                      await aportarALibro({
-                        destino, cuentaOrigen, cuentaDestino, monto,
-                        fecha: today(), detalle: detalle.trim() || null
-                      });
-                      montoRaw = ''; detalle = ''; pasando = false;
-                    })}>
-              {monto > 0 ? `Pasar ${money(monto, origen?.unit)}` : 'Pasar'}
-            </button>
-          </div>
-        {:else}
-          <button onclick={() => { pasando = true; listAccounts().then((a) => (misCuentas = a.filter((x) => x.valuation === 'balance'))); }}>
-            Pasar plata
-          </button>
-        {/if}
-      </section>
+      <p class="dim sm">
+        Para pasar plata de un libro a otro, usá <b>Mover</b> al registrar un
+        movimiento: ahí aparecen las cuentas de tus otros libros.
+        <a href="/nuevo">Ir a registrar →</a>
+      </p>
     {/if}
 
     {#if creando}

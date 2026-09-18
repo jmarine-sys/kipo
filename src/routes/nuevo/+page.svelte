@@ -3,6 +3,9 @@
   import { goto } from '$app/navigation';
   import { listAccounts, listCategories, createTransaction, cotizacionesVigentes } from '$lib/ledger/api';
   import { plausibilidad, type Cotizacion } from '$lib/ledger/plausibilidad';
+  import { misLibros, cuentasDeLibro, aportarALibro } from '$lib/ledger/libros';
+  import { nombresRepetidos, esAmbigua } from '$lib/ledger/tipos';
+  import Cuenta from '$lib/Cuenta.svelte';
   import { expense, income, transfer, exchange, impliedRate } from '$lib/ledger/entries';
   import { money, today } from '$lib/format';
   import { bump, byUse } from '$lib/frequent';
@@ -50,6 +53,28 @@
   const account = $derived(accounts.find((a) => a.id === accountId) ?? null);
   const toAccount = $derived(accounts.find((a) => a.id === toAccountId) ?? null);
   const destinations = $derived(accounts.filter((a) => a.id !== accountId));
+
+  /**
+   * Mover plata a una cuenta de OTRO libro — ADR-032.
+   *
+   * Vivía escondido en la pantalla de libros, y no era su lugar: la intención es
+   * la misma que mover plata acá adentro, y dónde cae decide la mecánica. Es el
+   * mismo criterio con el que «Transferir» y «Cambio» se fundieron en «Mover».
+   *
+   * Lo que cambia no es la intención sino la contabilidad: adentro del libro es
+   * una transferencia y tu patrimonio no se mueve; hacia otro libro es un GASTO,
+   * porque esa plata ya no la podés usar solo. Por eso se dice en la pantalla.
+   */
+  type Ajena = { id: string; name: string; unit: string; libro: string; libroNombre: string };
+  let ajenas = $state<Ajena[]>([]);
+
+  const ajenasPosibles = $derived(
+    account ? ajenas.filter((a) => a.unit === account.unit) : []
+  );
+  const ajenaElegida = $derived(ajenas.find((a) => a.id === toAccountId) ?? null);
+
+  // Los nombres que se repiten, para aclarar el banco SOLO donde hace falta.
+  const repetidos = $derived(nombresRepetidos(accounts));
 
   // ---- categorías -----------------------------------------------------------
   const catKind = $derived(mode === 'income' ? 'income' : 'expense');
@@ -106,6 +131,7 @@
     if (!amount || !accountId) return false;
     if (mode === 'expense' || mode === 'income') return !!categoryId;
     if (!toAccountId) return false;
+    if (ajenaElegida) return true;
     if (!isExchange) return true;
     if (!amount2) return false;
     return sospecha.estado !== 'sospechoso' || rateOk;
@@ -129,6 +155,20 @@
       // En segundo plano: si no hay cotizaciones, el aviso no aparece y cargar
       // sigue siendo igual de rápido. Nunca debe demorar el formulario.
       cotizacionesVigentes(date).then((c) => (cotizaciones = c)).catch(() => {});
+
+      // Y las cuentas de tus otros libros, si tenés más de uno. También en
+      // segundo plano: el 99% de los movimientos no cruzan libros.
+      misLibros()
+        .then(async (ls) => {
+          const otros = ls.filter((l) => !l.activo);
+          const todas = await Promise.all(
+            otros.map(async (l) => (await cuentasDeLibro(l.ledger_id)).map((c) => ({
+              id: c.id, name: c.name, unit: c.unit, libro: l.ledger_id, libroNombre: l.name
+            })))
+          );
+          ajenas = todas.flat();
+        })
+        .catch(() => {});
     } catch (e) {
       error = e instanceof Error ? e.message : 'No se pudo cargar';
     } finally { loaded = true; }
@@ -166,6 +206,22 @@
     try {
       const unit = account!.unit;
       const common = { date, description: note || null };
+
+      // Hacia otro libro no hay UN movimiento: son dos, uno en cada libro, y los
+      // arma la base. No puede pasar por create_transaction.
+      if (ajenaElegida) {
+        await aportarALibro({
+          destino: ajenaElegida.libro,
+          cuentaOrigen: accountId,
+          cuentaDestino: ajenaElegida.id,
+          monto: Math.abs(amount),
+          fecha: date,
+          detalle: note || null
+        });
+        bump(accountId);
+        goto('/');
+        return;
+      }
       const input =
         mode === 'expense' ? expense({ accountId, categoryId: categoryId!, amount, unit, ...common,
                                        installments: onCard && cuotas > 1 ? cuotas : null })
@@ -297,7 +353,7 @@
         {#each sources as a}
           <button class="chip" class:on={accountId === a.id}
                   onclick={() => { accountId = a.id; if (toAccountId === a.id) toAccountId = null; }}>
-            {a.name}{#if a.kind === 'liability'}<span class="tag">tarjeta</span>{/if}
+            <Cuenta cuenta={a} ambigua={esAmbigua(a, repetidos)} />
           </button>
         {:else}
           <!-- Sin esto la pantalla mostraba un hueco mudo y el boton de guardar
@@ -338,13 +394,34 @@
           {#each destinations as a}
             <button class="chip" class:on={toAccountId === a.id}
                     onclick={() => (toAccountId = a.id)}>
-              {a.name}{#if a.unit !== account?.unit}<span class="tag">{a.unit}</span>{/if}
+              <Cuenta cuenta={a} ambigua={esAmbigua(a, repetidos)} />
             </button>
           {:else}
             <p class="dim sm">No tenés otra cuenta a dónde mover.</p>
           {/each}
         </div>
-        {#if payingOff}
+
+        <!-- Las de tus otros libros, aparte y dichas como lo que son. Solo las
+             de la misma moneda: un aporte no es un cambio. -->
+        {#if ajenasPosibles.length}
+          <h2 class="lbl otro">En otro libro tuyo</h2>
+          <div class="wrap">
+            {#each ajenasPosibles as a}
+              <button class="chip ajena" class:on={toAccountId === a.id}
+                      onclick={() => (toAccountId = a.id)}>
+                <Cuenta cuenta={{ name: a.name, unit: a.unit }} />
+                <span class="tag libro">{a.libroNombre}</span>
+              </button>
+            {/each}
+          </div>
+        {/if}
+        {#if ajenaElegida}
+          <p class="what aviso">
+            Va a <em>{ajenaElegida.libroNombre}</em>, que es otro libro. Acá sale como
+            <strong>gasto</strong>: esa plata ya no la podés usar solo. Allá entra como
+            ingreso. Se registran los dos movimientos.
+          </p>
+        {:else if payingOff}
           <p class="what dim sm">
             Pagás deuda de {toAccount?.name}. <strong>No es un gasto</strong>: ya lo contaste
             cuando compraste. Tu patrimonio no cambia — baja la plata y baja la deuda.
@@ -381,7 +458,8 @@
 </div>
 
 <style>
-  .page { padding-bottom: 2rem; }
+  /* Sin padding-bottom propio: el global ya reserva lo que tapa la barra, y
+     pisarlo aca fue lo que dejo el boton de guardar debajo de ella. */
   .top { margin-bottom: .75rem; }
   .back { font-size: 1.5rem; text-decoration: none; min-width: var(--tap); }
   .date {
@@ -424,6 +502,16 @@
   }
   .chip.on { background: var(--accent); color: var(--accent-fg); border-color: transparent; font-weight: 600; }
   .chip.more { border-style: dashed; }
+  .chip.ajena { border-style: dashed; }
+  .chip .tag.libro { font-size: .66rem; padding: .05rem .3rem; border-radius: 4px;
+                     background: color-mix(in srgb, var(--accent) 22%, transparent); }
+  .lbl.otro { margin-top: .7rem; }
+  .what.aviso {
+    padding: .6rem .8rem; border-radius: 10px;
+    background: color-mix(in srgb, var(--warn) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--warn) 35%, transparent);
+    color: var(--text);
+  }
   .salida {
     margin: 0; padding: .7rem .85rem; border-radius: 10px; font-size: .86rem;
     background: color-mix(in srgb, var(--warn) 12%, transparent);

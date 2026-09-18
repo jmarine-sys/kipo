@@ -7,7 +7,8 @@
     listResumenTarjeta, type ResumenTarjeta
   } from '$lib/ledger/api';
   import { adjustment } from '$lib/ledger/entries';
-  import { tipoDeCuenta } from '$lib/ledger/tipos';
+  import { tipoDeCuenta, nombresRepetidos, esAmbigua } from '$lib/ledger/tipos';
+  import Cuenta from '$lib/Cuenta.svelte';
   import { signOut } from '$lib/session.svelte';
   import { prefs, elegirTema, alternarPrivado, type Tema } from '$lib/preferencias.svelte';
   import { money, today } from '$lib/format';
@@ -115,6 +116,8 @@
   let banco = $state('');
 
   /** Los bancos ya usados, para que 'Macro' y 'macro' no sean dos grupos. */
+  const repetidos = $derived(nombresRepetidos(balances));
+
   const bancosUsados = $derived(
     [...new Set(balances.map((b) => b.institution?.trim()).filter(Boolean) as string[])].sort()
   );
@@ -211,11 +214,12 @@
             <li>
               <button class="acc spread" onclick={() => abrir(b)}>
                 <span class="nom">
-                  {b.name}
+                  <!-- La misma ficha que en el resto de la app: nombre, moneda,
+                       y el banco solo cuando hay otra cuenta que se llama igual. -->
+                  <Cuenta cuenta={b} ambigua={esAmbigua(b, repetidos)} />
                   <!-- El tipo se deduce de lo que ES, nunca del nombre: renombrar
-                       una cuenta no puede cambiar como se la trata. -->
-                  <span class="tag">{tipoDeCuenta(b)}</span>
-                  {#if b.institution}<span class="dim sm donde">{b.institution}</span>{/if}
+                       una cuenta no puede cambiar cómo se la trata. -->
+                  <span class="tag tipo">{tipoDeCuenta(b)}</span>
                 </span>
                 <b class="money" class:neg={Number(b.balance) < 0}>{money(b.balance, b.unit)}</b>
               </button>
@@ -348,7 +352,7 @@
   .cuotas .cap { text-transform: capitalize; }
   .cuotas p { margin: 0; }
   .nom { display: flex; align-items: baseline; gap: .4rem; flex-wrap: wrap; }
-  .nom .donde { opacity: .8; }
+  .nom .tag.tipo { font-size: .66rem; opacity: .7; }
   .vistas { display: grid; grid-template-columns: 1fr 1fr; gap: .4rem; margin-bottom: .2rem; }
   .vistas button { min-height: 40px; font-size: .85rem; }
   .vistas button.on {
