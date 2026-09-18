@@ -7,6 +7,7 @@
   import { listUpcoming, cuandoFalta, type Upcoming } from '$lib/ledger/recurrentes';
   import { prefs, alternarPrivado } from '$lib/preferencias.svelte';
   import Vacio from '$lib/Vacio.svelte';
+  import { misLibros } from '$lib/ledger/libros';
   import type { AccountBalance } from '$lib/types';
 
   let entries = $state<EntryDetail[]>([]);
@@ -34,6 +35,14 @@
   );
 
   /** Lo que se viene: vencidos primero, y solo lo de los próximos 30 días. */
+  /**
+   * El nombre del libro activo, y solo cuando hay más de uno.
+   *
+   * Con un libro es ruido. Con dos, no saber en cuál estás es peor que cualquier
+   * otro error de la app: cargás el gasto en el libro equivocado y nada avisa.
+   */
+  let otroLibro = $state<string | null>(null);
+
   const pendientes = $derived(viene.filter((v) => v.dias <= 30));
   const vencidos = $derived(pendientes.filter((v) => v.vencido).length);
 
@@ -41,6 +50,11 @@
     try {
       // Lo esencial: sin esto no hay página que mostrar.
       [entries, balances] = await Promise.all([listEntries(m.from, m.to), listBalances()]);
+
+      // En segundo plano: saber en qué libro estás no puede demorar la pantalla.
+      misLibros()
+        .then((ls) => { otroLibro = ls.length > 1 ? (ls.find((l) => l.activo)?.name ?? null) : null; })
+        .catch(() => {});
 
       // Sin cuentas no hay nada que registrar ni que mostrar: todo movimiento
       // sale de algun lado. En vez de una pantalla vacia que explica, se lleva a
@@ -67,7 +81,12 @@
 
 <div class="page stack">
   <div class="spread encabezado">
-    <h1 class="cap">{m.label}</h1>
+    <span class="titulo">
+      <h1 class="cap">{m.label}</h1>
+      {#if otroLibro}
+        <a class="libro" href="/libros">{otroLibro} ▾</a>
+      {/if}
+    </span>
     <button class="ojo" onclick={alternarPrivado}
             aria-pressed={prefs.privado}
             aria-label={prefs.privado ? 'Mostrar los importes' : 'Ocultar los importes'}>
@@ -248,6 +267,13 @@
   .cuanto { display: flex; flex-direction: column; align-items: flex-end; gap: .05rem; flex-shrink: 0; }
   .cuanto b { font-size: .92rem; white-space: nowrap; }
 
+
+  .titulo { display: flex; align-items: baseline; gap: .5rem; flex-wrap: wrap; }
+  .libro {
+    font-size: .74rem; text-decoration: none; color: var(--accent);
+    padding: .1rem .45rem; border-radius: 999px;
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+  }
 
   .err {
     background: color-mix(in srgb, var(--neg) 14%, transparent);

@@ -269,6 +269,7 @@
     <p class="aprox">≈ Saldos estimados: no hay conciliación con el banco</p>
     <a class="link" href="/inversiones">Ver inversiones →</a>
     <a class="link" href="/categorias">Administrar categorías →</a>
+    <a class="link" href="/libros">Libros y personas →</a>
 
     <section class="card stack">
       <h2>Preferencias</h2>

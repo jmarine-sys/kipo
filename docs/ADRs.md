@@ -48,6 +48,7 @@ decision nobody made is fiction, and an agent will believe it.
 | [ADR-025](#adr-025--los-precios-se-traen-solos-todos-los-días-porque-el-de-hoy-no-se-recupera-mañana) | Los precios se traen solos todos los días, porque el de hoy no se recupera mañana | Accepted |
 | [ADR-026](#adr-026--el-portafolio-es-el-borde-es-flujo-solo-lo-que-lo-cruza) | El portafolio es el borde: es flujo solo lo que lo cruza | Accepted |
 | [ADR-027](#adr-027--el-alta-siembra-estructura-no-taxonomía-y-la-puesta-en-marcha-pregunta-el-resto) | El alta siembra estructura, no taxonomía, y la puesta en marcha pregunta el resto | Accepted |
+| [ADR-028](#adr-028--el-libro-activo-vive-en-la-base-y-compartir-uno-se-hace-por-código) | El libro activo vive en la base, y compartir uno se hace por código | Accepted |
 
 ---
 
@@ -1380,3 +1381,82 @@ existe, en vez de desaparecer:
 La diferencia se encontró comparando la lista de aserciones contra `git stash -u`.
 **Un `stash` sin `-u` deja las migraciones nuevas en el disco** y la corrida "antes"
 mide el estado equivocado: el primer intento dio un diff de 114 líneas sin sentido.
+
+
+---
+
+## ADR-028 — El libro activo vive en la base, y compartir uno se hace por código
+
+**Context.** `ledger_member` está en el esquema desde el primer día con sus políticas de RLS, y en la
+interfaz no había nada. Parecía faltar una pantalla de invitaciones. Al mirarlo, faltaba algo mucho
+más grande:
+
+```sql
+create function my_ledger() as $$ select * from my_ledgers() limit 1 $$;
+create policy ... using (ledger_id in (select my_ledgers()))
+```
+
+El día que alguien perteneciera a dos libros, **sin cambiar una sola línea**:
+
+1. **Toda lectura habría devuelto los dos libros mezclados.** La política filtra por *"alguno de los
+   tuyos"*, no por *"el que estás mirando"*: los gastos de dos personas en la misma lista, sumados en
+   el mismo resultado del mes.
+2. **Toda escritura habría ido a uno arbitrario.** `limit 1` sin `order by` no es *"el primero"*: es
+   cualquiera, y puede cambiar entre dos consultas.
+
+**Decision.** Existe un **libro activo por usuario**, guardado en la base, y RLS filtra por él. Las
+invitaciones son un **código de un solo uso** que el dueño genera y pasa por donde quiera.
+
+**Consequences.**
+- **El libro activo vive en la base y no en el cliente**, por la misma razón de
+  [ADR-003](#adr-003--cada-usuario-tiene-su-libro-y-la-interfaz-nunca-lo-nombra): si cada consulta
+  tuviera que acordarse de filtrar, alcanza con olvidarse en UNA para volver a mezclar, y consultas
+  nuevas se escriben todo el tiempo. Cambiar de libro es un `UPDATE` y la app entera cambia con él,
+  incluidas las pantallas que se escriban el año que viene.
+- **La línea de permisos está donde duele el error.** Un invitado registra y borra *movimientos*; no
+  crea ni borra *cuentas y categorías*, ni invita. Un movimiento mal cargado se corrige; una cuenta
+  borrada se lleva su historia.
+- **Por código y no por correo.** Buscar a alguien por su correo exige una función que diga si ese
+  correo está registrado, y eso es un enumerador de usuarios. Con un código no hace falta saber nada
+  del otro. La tabla `ledger_invite` **no tiene grants ni políticas**: si se pudiera leer, se podrían
+  listar los códigos vigentes. Solo la tocan dos funciones `SECURITY DEFINER`.
+- El mismo mensaje de error para *"no existe"*, *"ya se usó"* y *"venció"*: distinguirlos convertiría
+  el endpoint en un oráculo para adivinar códigos.
+- **La parte incómoda:** se miran de a uno, nunca juntos. No hay total del hogar. Sumarlos abriría
+  preguntas que hoy no tienen respuesta —las categorías de cada libro son distintas, así que *"¿en qué
+  se fue?"* no se puede sumar— y un número que mezcla dos economías no es de nadie.
+- `my_ledger()` pasó a `SECURITY DEFINER` porque ahora la llaman las políticas de RLS de todas las
+  tablas: como invocador, leer `active_ledger` dispararía su propia política y entraría en recursión.
+
+**Rejected alternatives.**
+- *Que el cliente filtre por `ledger_id` en cada consulta*: es la opción que no toca el esquema y la
+  peor. Una consulta olvidada mezcla los libros **sin fallar**, que es exactamente el modo de falla
+  que este proyecto viene persiguiendo.
+- *Invitar por correo*: más cómodo, y convierte la app en un verificador de si un correo está
+  registrado.
+- *Una vista combinada de todos los libros*: descartada por ahora — ver arriba.
+- *Un solo rol, "si te invito es porque confío"*: menos código de permisos que pueda tener un agujero,
+  pero cualquiera de los dos puede borrar una cuenta con años de historia sin que el otro se entere.
+
+**Evidence.** `supabase/migrations/20260918150000_libros_compartidos.sql`,
+`supabase/tests/15_libros.sql`, `src/routes/libros/+page.svelte`.
+
+**Verified against what already exists.**
+
+```
+docker: postgres:16 descartable, suite completa -> 146 aserciones ok
+
+ok  el invitado arranca con su propio libro
+ok  y no ve NADA del libro ajeno antes de que lo inviten
+ok  al aceptar pasa a tener dos libros
+ok  y exactamente UNO esta activo
+ok  un invitado puede registrar movimientos
+ok  un invitado NO puede crear cuentas
+ok  un invitado NO puede borrar categorias
+ok  un invitado NO puede invitar a nadie mas
+ok  un codigo ya usado no sirve de nuevo
+ok  al volver a su libro NO ve los movimientos del otro
+ok  ni una sola cuenta ajena
+```
+
+Las dos últimas son el ADR entero: **el mismo usuario, dos libros, y cero filtración entre ellos.**

@@ -81,6 +81,9 @@ psql -h localhost -p "$PORT" -U postgres -qtA -f supabase/tests/13_cedears.sql 2
 echo "== el portafolio es el borde: que cuenta como aporte y que no =="
 psql -h localhost -p "$PORT" -U postgres -qtA -f supabase/tests/14_portafolios.sql 2>&1 | grep -E '^(ok|FALLO)' | mirar
 
+echo "== libros compartidos: invitar, cambiar, y NO mezclar =="
+psql -h localhost -p "$PORT" -U postgres -qtA -f supabase/tests/15_libros.sql 2>&1 | grep -oP '^(ok|FALLO).*|(?<=NOTICE:  )(ok|FALLO).*' | mirar
+
 # Un archivo de prueba que nadie invoca es una prueba que no existe, y el
 # contador de aserciones no baja: se queda igual, que es peor. Paso de verdad:
 # un bloque nuevo fue a parar a "09_recurrentes.sql" -que no existia- en vez de
