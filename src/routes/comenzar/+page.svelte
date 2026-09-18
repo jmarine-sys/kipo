@@ -21,7 +21,7 @@
   const SUGERIDAS = [
     { id: 'efectivo', name: 'Efectivo',   kind: 'asset'     as const, unit: 'ARS', spend: true,  pista: 'lo que tenés en la billetera' },
     { id: 'banco',    name: 'Banco',      kind: 'asset'     as const, unit: 'ARS', spend: true,  pista: 'caja de ahorro, cuenta sueldo' },
-    { id: 'billetera',name: 'Mercado Pago', kind: 'asset'   as const, unit: 'ARS', spend: true,  pista: 'o cualquier billetera virtual' },
+    { id: 'billetera',name: 'Mercado Pago', kind: 'asset'   as const, unit: 'ARS', spend: true,  pista: 'o cualquier billetera virtual', banco: 'Mercado Pago' },
     { id: 'tarjeta',  name: 'Tarjeta',    kind: 'liability' as const, unit: 'ARS', spend: false, pista: 'lo que gastás y pagás después' },
     { id: 'dolares',  name: 'Dólares',    kind: 'asset'     as const, unit: 'USD', spend: true,  pista: 'los que tenés guardados' }
   ];
@@ -65,7 +65,10 @@
         if (!elegidas.has(s.id)) continue;
         await createAccount({
           name: s.name, kind: s.kind, unit: s.unit,
-          is_spendable: s.spend, institution: null, fx_source: null
+          // Donde la institucion es obvia se deja puesta; el resto se completa
+          // despues desde Cuentas. Preguntar el banco de cada una acá seria
+          // friccion justo en el primer minuto de uso.
+          is_spendable: s.spend, institution: s.banco ?? null, fx_source: null
         });
       }
       for (const n of propias) {

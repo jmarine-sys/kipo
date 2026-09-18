@@ -314,6 +314,22 @@ export async function renameAccount(id: string, name: string): Promise<void> {
   if (error) fail('No se pudo renombrar la cuenta', error);
 }
 
+/**
+ * Cambiar dónde está una cuenta — OD-37.
+ *
+ * Sin esto, el banco solo se podía poner AL CREAR la cuenta, y la puesta en
+ * marcha las crea todas sin banco. Resultado: la vista "Por banco" existía y no
+ * había manera de llegar a ella. Es la quinta vez en este proyecto que algo
+ * queda construido y sin camino.
+ */
+export async function setInstitution(id: string, institution: string | null): Promise<void> {
+  const { error } = await supabase
+    .from('account')
+    .update({ institution: institution?.trim() || null })
+    .eq('id', id);
+  if (error) fail('No se pudo cambiar el banco', error);
+}
+
 export async function deleteAccount(id: string): Promise<void> {
   const { error } = await supabase.from('account').delete().eq('id', id);
   if (error) {

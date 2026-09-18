@@ -3,7 +3,7 @@
   import { onMount } from 'svelte';
   import {
     listBalances, listCategories, createTransaction,
-    archiveAccount, renameAccount, deleteAccount,
+    archiveAccount, renameAccount, deleteAccount, setInstitution,
     listResumenTarjeta, type ResumenTarjeta
   } from '$lib/ledger/api';
   import { adjustment } from '$lib/ledger/entries';
@@ -93,6 +93,7 @@
     if (abierta === b.account_id) { abierta = null; return; }
     abierta = b.account_id;
     nombre = b.name;
+    banco = b.institution ?? '';
     realRaw = '';
     error = null;
   }
@@ -106,6 +107,21 @@
     } catch (e) {
       error = e instanceof Error ? e.message : 'No se pudo cargar';
     } finally { loading = false; }
+  }
+
+  let banco = $state('');
+
+  /** Los bancos ya usados, para que 'Macro' y 'macro' no sean dos grupos. */
+  const bancosUsados = $derived(
+    [...new Set(balances.map((b) => b.institution?.trim()).filter(Boolean) as string[])].sort()
+  );
+
+  async function guardarBanco() {
+    if (!abierto) return;
+    busy = true; error = null;
+    try { await setInstitution(abierto.account_id, banco); await load(); }
+    catch (e) { error = e instanceof Error ? e.message : 'No se pudo guardar'; }
+    finally { busy = false; }
   }
 
   async function guardarNombre() {
@@ -225,6 +241,23 @@
                       <button class="btn-primary chico" disabled={busy || nombre.trim() === b.name || !nombre.trim()}
                               onclick={guardarNombre}>Guardar</button>
                     </span>
+                  </label>
+
+                  <!-- OD-37: con esto la vista "Por banco" se vuelve alcanzable.
+                       Antes solo se podia poner al CREAR la cuenta, y la puesta
+                       en marcha las crea sin banco. -->
+                  <label class="campo">
+                    <span>¿Dónde está? <span class="dim">agrupa tus cuentas por banco</span></span>
+                    <span class="row">
+                      <input bind:value={banco} list="bancos-usados"
+                             placeholder="Santander, Mercado Pago, Balanz…" />
+                      <button class="btn-primary chico"
+                              disabled={busy || banco.trim() === (b.institution ?? '')}
+                              onclick={guardarBanco}>Guardar</button>
+                    </span>
+                    <datalist id="bancos-usados">
+                      {#each bancosUsados as x}<option value={x}></option>{/each}
+                    </datalist>
                   </label>
 
                   {#if g.id === 'balance' && catAjuste}
