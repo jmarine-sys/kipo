@@ -81,6 +81,20 @@ psql -h localhost -p "$PORT" -U postgres -qtA -f supabase/tests/13_cedears.sql 2
 echo "== el portafolio es el borde: que cuenta como aporte y que no =="
 psql -h localhost -p "$PORT" -U postgres -qtA -f supabase/tests/14_portafolios.sql 2>&1 | grep -E '^(ok|FALLO)' | mirar
 
+# Un archivo de prueba que nadie invoca es una prueba que no existe, y el
+# contador de aserciones no baja: se queda igual, que es peor. Paso de verdad:
+# un bloque nuevo fue a parar a "09_recurrentes.sql" -que no existia- en vez de
+# "08_recurrentes.sql", y la suite siguio en verde con cuatro aserciones menos de
+# las que creia tener.
+sueltos=0
+for f in supabase/tests/[0-9][0-9]_*.sql; do
+  case "$(basename "$f")" in 00_*) continue;; esac
+  grep -q "$(basename "$f")" supabase/tests/run.sh || {
+    echo "FALLO SUELTO: $(basename "$f") existe y nadie lo corre" | mirar
+    sueltos=1
+  }
+done
+
 echo
 if grep -q 'FALLO' "$FALLOS"; then
   echo "HAY FALLOS:"

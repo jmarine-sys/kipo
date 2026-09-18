@@ -123,6 +123,43 @@
     finally { busy = false; }
   }
 
+  let nFinDeMes = $state(false);
+
+  /**
+   * Atajos de fecha — OD-38.
+   *
+   * "Fin de mes" NO es un atajo que escribe una fecha: enciende una regla. Sin
+   * ella, `31-ene + 1 mes` da 28-feb y de ahí en adelante se queda en 28 para
+   * siempre. Verificado contra PostgreSQL, y por eso vive en la base y no acá.
+   */
+  const ATAJOS = [
+    { id: 'hoy',    label: 'Hoy' },
+    { id: 'dia1',   label: 'Día 1' },
+    { id: 'dia10',  label: 'Día 10' },
+    { id: 'quince', label: 'Día 15' },
+    { id: 'fin',    label: 'Fin de mes' }
+  ] as const;
+
+  function aplicar(id: (typeof ATAJOS)[number]['id']) {
+    const hoy = new Date();
+    const y = hoy.getFullYear();
+    const m = hoy.getMonth();
+    const d = hoy.getDate();
+    const iso = (fecha: Date) =>
+      `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}-${String(fecha.getDate()).padStart(2, '0')}`;
+
+    // Si el día ya pasó este mes, se apunta al que viene: agendar algo para ayer
+    // no es lo que nadie quiso decir.
+    const dia = (n: number) => iso(new Date(y, n < d ? m + 1 : m, n));
+
+    nFinDeMes = id === 'fin';
+    nDesde = id === 'hoy'    ? iso(hoy)
+           : id === 'dia1'   ? dia(1)
+           : id === 'dia10'  ? dia(10)
+           : id === 'quince' ? dia(15)
+           : iso(new Date(y, m + 1, 0));   // día 0 del mes siguiente = último de este
+  }
+
   async function crear(ev: SubmitEvent) {
     ev.preventDefault();
     if (!nCat) return;
@@ -135,9 +172,10 @@
         amount: nVariable ? null : num(nMontoRaw),
         currency: 'ARS',
         frequency: nFrec,
-        next_on: nDesde
+        next_on: nDesde,
+        month_end: nFinDeMes
       });
-      nDesc = ''; nMontoRaw = ''; nVariable = false; creando = false;
+      nDesc = ''; nMontoRaw = ''; nVariable = false; nFinDeMes = false; creando = false;
       await load();
     } catch (e) {
       error = e instanceof Error ? e.message : 'No se pudo crear';
@@ -304,6 +342,19 @@
           </label>
           <label class="campo"><span>Próxima vez</span>
             <input type="date" bind:value={nDesde} required />
+            <!-- Nadie piensa "el 2026-10-31": piensa "a fin de mes". Los atajos
+                 están más cerca del modelo mental que el calendario. -->
+            <span class="atajos">
+              {#each ATAJOS as a}
+                <button type="button" class="atajo" onclick={() => aplicar(a.id)}>{a.label}</button>
+              {/each}
+            </span>
+            {#if nFinDeMes}
+              <span class="dim sm">
+                Vence <b>el último día de cada mes</b>: 28, 30 o 31 según cuál sea.
+                <button type="button" class="link" onclick={() => (nFinDeMes = false)}>usar el día fijo</button>
+              </span>
+            {/if}
           </label>
         </div>
 
@@ -319,6 +370,11 @@
 </div>
 
 <style>
+  .atajos { display: flex; flex-wrap: wrap; gap: .3rem; margin-top: .35rem; }
+  .atajo {
+    min-height: 34px; padding: 0 .65rem; border-radius: 999px; font-size: .78rem;
+  }
+
   .back { font-size: 1.5rem; text-decoration: none; }
   h1 { font-size: 1.15rem; }
   .sm { font-size: .78rem; }

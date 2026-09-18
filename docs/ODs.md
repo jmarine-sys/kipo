@@ -72,7 +72,7 @@ It is the counterpart of [ADRs.md](ADRs.md): there is **what was decided and why
 | OD-35 | La app habla como quien la construyó, no como quien la usa | `risk` | DECIDED | **Primera pasada hecha el 2026-09-18**, sobre lo que engaña y lo que está siempre a la vista. **«Ajustes» era lo peor**: en la pantalla principal, con el significado de *Configuración* en cualquier otra app — y encima escrito a mano, así que renombrar la categoría no cambiaba el rótulo. Ahora Inicio muestra **el nombre real** de la categoría, que en los libros nuevos nace como *Ajuste de saldo*. También: la pestaña *Cartera* → **Inversiones**, *Posiciones* → **Lo que tenés**, *Portafolios* → **Dónde invertís**, *Nueva obligación* → **Algo que se repite**, *Capital* → **Cuánto ponés**. **Reserva:** los formularios de inversión siguen en jerga (*Moneda de cotización*, *Acción que representa*) — se dejaron porque los ve solo quien invierte | — |
 | OD-36 | No hay forma de compartir un libro entre dos personas | `debt` | OPEN | `ledger_member` está en el esquema desde el día uno, con sus políticas de RLS, y **en la interfaz no hay nada**: ni invitar, ni aceptar, ni ver quién más está. Hoy cada usuario queda con su libro aislado, que es lo que se buscaba para este caso. **Falta decidir** si alguna vez se abre, y si un invitado puede borrar o solo cargar | Uso compartido (pareja, familia) |
 | OD-37 | Las cuentas no se agrupan por institución | `decision` | DECIDED | **Un interruptor, no una elección**: `/cuentas` ofrece *Por tipo* —que contesta «¿cuánto puedo gastar hoy?», el punto 8 del brief— y *Por banco* —«¿cuánto tengo en Macro?»—. El campo `institution` ya existía **y `account_balance` ya lo exponía**: no hizo falta nada de esquema. Contra el texto libre, un `datalist` con los bancos ya usados. **Sin entidad `institution` por ahora**: se agregaría el día que haga falta renombrar en un lugar o darle una fuente de dólar propia. **No se confunde con `portfolio` (ADR-026):** institución es *dónde está*, portafolio es *qué se mide junto* | — |
-| OD-38 | Las fechas de la agenda se cargan una por una, sin atajos | `decision` | OPEN | **Propuesto por el usuario el 2026-09-18**: atajos tipo *primera quincena* o *fin de mes* al agendar. No ensucia el diseño —nadie piensa *«el 2026-10-31»*, piensa *«a fin de mes»*— pero **verificado el 2026-09-18 contra PostgreSQL 16**, un atajo que solo escribe una fecha miente: `31-ene + 1 mes` da `28-feb`, y de ahí en adelante `28-mar`, `28-abr`. **Se degrada al 28 y no vuelve nunca.** **Falta decidir** entre atajos que solo escriben la fecha (gratis, honestos salvo el último día del mes) o una regla de verdad en `scheduled_event` —*último día*, *día 15*— que sobreviva al avance | Fidelidad de los vencimientos a fin de mes |
+| OD-38 | Las fechas de la agenda se cargan una por una, sin atajos | `decision` | DECIDED | **Atajos sí, pero *fin de mes* no es un atajo: es una regla.** *Hoy / Día 1 / Día 10 / Día 15* solo escriben una fecha y apuntan al mes siguiente si el día ya pasó. *Fin de mes* enciende `scheduled_event.month_end`, porque `31-ene + 1 mes` da `28-feb` y **de ahí en adelante se queda en 28**. Se resolvió con un **trigger**, no cambiando las funciones que adelantan la agenda: son dos hoy y podrían ser tres, y así el invariante no depende de que nadie se olvide. **No se adivina** por la fecha: un 28-feb puede ser *«el 28»* o *«el último día»*, y solo lo sabe quien lo cargó | — |
 | OD-26 | El arte del ícono trae su propio fondo: debería ser una capa aparte | `decision` | DECIDED | **Resuelto el 2026-09-16.** Se quitan del vector las dos capas de relleno —el rectángulo blanco y el cuadrado menta— y se compone de nuevo: el bolsillo con la moneda es el frente, el menta es fondo generado. Verificado aplicando el recorte circular **al 80% y al 100%**: no se corta nada. El favicon pasa además a ser cuadrado y recortado al dibujo, porque el original es vertical y a 16 px eso dejaba aire donde menos lugar hay | — |
 | OD-27 | La lista de movimientos corta los nombres de categoría | `decision` | DECIDED | **Resuelto el 2026-09-15.** Se muestra solo la subcategoría y la madre pasa a ser un punto de color, derivado de su nombre con un hash estable. Se quitó además el texto *"no afecta el resultado"* de cada renglón: el color del monto ya lo dice, y el lugar de enseñarlo es el formulario, no una lista que se lee cientos de veces | — |
 | OD-28 | Faltan filtros en movimientos | `decision` | DECIDED | **Resuelto el 2026-09-16.** Filtro por **período** (mes con navegación, 3 y 6 meses, año, o entre dos fechas) y por **categoría madre**, con selección múltiple y el mismo código de color de la lista. Muestra cuántos movimientos quedan y cuánto suman. **Los gráficos NO entran acá**: quedan en OD-29 | — |
@@ -81,8 +81,8 @@ It is the counterpart of [ADRs.md](ADRs.md): there is **what was decided and why
 
 ## The state of the project, read off the register
 
-Actualizado 2026-09-18 (vigesimoquinta revisión). Treinta y ocho ítems: **27 `DECIDED`**,
-**11 `OPEN`**, **0 `LEANING`** y **0 `NEEDS-INPUT`**.
+Actualizado 2026-09-18 (vigesimosexta revisión). Treinta y ocho ítems: **28 `DECIDED`**,
+**10 `OPEN`**, **0 `LEANING`** y **0 `NEEDS-INPUT`**.
 
 **Veintisiete decisiones** en [ADRs.md](ADRs.md), veinte migraciones verificadas contra PostgreSQL 16
 con 115 aserciones, y una aplicación SvelteKit con trece pantallas, en producción y en uso.
@@ -93,13 +93,12 @@ categorías ajenas, no existía ninguna pantalla de primer uso, y la aplicación
 contador. Nada de eso lo veían las pruebas, **porque todas preguntan si lo construido funciona y
 ninguna pregunta si se entiende**.
 
-De los 11 `OPEN`, ninguno impide usar la aplicación:
+De los 10 `OPEN`, ninguno impide usar la aplicación:
 
 - **Esperan datos que todavía no existen (2):** OD-20 método de costo, OD-29 gráficos.
 - **Riesgo solo evaluable con uso real (4):** OD-10 pausa por inactividad, OD-11 la fricción de la
   tarjeta, OD-22 el reseteo tras la puesta en marcha, OD-25 el preview que apunta a producción.
 - **Diferidos por el usuario (3):** OD-23 y OD-24 las cuotas, OD-32 los instrumentos UVA.
-- **Propuesto por el usuario usándola (1):** OD-38, atajos de fecha en la agenda.
 - **Deuda: una.** OD-36, compartir un libro: el esquema lo soporta y la interfaz no lo expone.
 
 ---

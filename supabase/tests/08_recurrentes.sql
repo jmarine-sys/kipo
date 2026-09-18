@@ -109,3 +109,55 @@ select case when :'nueva'::date = date '2026-12-05' then 'ok  saltear adelanta u
 select case when count(*) = :antes_skip then 'ok  saltear NO registra ningun movimiento'
             else 'FALLO  creo un movimiento' end from transaction;
 reset role;
+
+-- ---------------------------------------------------------------------------
+-- Fin de mes: la regla que la aritmetica de fechas sola no puede sostener.
+-- ---------------------------------------------------------------------------
+set role rls_probe;
+select set_config('test.uid','11111111-1111-1111-1111-111111111111', false);
+
+insert into scheduled_event (ledger_id, kind, description, category_id, account_id,
+                             amount, currency, frequency, next_on, month_end)
+select my_ledger(), 'recurring', 'Alquiler fin de mes',
+       (select id from category where name = 'Servicios'),
+       (select id from account  where name = 'Banco ARS'),
+       500000, 'ARS', 'monthly', date '2026-01-15', true;
+
+select case when next_on = date '2026-01-31'
+            then 'ok  al crearla con fin de mes, el 15 se corrige al 31'
+            else format('FALLO  quedo en %s', next_on) end
+  from scheduled_event where description = 'Alquiler fin de mes';
+
+-- El caso que motivo todo: enero -> febrero, donde la aritmetica sola cae al 28
+-- y ya no vuelve a subir.
+update scheduled_event set next_on = avanzar_fecha(next_on, 'monthly')
+ where description = 'Alquiler fin de mes';
+
+select case when next_on = date '2026-02-28'
+            then 'ok  febrero es 28: el ultimo dia, no una degradacion'
+            else format('FALLO  dio %s', next_on) end
+  from scheduled_event where description = 'Alquiler fin de mes';
+
+-- Y ACA esta la diferencia. Sin la regla, de 28-feb en adelante se queda en 28.
+update scheduled_event set next_on = avanzar_fecha(next_on, 'monthly')
+ where description = 'Alquiler fin de mes';
+
+select case when next_on = date '2026-03-31'
+            then 'ok  marzo VUELVE al 31: sin la regla se habria quedado en 28'
+            else format('FALLO  dio %s, se degrado', next_on) end
+  from scheduled_event where description = 'Alquiler fin de mes';
+
+-- Contraprueba: una regla comun no se toca.
+insert into scheduled_event (ledger_id, kind, description, category_id, account_id,
+                             amount, currency, frequency, next_on)
+select my_ledger(), 'recurring', 'Netflix el 10',
+       (select id from category where name = 'Servicios'),
+       (select id from account  where name = 'Banco ARS'),
+       9000, 'ARS', 'monthly', date '2026-01-10';
+
+select case when next_on = date '2026-01-10'
+            then 'ok  una regla sin fin de mes queda donde la pusieron'
+            else format('FALLO  la movio a %s', next_on) end
+  from scheduled_event where description = 'Netflix el 10';
+
+reset role;

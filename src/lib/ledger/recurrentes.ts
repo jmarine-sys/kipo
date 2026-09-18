@@ -41,6 +41,8 @@ export interface Upcoming {
 }
 
 export interface NuevoRecurrente {
+  /** true = vence el último día del mes, sea 28, 30 o 31 (OD-38). */
+  month_end?: boolean;
   description: string;
   category_id: string;
   account_id: string | null;
