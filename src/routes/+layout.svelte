@@ -61,6 +61,9 @@
           <span class="lb">{t.label}</span>
         </a>
       {/each}
+      <!-- No en /nuevo: ahi el flotante no lleva a ningun lado y tapa el boton
+           de guardar, que es lo unico que importa en esa pantalla. -->
+      {#if page.url.pathname !== '/nuevo'}
       <a href="/nuevo" class="fab" aria-label="Registrar movimiento">
         <!-- Trazo dibujado, no el caracter '+': una tipografia en peso liviano
              adelgaza el signo hasta volverlo casi invisible sobre el color. -->
@@ -69,6 +72,7 @@
                 stroke-linecap="round" fill="none"/>
         </svg>
       </a>
+      {/if}
     </nav>
   {/if}
 {/if}

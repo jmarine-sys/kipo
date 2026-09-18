@@ -16,6 +16,10 @@
 
   --radius: 14px;
   --tap:    48px;      /* area minima tocable */
+  /* Lo que tapa la barra de abajo: el alto de una pestania mas su padding, mas
+     el area segura del telefono. Las paginas reservan esto para que su ultimo
+     boton no quede debajo. */
+  --barra:  calc(var(--tap) + 1rem + env(safe-area-inset-bottom));
   color-scheme: light dark;
 }
 
@@ -212,7 +216,12 @@ input[type='checkbox'] {
 .spread { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
 .wrap   { display: flex; flex-wrap: wrap; gap: .5rem; }
 
-.page { max-width: 680px; margin: 0 auto; padding: 1rem 1rem 6rem; }
+.page {
+  max-width: 680px; margin: 0 auto;
+  /* El ultimo boton de una pantalla quedaba a medias debajo de la barra: 6rem
+     fijos no alcanzaban con el area segura de un telefono con gesto. */
+  padding: 1rem 1rem calc(var(--barra) + 1.5rem);
+}
 
 /* ---------------------------------------------------------------------------
    Ilustraciones de la mascota.

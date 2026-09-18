@@ -8,7 +8,7 @@
   import { listUpcoming, cuandoFalta, type Upcoming } from '$lib/ledger/recurrentes';
   import { prefs, alternarPrivado } from '$lib/preferencias.svelte';
   import Vacio from '$lib/Vacio.svelte';
-  import { misLibros } from '$lib/ledger/libros';
+  import { misLibros, cambiarLibro, type Libro } from '$lib/ledger/libros';
   import type { AccountBalance } from '$lib/types';
 
   let entries = $state<EntryDetail[]>([]);
@@ -42,20 +42,34 @@
    * Con un libro es ruido. Con dos, no saber en cuál estás es peor que cualquier
    * otro error de la app: cargás el gasto en el libro equivocado y nada avisa.
    */
-  let otroLibro = $state<string | null>(null);
+  let libros = $state<Libro[]>([]);
+  const libroActivo = $derived(libros.find((l) => l.activo) ?? null);
+  /** El selector solo tiene sentido con más de uno. Con uno es ruido. */
+  const hayVarios = $derived(libros.length > 1);
+
+  /**
+   * Cambiar de libro recarga TODO, y tiene que ser así: la política de RLS
+   * filtra por el libro activo, así que después de cambiarlo cualquier dato que
+   * quedara en pantalla sería del libro anterior.
+   */
+  async function cambiar(id: string) {
+    if (!id || id === libroActivo?.ledger_id) return;
+    loading = true;
+    try { await cambiarLibro(id); await cargar(); }
+    catch (e) { error = e instanceof Error ? e.message : 'No se pudo cambiar de libro'; }
+    finally { loading = false; }
+  }
 
   const pendientes = $derived(viene.filter((v) => v.dias <= 30));
   const vencidos = $derived(pendientes.filter((v) => v.vencido).length);
 
-  onMount(async () => {
+  async function cargar() {
     try {
       // Lo esencial: sin esto no hay página que mostrar.
       [entries, balances] = await Promise.all([listEntries(m.from, m.to), listBalances()]);
 
       // En segundo plano: saber en qué libro estás no puede demorar la pantalla.
-      misLibros()
-        .then((ls) => { otroLibro = ls.length > 1 ? (ls.find((l) => l.activo)?.name ?? null) : null; })
-        .catch(() => {});
+      misLibros().then((ls) => (libros = ls)).catch(() => {});
 
       // Sin cuentas no hay nada que registrar ni que mostrar: todo movimiento
       // sale de algun lado. En vez de una pantalla vacia que explica, se lleva a
@@ -74,9 +88,12 @@
       }
     } catch (e) {
       error = e instanceof Error ? e.message : 'No se pudo cargar';
-    } finally {
-      loading = false;
     }
+  }
+
+  onMount(async () => {
+    await cargar();
+    loading = false;
   });
 </script>
 
@@ -84,8 +101,14 @@
   <div class="spread encabezado">
     <span class="titulo">
       <h1 class="cap">{m.label}</h1>
-      {#if otroLibro}
-        <a class="libro" href="/libros">{otroLibro} ▾</a>
+      <!-- Un desplegable y no un enlace: cambiar de libro es algo que hacés
+           seguido, y mandarte a otra pantalla para volver corta el hilo. -->
+      {#if hayVarios}
+        <select class="libro" value={libroActivo?.ledger_id ?? ''}
+                onchange={(e) => cambiar(e.currentTarget.value)}
+                aria-label="Cambiar de libro">
+          {#each libros as l}<option value={l.ledger_id}>{l.name}</option>{/each}
+        </select>
       {/if}
     </span>
     <button class="ojo" onclick={alternarPrivado}
@@ -292,9 +315,15 @@
 
   .titulo { display: flex; align-items: baseline; gap: .5rem; flex-wrap: wrap; }
   .libro {
-    font-size: .74rem; text-decoration: none; color: var(--accent);
-    padding: .1rem .45rem; border-radius: 999px;
+    font-size: .74rem; color: var(--accent); font-weight: 600;
+    padding: .2rem 1.4rem .2rem .5rem; border-radius: 999px;
     background: color-mix(in srgb, var(--accent) 12%, transparent);
+    border: none; appearance: none; min-height: 0;
+    background-image: linear-gradient(45deg, transparent 50%, currentColor 50%),
+                      linear-gradient(135deg, currentColor 50%, transparent 50%);
+    background-position: calc(100% - 12px) 55%, calc(100% - 8px) 55%;
+    background-size: 4px 4px, 4px 4px;
+    background-repeat: no-repeat;
   }
 
   .err {
