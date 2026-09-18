@@ -5,7 +5,7 @@
     listPosiciones, comprarActivo, venderActivo, guardarPrecio,
     rendimiento, TIPOS_ACTIVO, type Posicion
   } from '$lib/ledger/inversiones';
-  import { money, today, shortDate } from '$lib/format';
+  import { money, today, shortDate, num } from '$lib/format';
   import Vacio from '$lib/Vacio.svelte';
   import { cargarCartera } from '$lib/ledger/cartera.datos';
   import type { ValorInversion } from '$lib/ledger/cartera';
@@ -45,7 +45,6 @@
   let cRatio = $state('');
   let cSubyacente = $state('');
 
-  const num = (s: string) => Number(s.replace(/\./g, '').replace(',', '.')) || 0;
   const efectivo = $derived(cuentas.filter((c) => c.valuation === 'balance' && c.kind === 'asset'));
 
   /**
@@ -168,8 +167,10 @@
       <!-- Dónde se cobra, dicho acá: el usuario lo cargaba en esta pantalla y el
            vencimiento aparecía en otra sin que nada lo anticipara. -->
       <p class="dim sm">
-        El día que vencen aparecen en <a href="/recurrentes">Agenda</a>, que es donde
-        se registran: cobrarlo es un evento con fecha, no una compra.
+        Cuando el vencimiento entra en el mes, aparecen en
+        <a href="/recurrentes">Agenda</a>, que es donde se cobran: cobrarlo es un
+        evento con fecha, no una compra. Verlos con días de anticipación es a
+        propósito — es plata que vuelve y conviene saber cuándo.
       </p>
     </section>
   {/if}
@@ -373,7 +374,6 @@
 <style>
   .back { font-size: 1.5rem; text-decoration: none; }
   .rend { text-decoration: none; font-size: .86rem; font-weight: 600; white-space: nowrap; }
-  h1 { font-size: 1.15rem; }
   .sm { font-size: .78rem; }
 
   .total .grande { font-size: 1.5rem; }
@@ -427,9 +427,4 @@
   .nueva { width: 100%; }
   .link { border: none; background: none; color: var(--accent); min-height: 38px; }
   h2 { font-size: .95rem; }
-  .err {
-    background: color-mix(in srgb, var(--neg) 14%, transparent);
-    border: 1px solid color-mix(in srgb, var(--neg) 40%, transparent);
-    color: var(--neg); padding: .7rem .85rem; border-radius: var(--radius); font-size: .88rem;
-  }
 </style>

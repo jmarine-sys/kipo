@@ -364,9 +364,4 @@
   }
 
   .link { display: block; text-align: center; padding: .6rem; font-size: .9rem; }
-  .err {
-    background: color-mix(in srgb, var(--neg) 14%, transparent);
-    border: 1px solid color-mix(in srgb, var(--neg) 40%, transparent);
-    color: var(--neg); padding: .7rem .85rem; border-radius: var(--radius); font-size: .88rem;
-  }
 </style>

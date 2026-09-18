@@ -3,7 +3,7 @@
   import { goto } from '$app/navigation';
   import { listEntries, listBalances, type EntryDetail } from '$lib/ledger/api';
   import { summarize, type MonthSummary } from '$lib/ledger/presentacion';
-  import { money, monthRange } from '$lib/format';
+  import { money, monthRange, esDeEsteMes } from '$lib/format';
   import { colorCategoria } from '$lib/categorias';
   import { listUpcoming, cuandoFalta, type Upcoming } from '$lib/ledger/recurrentes';
   import { prefs, alternarPrivado } from '$lib/preferencias.svelte';
@@ -70,12 +70,7 @@
    * Los vencidos entran igual, sean de cuando sean: eso no es del mes que
    * viene, es una deuda de ahora.
    */
-  const finDeMes = (() => {
-    const h = new Date();
-    return new Date(h.getFullYear(), h.getMonth() + 1, 0).toISOString().slice(0, 10);
-  })();
-
-  const pendientes = $derived(viene.filter((v) => v.vencido || v.next_on <= finDeMes));
+  const pendientes = $derived(viene.filter((v) => v.vencido || esDeEsteMes(v.next_on)));
   const vencidos = $derived(pendientes.filter((v) => v.vencido).length);
 
   async function cargar() {
@@ -115,7 +110,7 @@
 <div class="page stack">
   <div class="spread encabezado">
     <span class="titulo">
-      <h1 class="cap">{m.label}</h1>
+      <h1 class="cap principal">{m.label}</h1>
       <!-- Un desplegable y no un enlace: cambiar de libro es algo que hacés
            seguido, y mandarte a otra pantalla para volver corta el hilo. -->
       {#if hayVarios}
@@ -351,9 +346,4 @@
     background-repeat: no-repeat;
   }
 
-  .err {
-    background: color-mix(in srgb, var(--neg) 14%, transparent);
-    border: 1px solid color-mix(in srgb, var(--neg) 40%, transparent);
-    color: var(--neg); padding: .7rem .85rem; border-radius: var(--radius);
-  }
 </style>

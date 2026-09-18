@@ -3,7 +3,7 @@
   import { goto } from '$app/navigation';
   import { listBalances } from '$lib/ledger/api';
   import { crearPlazoFijo, tasaImplicita, diasEntre } from '$lib/ledger/inversiones';
-  import { money, today } from '$lib/format';
+  import { money, today, num } from '$lib/format';
   import type { AccountBalance } from '$lib/types';
 
   let cuentas = $state<AccountBalance[]>([]);
@@ -18,7 +18,6 @@
   let institucion = $state('');
   const fecha = today();
 
-  const num = (s: string) => Number(s.replace(/\./g, '').replace(',', '.')) || 0;
   const capital = $derived(num(capitalRaw));
   const esperado = $derived(num(esperadoRaw));
 
@@ -120,7 +119,6 @@
 
 <style>
   .back { font-size: 1.5rem; text-decoration: none; }
-  h1 { font-size: 1.15rem; }
   .sm { font-size: .82rem; }
   .dos { gap: .5rem; align-items: flex-end; }
   .dos > .campo { flex: 1; }
@@ -130,9 +128,4 @@
     background: var(--surface-2); font-size: .88rem;
   }
   .nota { margin-top: .2rem; }
-  .err {
-    background: color-mix(in srgb, var(--neg) 14%, transparent);
-    border: 1px solid color-mix(in srgb, var(--neg) 40%, transparent);
-    color: var(--neg); padding: .7rem .85rem; border-radius: var(--radius); font-size: .88rem;
-  }
 </style>

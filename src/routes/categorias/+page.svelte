@@ -206,7 +206,6 @@
 
 <style>
   .back { font-size: 1.5rem; text-decoration: none; }
-  h1 { font-size: 1.15rem; }
   .sm { font-size: .8rem; }
   .sistema {
     font-size: .68rem; padding: .1rem .4rem; border-radius: 999px;
@@ -243,9 +242,4 @@
   }
 
   h2 { font-size: .95rem; }
-  .err {
-    background: color-mix(in srgb, var(--neg) 14%, transparent);
-    border: 1px solid color-mix(in srgb, var(--neg) 40%, transparent);
-    color: var(--neg); padding: .7rem .85rem; border-radius: var(--radius); font-size: .88rem;
-  }
 </style>

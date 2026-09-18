@@ -9,7 +9,7 @@
   import { nombresRepetidos, esAmbigua } from '$lib/ledger/tipos';
   import Cuenta from '$lib/Cuenta.svelte';
   import { expense, income, transfer, exchange, impliedRate } from '$lib/ledger/entries';
-  import { money, today, shortDate } from '$lib/format';
+  import { money, today, shortDate, num } from '$lib/format';
   import { bump, byUse } from '$lib/frequent';
   import type { Account, Category } from '$lib/types';
 
@@ -42,7 +42,6 @@
   let categories = $state<Category[]>([]);
   let loaded = $state(false);
 
-  const num = (s: string) => Number(s.replace(/\./g, '').replace(',', '.')) || 0;
   const amount = $derived(num(raw));
   const amount2 = $derived(num(raw2));
 
@@ -714,9 +713,4 @@
   .key { min-height: 56px; font-size: 1.3rem; background: var(--surface-2); }
   .save { width: 100%; min-height: 56px; font-size: 1.05rem; }
 
-  .err {
-    background: color-mix(in srgb, var(--neg) 14%, transparent);
-    border: 1px solid color-mix(in srgb, var(--neg) 40%, transparent);
-    color: var(--neg); padding: .7rem .85rem; border-radius: var(--radius); font-size: .88rem;
-  }
 </style>

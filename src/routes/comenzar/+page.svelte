@@ -167,9 +167,4 @@
 
   .btn-primary.grande { padding: .85rem; border-radius: 12px; font-size: .95rem; }
   .sm { font-size: .78rem; }
-  .err {
-    background: color-mix(in srgb, var(--neg) 14%, transparent);
-    border: 1px solid color-mix(in srgb, var(--neg) 40%, transparent);
-    padding: .6rem .8rem; border-radius: 10px; margin: 0;
-  }
 </style>

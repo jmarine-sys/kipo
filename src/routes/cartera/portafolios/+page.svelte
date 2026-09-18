@@ -161,7 +161,6 @@
 
 <style>
   .back { font-size: 1.5rem; text-decoration: none; }
-  h1 { font-size: 1.15rem; }
   .intro { margin: 0; }
   .pf { gap: .6rem; }
   .cab { align-items: flex-start; }
@@ -173,9 +172,4 @@
   .cuentas .casilla > span { display: flex; flex-direction: column; gap: .1rem; }
   .avisos h2 { font-size: .9rem; margin: 0 0 .4rem; }
   .avisos ul { margin: 0 0 .5rem; padding-left: 1.1rem; }
-  .err {
-    background: color-mix(in srgb, var(--neg) 14%, transparent);
-    border: 1px solid color-mix(in srgb, var(--neg) 40%, transparent);
-    padding: .6rem .8rem; border-radius: 10px; margin: 0;
-  }
 </style>

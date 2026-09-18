@@ -153,9 +153,4 @@
   .opts.row3 button { align-items: center; justify-content: center; }
   .opts button.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--surface)); }
   .sm { font-size: .76rem; }
-  .err {
-    background: color-mix(in srgb, var(--neg) 14%, transparent);
-    border: 1px solid color-mix(in srgb, var(--neg) 40%, transparent);
-    color: var(--neg); padding: .7rem .85rem; border-radius: var(--radius);
-  }
 </style>

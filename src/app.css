@@ -118,7 +118,12 @@ html, body {
 body { padding-bottom: env(safe-area-inset-bottom); }
 
 h1, h2, h3 { margin: 0; font-weight: 650; letter-spacing: -0.01em; }
-h1 { font-size: 1.35rem; }
+/* El titulo de una pantalla, definido UNA vez.
+   Estaba en app.css a 1.35rem y siete pantallas lo pisaban a 1.15 — pero
+   Movimientos y Cuentas no, asi que Agenda se veia mas chica que sus pares de
+   la barra sin ninguna razon. Inicio se distingue a proposito, con su clase. */
+h1 { font-size: 1.15rem; }
+h1.principal { font-size: 1.35rem; }
 h2 { font-size: 1.05rem; }
 
 a { color: var(--accent); }
@@ -140,11 +145,20 @@ button {
 button:active { transform: scale(.975); }
 button:disabled { opacity: .45; cursor: not-allowed; }
 
+/* Sirve igual en un <button> y en un <a>: los estilos de caja estaban solo en
+   el selector `button`, asi que un enlace con esta clase salia con el color
+   puesto y sin padding, sin alto minimo y sin bordes redondeados. */
 .btn-primary {
   background: var(--accent);
   color: var(--accent-fg);
   border-color: transparent;
   font-weight: 650;
+}
+
+a.btn-primary {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-height: var(--tap); padding: 0 1rem;
+  border-radius: var(--radius); text-decoration: none;
 }
 
 .card {
@@ -257,3 +271,23 @@ input[type='checkbox'] {
   align-items: center;
   gap: .35rem;
 }
+
+/* ---------------------------------------------------------------------------
+   Lo que estaba copiado en cada pantalla.
+   `.err` vivia en CATORCE archivos con diferencias chicas entre si, que es
+   exactamente como una interfaz deja de verse igual a si misma.
+   --------------------------------------------------------------------------- */
+
+.err {
+  background: color-mix(in srgb, var(--neg) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--neg) 40%, transparent);
+  color: var(--text);
+  padding: .7rem .85rem;
+  border-radius: var(--radius);
+  margin: 0;
+  font-size: .88rem;
+}
+
+/* Un campo de formulario: su rotulo arriba, chico y apagado. */
+.campo { display: flex; flex-direction: column; gap: .3rem; }
+.campo > span:first-child { font-size: .78rem; color: var(--text-dim); }

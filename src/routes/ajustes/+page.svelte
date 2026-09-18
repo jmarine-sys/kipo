@@ -71,7 +71,6 @@
 
 <style>
   .back { font-size: 1.5rem; text-decoration: none; }
-  h1 { font-size: 1.15rem; }
   h2 { font-size: .95rem; margin: 0; }
   .link { display: block; text-decoration: none; padding: .35rem 0; }
   .rotulo { font-size: .78rem; color: var(--text-dim); display: block; margin-bottom: .35rem; }

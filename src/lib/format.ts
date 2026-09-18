@@ -52,3 +52,28 @@ export function shortDate(iso: string): string {
   return new Intl.DateTimeFormat('es-AR', { day: 'numeric', month: 'short' })
     .format(new Date(y, m - 1, d));
 }
+
+/**
+ * De lo que se tipea a un número — una sola vez.
+ *
+ * Estaba copiado en cinco pantallas. El punto es separador de miles y la coma es
+ * el decimal: escribir `1.250,50` tiene que dar 1250.5, no 1.25.
+ */
+export function num(s: string): number {
+  return Number(s.replace(/\./g, '').replace(',', '.')) || 0;
+}
+
+/**
+ * El último día del mes en curso, en ISO.
+ *
+ * Estaba calculado en tres pantallas, y las tres contestan la misma pregunta:
+ * «¿esto es de este mes?». Antes eran «los próximos 30 días», que a fin de mes
+ * mete cosas del siguiente y a principio se come medio calendario.
+ */
+export function finDeMes(d = new Date()): string {
+  const u = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+  return `${u.getFullYear()}-${String(u.getMonth() + 1).padStart(2, '0')}-${String(u.getDate()).padStart(2, '0')}`;
+}
+
+/** Si una fecha ISO cae dentro del mes en curso. */
+export const esDeEsteMes = (iso: string, hoy = new Date()) => iso <= finDeMes(hoy);

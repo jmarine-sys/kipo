@@ -247,7 +247,6 @@
 </div>
 
 <style>
-  h1 { font-size: 1.15rem; }
   .sm { font-size: .78rem; }
   .sep { opacity: .5; }
   .lbl { font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; color: var(--text-dim); margin: .3rem 0 -.1rem; }
@@ -302,9 +301,4 @@
   .avisos li { margin-bottom: .2rem; }
   .avisos p { margin: 0; }
 
-  .err {
-    background: color-mix(in srgb, var(--neg) 14%, transparent);
-    border: 1px solid color-mix(in srgb, var(--neg) 40%, transparent);
-    color: var(--neg); padding: .7rem .85rem; border-radius: var(--radius); font-size: .88rem;
-  }
 </style>

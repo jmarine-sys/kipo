@@ -188,7 +188,6 @@
 
 <style>
   .back { font-size: 1.5rem; text-decoration: none; }
-  h1 { font-size: 1.15rem; }
   h2 { font-size: .95rem; margin: 0; }
   .intro { margin: 0; }
   .list { list-style: none; margin: 0; padding: 0; display: grid; gap: .45rem; }
@@ -219,9 +218,4 @@
   .campo > span:first-child { font-size: .78rem; color: var(--text-dim); }
   .campo input { letter-spacing: .12em; text-transform: uppercase; }
   .row { display: flex; gap: .4rem; }
-  .err {
-    background: color-mix(in srgb, var(--neg) 14%, transparent);
-    border: 1px solid color-mix(in srgb, var(--neg) 40%, transparent);
-    padding: .6rem .8rem; border-radius: 10px; margin: 0;
-  }
 </style>

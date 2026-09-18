@@ -8,7 +8,7 @@
   } from '$lib/ledger/recurrentes';
   import { colorCategoria } from '$lib/categorias';
   import { registrarVencimiento } from '$lib/ledger/inversiones';
-  import { money, today, shortDate } from '$lib/format';
+  import { money, today, shortDate, num, esDeEsteMes } from '$lib/format';
   import Vacio from '$lib/Vacio.svelte';
   import type { Account, Category } from '$lib/types';
 
@@ -27,7 +27,6 @@
   let nCuenta = $state<string | null>(null);
   let nFrec = $state<Frecuencia>('monthly');
 
-  const num = (s: string) => Number(s.replace(/\./g, '').replace(',', '.')) || 0;
 
   const pagables = $derived(cuentas.filter((a) => a.valuation === 'balance'));
   const hojas = $derived(
@@ -42,13 +41,8 @@
    * meses ocupaba el mismo lugar que el alquiler de pasado mañana. Lo que hay
    * que hacer AHORA tiene que poder leerse sin filtrar con la vista.
    */
-  const finDeMes = (() => {
-    const h = new Date();
-    return new Date(h.getFullYear(), h.getMonth() + 1, 0).toISOString().slice(0, 10);
-  })();
-
-  const esteMes = $derived(items.filter((i) => !i.vencido && i.next_on <= finDeMes));
-  const masAdelante = $derived(items.filter((i) => !i.vencido && i.next_on > finDeMes));
+  const esteMes = $derived(items.filter((i) => !i.vencido && esDeEsteMes(i.next_on)));
+  const masAdelante = $derived(items.filter((i) => !i.vencido && !esDeEsteMes(i.next_on)));
 
   /** Lo de más adelante arranca cerrado: verlo siempre es ruido. */
   let verMasAdelante = $state(false);
@@ -70,10 +64,24 @@
     } finally { busy = false; }
   }
 
-  /** Lo que se viene en los próximos 30 días, que es la proyección útil. */
-  const totalMes = $derived(
-    items.filter((i) => i.dias <= 30 && i.currency === 'ARS' && i.amount !== null)
-         .reduce((t, i) => t + Number(i.amount), 0)
+  /**
+   * Lo de ESTE mes, y separado por sentido — OD-45.
+   *
+   * Decía «en los próximos 30 días», que a fin de mes mete cosas del que viene,
+   * y sumaba TODO junto: un plazo fijo que vence es plata que ENTRA y estaba
+   * contado como si fuera un gasto más. El número decía que te iban a sacar
+   * justo lo que te iban a dar.
+   */
+  const delMes = $derived(
+    items.filter((i) => (i.vencido || esDeEsteMes(i.next_on)) &&
+                        i.currency === 'ARS' && i.amount !== null)
+  );
+  const aPagar  = $derived(delMes.filter((i) => i.kind === 'recurring')
+                                 .reduce((t, i) => t + Number(i.amount), 0));
+  const aCobrar = $derived(delMes.filter((i) => i.kind === 'maturity')
+                                 .reduce((t, i) => t + Number(i.amount), 0));
+  const variables = $derived(
+    items.filter((i) => (i.vencido || esDeEsteMes(i.next_on)) && i.amount === null).length
   );
 
   function abrir(i: Upcoming) {
@@ -167,10 +175,21 @@
   {#if loading}
     <p class="dim">Cargando…</p>
   {:else}
-    {#if totalMes > 0}
+    {#if aPagar > 0 || aCobrar > 0}
       <p class="proyeccion">
-        En los próximos 30 días se vienen <b class="money">{money(totalMes)}</b>
-        <span class="dim sm">· sin contar los de importe variable</span>
+        Este mes
+        {#if aPagar > 0}
+          pagás <b class="money neg">{money(aPagar)}</b>
+        {/if}
+        {#if aPagar > 0 && aCobrar > 0}<span class="sep">·</span>{/if}
+        {#if aCobrar > 0}
+          cobrás <b class="money pos">{money(aCobrar)}</b>
+        {/if}
+        {#if variables}
+          <span class="dim sm">
+            · más {variables} de importe variable, que no se puede anticipar
+          </span>
+        {/if}
       </p>
     {/if}
 
@@ -322,13 +341,12 @@
              href="/nuevo?repite=1" accion="Cargar el primero" />
     {/if}
 
-    <a class="btn-primary nueva" href="/nuevo?repite=1">+ Algo que se repite</a>
+    <a class="btn-primary nueva" href="/nuevo?repite=1">+ Nuevo gasto fijo</a>
   {/if}
 </div>
 
 <style>
 
-  h1 { font-size: 1.15rem; }
   .sm { font-size: .78rem; }
   .lbl { font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; color: var(--text-dim); margin: .4rem 0 -.1rem; }
 
@@ -383,11 +401,20 @@
   .adelante .flecha.abierta { transform: rotate(180deg); }
   .adelante .lejos { list-style: none; margin: 0; padding: 0 .85rem; display: grid; gap: .45rem; }
   .adelante > p { padding: .5rem .85rem .8rem; margin: 0; }
-  .cambiar summary { font-size: .82rem; cursor: pointer; padding: .3rem 0; }
-  .cambiar[open] { padding-bottom: .3rem; }
-  .err {
-    background: color-mix(in srgb, var(--neg) 14%, transparent);
-    border: 1px solid color-mix(in srgb, var(--neg) 40%, transparent);
-    color: var(--neg); padding: .7rem .85rem; border-radius: var(--radius); font-size: .88rem;
+  /* Su propia caja, con su propio espaciado.
+     Estaba suelto dentro del panel: `details` no hereda el `gap` del `.stack`,
+     asi que los campos quedaban pegados al resumen y al boton, y se leia como
+     si la tarjeta no tuviera padding. */
+  .cambiar {
+    border: 1px solid var(--border); border-radius: 10px;
+    padding: .55rem .7rem; background: var(--surface);
   }
+  .cambiar summary {
+    font-size: .82rem; cursor: pointer; font-weight: 600;
+    list-style: none; display: flex; align-items: center; gap: .35rem;
+  }
+  .cambiar summary::after { content: '▾'; opacity: .5; font-size: .8em; }
+  .cambiar[open] summary::after { content: '▴'; }
+  .cambiar[open] summary { margin-bottom: .6rem; }
+  .cambiar .campos { margin-bottom: .6rem; }
 </style>

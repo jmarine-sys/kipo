@@ -16,7 +16,6 @@
 
 <style>
   .back { font-size: 1.5rem; text-decoration: none; }
-  h1 { font-size: 1.15rem; }
   .sm { font-size: .76rem; }
   .note { margin-top: .5rem; }
 </style>
