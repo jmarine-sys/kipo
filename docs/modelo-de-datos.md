@@ -672,7 +672,9 @@ Dos rutas, y **cuál corresponde depende de qué lado de la puesta en marcha est
 Los datos de prueba son descartables. Se vacía todo y se vuelve a sembrar:
 
 ```bash
-psql "$DATABASE_URL" -v reset_confirm=BORRAR_TODO -f supabase/reset_ledger.sql
+# Editar la linea `confirmo` a 'BORRAR_TODO' y despues:
+psql "$DATABASE_URL" -f supabase/reset_ledger.sql
+# o pegarlo entero en el SQL Editor de Supabase: es SQL comun
 ```
 
 Sin esa confirmación el script aborta sin tocar nada. Conserva el libro y el usuario: vacía el

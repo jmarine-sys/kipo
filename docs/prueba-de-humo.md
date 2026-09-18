@@ -186,7 +186,9 @@ Tres cosas están anotadas como riesgos abiertos y **solo se resuelven usándola
 ## Borrar todo antes de arrancar en serio
 
 ```bash
-psql "$DATABASE_URL" -v reset_confirm=BORRAR_TODO -f supabase/reset_ledger.sql
+# Editar la linea `confirmo` a 'BORRAR_TODO' y despues:
+psql "$DATABASE_URL" -f supabase/reset_ledger.sql
+# o pegarlo entero en el SQL Editor de Supabase: es SQL comun
 ```
 
 Vacía el contenido y resiembra las categorías. **Conserva tu usuario**: no hay que volver a
