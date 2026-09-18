@@ -125,6 +125,13 @@
     <a href="/cartera" class="rend">¿Cuánto rinde? →</a>
   </div>
 
+  <!-- Un plazo fijo es una inversión y se espera verlo acá. Vivía colgado de
+       Cuentas, donde nadie lo iba a buscar: por dentro se parece a una cuenta,
+       pero lo que importa es qué significa para quien lo usa. ADR-033. -->
+  <div class="altas">
+    <a class="add" href="/inversiones/plazo-fijo">+ Plazo fijo</a>
+  </div>
+
   {#if error}<p class="err" role="alert">{error}</p>{/if}
 
   {#if loading}
@@ -330,6 +337,9 @@
   .total .grande { font-size: 1.5rem; }
   .total .linea { margin-top: .45rem; font-size: .88rem; }
   .pct { font-size: .8rem; margin-left: .3rem; }
+  .altas { display: flex; justify-content: flex-end; }
+  .add { font-size: .84rem; text-decoration: none; padding: .35rem .6rem; border-radius: 999px;
+         background: var(--surface); border: 1px solid var(--border); }
   .aviso { margin: .7rem 0 0; font-size: .78rem; padding-top: .6rem; border-top: 1px solid var(--border); }
 
   .list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .4rem; }
@@ -358,6 +368,9 @@
   .monto { text-align: right; }
   .resumen { margin: 0; padding: .65rem .8rem; border-radius: 10px; background: var(--surface-2); font-size: .86rem; }
   .manual { color: var(--warn); }
+  .altas { display: flex; justify-content: flex-end; }
+  .add { font-size: .84rem; text-decoration: none; padding: .35rem .6rem; border-radius: 999px;
+         background: var(--surface); border: 1px solid var(--border); }
   .aviso {
     margin: 0; padding: .65rem .8rem; border-radius: 10px; font-size: .82rem;
     background: color-mix(in srgb, var(--warn) 12%, transparent);

@@ -9,8 +9,6 @@
   import { adjustment } from '$lib/ledger/entries';
   import { tipoDeCuenta, nombresRepetidos, esAmbigua } from '$lib/ledger/tipos';
   import Cuenta from '$lib/Cuenta.svelte';
-  import { signOut } from '$lib/session.svelte';
-  import { prefs, elegirTema, alternarPrivado, type Tema } from '$lib/preferencias.svelte';
   import { money, today } from '$lib/format';
   import type { AccountBalance, Category } from '$lib/types';
 
@@ -181,7 +179,6 @@
   <div class="spread">
     <h1>Cuentas</h1>
     <div class="row altas">
-      <a class="add" href="/cuentas/plazo-fijo">+ Plazo fijo</a>
       <a class="add" href="/cuentas/nueva">+ Cuenta</a>
     </div>
   </div>
@@ -313,37 +310,12 @@
     {/each}
 
     <p class="aprox">≈ Saldos estimados: no hay conciliación con el banco</p>
-    <a class="link" href="/inversiones">Ver inversiones →</a>
-    <a class="link" href="/categorias">Administrar categorías →</a>
-    <a class="link" href="/libros">Libros y personas →</a>
+    <!-- Las categorías, los libros y las preferencias se mudaron a Ajustes: esta
+         pantalla se estaba pareciendo más a una de configuración que a una de
+         cuentas. Ver ADR-033. -->
+    <a class="link" href="/ajustes">Ajustes →</a>
 
-    <section class="card stack">
-      <h2>Preferencias</h2>
 
-      <div>
-        <span class="rotulo">Tema</span>
-        <div class="temas">
-          {#each [['auto','Automático'],['claro','Claro'],['oscuro','Oscuro']] as [id, etiqueta]}
-            <button class:on={prefs.tema === id} onclick={() => elegirTema(id as Tema)}>
-              {etiqueta}
-            </button>
-          {/each}
-        </div>
-        {#if prefs.tema === 'auto'}
-          <p class="dim sm ayuda">Sigue lo que tenga configurado tu teléfono.</p>
-        {/if}
-      </div>
-
-      <label class="casilla">
-        <input type="checkbox" checked={prefs.privado} onchange={alternarPrivado} />
-        <span>
-          Ocultar los importes
-          <span class="dim sm bloque">Los difumina en toda la app, para mirarla con gente al lado.</span>
-        </span>
-      </label>
-    </section>
-
-    <button class="out" onclick={signOut}>Cerrar sesión</button>
   {/if}
 </div>
 
@@ -391,15 +363,7 @@
   }
 
   .link { display: block; text-align: center; padding: .6rem; font-size: .9rem; }
-  .rotulo { font-size: .78rem; color: var(--text-dim); display: block; margin-bottom: .4rem; }
-  .temas { display: grid; grid-template-columns: repeat(3, 1fr); gap: .35rem; }
-  .temas button { min-height: 42px; border-radius: 10px; font-size: .86rem; padding: 0 .3rem; }
-  .temas button.on { background: var(--accent); color: var(--accent-fg); border-color: transparent; font-weight: 650; }
-  .ayuda { margin: .45rem 0 0; }
-  .bloque { display: block; margin-top: .1rem; }
-  .casilla { align-items: flex-start; padding-top: .2rem; }
   .casilla input { margin-top: .2rem; }
-  .out { width: 100%; color: var(--neg); }
   .err {
     background: color-mix(in srgb, var(--neg) 14%, transparent);
     border: 1px solid color-mix(in srgb, var(--neg) 40%, transparent);

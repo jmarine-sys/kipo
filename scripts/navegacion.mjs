@@ -22,9 +22,29 @@ const LAYOUT = join(RAIZ, '+layout.svelte');
 //   /login     cuando no hay sesion
 //   /comenzar  cuando no hay ninguna cuenta todavia (ADR-027)
 const SIN_ENLACE = new Set(['/login', '/comenzar']);
-// Dos, no tres. El defecto real que motivo este script era una pantalla a TRES
-// clicks: con el limite en 3 habria pasado en verde y no habria servido de nada.
-const MAX_PASOS = 2;
+// DOS limites, no uno.
+//
+// La primera version exigia dos clicks para TODO, y esa regla estaba mal: acorta
+// el camino a la pantalla de ajustes al mismo precio que al de registrar un
+// gasto, y el lugar en la barra es finito. Aplicada a todo, amontona en el
+// camino rapido cosas que se tocan una vez por anio.
+//
+// Lo que importa no es la distancia sino QUE esta lejos. Asi que la lista de
+// abajo dice que pantallas son del uso diario -esas, a dos clicks- y el resto
+// tiene tres. Ninguna puede ser inalcanzable.
+//
+// El defecto que motivo el script sigue atrapado: la cartera estaba a TRES y
+// esta en la lista.
+const CAMINO_RAPIDO = new Set([
+  '/',             // el resumen del mes
+  '/nuevo',        // registrar: el 90% del uso
+  '/movimientos',  // revisar lo cargado
+  '/cartera',      // la pregunta central del proyecto
+  '/recurrentes',  // lo que se viene
+  '/cuentas'       // ajustar un saldo, ver cuanto hay
+]);
+const MAX_RAPIDO = 2;
+const MAX_PASOS  = 3;
 
 function archivos(dir) {
   return readdirSync(dir).flatMap((n) => {
@@ -78,13 +98,15 @@ for (const r of rutas) {
   const d = pasos.get(r);
   if (SIN_ENLACE.has(r)) { console.log(`  ${r.padEnd(24)} por redireccion`); continue; }
   if (!d) { console.log(`  ${r.padEnd(24)} INALCANZABLE`); malas++; continue; }
+  const tope = CAMINO_RAPIDO.has(r) ? MAX_RAPIDO : MAX_PASOS;
   const etiqueta = d === 1 ? 'en la barra' : `${d} clicks`;
-  console.log(`  ${r.padEnd(24)} ${etiqueta}${d > MAX_PASOS ? '  DEMASIADO LEJOS' : ''}`);
-  if (d > MAX_PASOS) malas++;
+  const marca = d > tope ? (tope === MAX_RAPIDO ? '  DEMASIADO LEJOS (uso diario)' : '  DEMASIADO LEJOS') : '';
+  console.log(`  ${r.padEnd(24)} ${etiqueta}${marca}`);
+  if (d > tope) malas++;
 }
 
 if (malas) {
   console.error(`\n${malas} pantalla/s sin camino razonable desde la barra.`);
   process.exit(1);
 }
-console.log(`  ${rutas.length} pantallas, todas a ${MAX_PASOS} clicks o menos`);
+console.log(`  ${rutas.length} pantallas: las de uso diario a ${MAX_RAPIDO} clicks, el resto a ${MAX_PASOS}`);

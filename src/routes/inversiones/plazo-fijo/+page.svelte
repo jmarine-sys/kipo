@@ -48,7 +48,7 @@
         nombre: nombre.trim(), desdeId, capital, vence, esperado,
         institucion: institucion.trim() || null, fecha
       });
-      goto('/cuentas');
+      goto('/inversiones');
     } catch (err) {
       error = err instanceof Error ? err.message : 'No se pudo constituir';
       busy = false;
@@ -58,7 +58,7 @@
 
 <div class="page stack">
   <div class="spread">
-    <a href="/cuentas" class="back" aria-label="Volver">←</a>
+    <a href="/inversiones" class="back" aria-label="Volver">←</a>
     <h1>Nuevo plazo fijo</h1>
     <span></span>
   </div>

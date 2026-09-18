@@ -53,6 +53,7 @@ decision nobody made is fiction, and an agent will believe it.
 | [ADR-030](#adr-030--qué-tipo-es-cómo-se-llama-y-dónde-está-son-tres-preguntas-distintas) | Qué tipo es, cómo se llama y dónde está son tres preguntas distintas | Accepted |
 | [ADR-031](#adr-031--una-cuenta-puede-estar-en-varias-carteras-y-la-del-broker-se-arma-sola) | Una cuenta puede estar en varias carteras, y la del broker se arma sola | Accepted |
 | [ADR-032](#adr-032--aportar-a-otro-libro-es-gastar-y-son-dos-movimientos-uno-por-libro) | Aportar a otro libro es gastar, y son dos movimientos, uno por libro | Accepted |
+| [ADR-033](#adr-033--la-navegación-agrupa-por-significado-y-no-todo-merece-estar-cerca) | La navegación agrupa por significado, y no todo merece estar cerca | Accepted |
 
 ---
 
@@ -1768,3 +1769,66 @@ ok  el ajuste de saldo sigue siendo un ajuste
 
 La última de la base es la que importa: **se agregó plata entre libros sin que ningún movimiento
 cruce libros.**
+
+
+---
+
+## ADR-033 — La navegación agrupa por significado, y no todo merece estar cerca
+
+**Context.** El usuario señaló tres cosas que son la misma:
+
+1. *"La vista de cuentas ahora parece más una vista de ajustes que otra cosa."* Y era cierto: tenía las
+   cuentas, las categorías, los libros, el tema, el modo privado y cerrar sesión.
+2. *"Para crear un plazo fijo tenés que ir a cuentas y queda rarísimo."* También cierto. Un plazo fijo
+   **por dentro** se parece a una cuenta —de hecho lo es, `valuation = 'accrual'`— pero **para quien lo
+   usa** es una inversión.
+3. *"La premisa de que todo se tiene que alcanzar con dos clicks está bien, pero no me parece que tenga
+   que ser para todo, solo para lo más importante."*
+
+La tercera explica las otras dos. `scripts/navegacion.mjs` exigía **dos clicks para todo**, y esa regla
+acorta el camino a la pantalla de ajustes al mismo precio que al de registrar un gasto. El lugar en la
+barra es finito: aplicada a todo, la regla **amontona en el camino rápido cosas que se tocan una vez
+por año**.
+
+**Decision.** Las pantallas se agrupan por lo que significan para quien las usa, no por cómo están
+implementadas. Y el chequeo de navegación pasa a tener **dos límites**: dos clicks para el uso diario,
+tres para el resto.
+
+**Consequences.**
+- **Ajustes** es una pantalla propia: categorías, libros y personas, tema, modo privado, objetivo y
+  cerrar sesión. Se llega con el engranaje de Inicio, a un click.
+- **Cuentas vuelve a ser solo cuentas**: la lista, crear una, ajustar un saldo.
+- **El plazo fijo se mudó a Inversiones**, con las posiciones. Que por dentro sea una cuenta es un
+  detalle de implementación; lo que manda es qué significa.
+- **El chequeo declara qué es de uso diario** en una lista explícita, y eso es lo valioso: obliga a
+  escribir la prioridad en vez de suponerla. Lo que no está en la lista tiene tres clicks, y nada puede
+  quedar inalcanzable.
+- **La parte incómoda:** el límite se aflojó, y aflojar un chequeo para que pase un cambio propio es
+  exactamente cómo se pudren los chequeos. Se acepta porque el defecto que lo motivó **sigue atrapado**
+  —la cartera está en la lista de uso diario y a tres clicks falla—, y porque la regla vieja era la que
+  estaba mal, no el cambio.
+
+**Rejected alternatives.**
+- *Una sexta pestaña para Ajustes*: la barra ya tiene cinco y un botón; seis destinos en el pulgar es
+  ruido permanente para algo que se toca una vez.
+- *Dejar todo como estaba*: Cuentas seguía siendo dos pantallas peleadas por el mismo lugar.
+- *Subir el límite a tres para todo*: el defecto original —la cartera enterrada a tres clicks— habría
+  pasado en verde, y el chequeo dejaría de servir para lo que se escribió.
+
+**Evidence.** `scripts/navegacion.mjs`, `src/routes/ajustes/+page.svelte`,
+`src/routes/inversiones/plazo-fijo/+page.svelte`.
+
+**Verified against what already exists.**
+
+```
+./scripts/verificar.sh
+  15 pantallas: las de uso diario a 2 clicks, el resto a 3
+
+Prueba de mutacion, sacando Cartera de la barra:
+  /cartera              3 clicks  DEMASIADO LEJOS (uso diario)
+  /cartera/portafolios  4 clicks  DEMASIADO LEJOS
+  3 pantalla/s sin camino razonable desde la barra.  -> sale 1
+```
+
+El chequeo se aflojó y **sigue atrapando el caso que lo originó**. Si no lo atrapara, el límite nuevo
+sería una excusa y no una regla.
