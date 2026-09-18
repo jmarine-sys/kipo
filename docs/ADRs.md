@@ -50,6 +50,7 @@ decision nobody made is fiction, and an agent will believe it.
 | [ADR-027](#adr-027--el-alta-siembra-estructura-no-taxonomía-y-la-puesta-en-marcha-pregunta-el-resto) | El alta siembra estructura, no taxonomía, y la puesta en marcha pregunta el resto | Accepted |
 | [ADR-028](#adr-028--el-libro-activo-vive-en-la-base-y-compartir-uno-se-hace-por-código) | El libro activo vive en la base, y compartir uno se hace por código | Accepted |
 | [ADR-029](#adr-029--la-fuente-de-precios-locales-es-data912-con-byma-de-respaldo-y-el-precio-se-guarda-como-se-cotiza) | La fuente de precios locales es data912, con BYMA de respaldo, y el precio se guarda como se cotiza | Accepted |
+| [ADR-030](#adr-030--qué-tipo-es-cómo-se-llama-y-dónde-está-son-tres-preguntas-distintas) | Qué tipo es, cómo se llama y dónde está son tres preguntas distintas | Accepted |
 
 ---
 
@@ -1536,3 +1537,77 @@ Y la lamina, contra postgres:
 ```
 
 Sin la lámina, esa tenencia habría valido **851.000.000** en vez de 8.510.000.
+
+
+---
+
+## ADR-030 — Qué tipo es, cómo se llama y dónde está son tres preguntas distintas
+
+**Context.** El usuario dijo que los tipos de cuenta estaban mal: *"una cuenta banco como tal no tiene
+sentido, tampoco una que sea billetera virtual… si es una caja de ahorro es una caja de ahorro
+independientemente de que le quieras poner el nombre «Banco»"*. Al mirarlo, tenía razón y había algo
+peor debajo.
+
+El formulario preguntaba **«¿Tengo plata acá o debo plata acá?»** —un eje de los tres que el modelo
+tiene— y derivaba el resto:
+
+```ts
+const spendable = $derived(kind === 'asset');
+```
+
+Con eso, **toda cuenta de activo creada a mano quedaba como plata disponible**, así que **no había
+forma de cargar una cuenta comitente**: el efectivo parado en un broker aparecía en *"Disponible"*
+junto a la caja de ahorro, siendo justamente la plata que no se puede gastar mañana.
+
+Y la puesta en marcha ofrecía `Efectivo`, `Banco`, `Mercado Pago`, `Tarjeta`, `Dólares`. De esos, dos
+no son tipos: *Banco* es el **dónde** y *Mercado Pago* es una **institución**.
+
+**Decision.** Se preguntan tres cosas por separado: **qué tipo es**, **cómo la llamás** y **dónde
+está**. Los tipos son los que el modelo ya distinguía, y viven en un solo archivo.
+
+**Consequences.**
+- Los tres tipos del formulario general son **caja de ahorro o efectivo**, **cuenta de inversión** y
+  **tarjeta de crédito**. El plazo fijo y la posición tienen pantalla propia porque piden datos que
+  ninguno de esos necesita: un vencimiento y un instrumento con su precio.
+- **La diferencia entre caja de ahorro y cuenta de inversión es `is_spendable`, y es la que faltaba.**
+  Las dos guardan dinero; solo una entra en *"cuánto puedo gastar hoy"*, que es el punto 8 del brief.
+- **El tipo se deduce de lo que la cuenta ES, nunca de su nombre.** Renombrarla no puede cambiar cómo
+  se la trata — mismo criterio que la categoría de ajustes, que se busca por `is_system` y no por
+  llamarse *"Ajustes"*.
+- La puesta en marcha ahora pregunta el **dónde**, que es lo que después hace que la vista *Por banco*
+  tenga algo que agrupar. Antes creaba todo sin institución y esa vista no aparecía nunca.
+- **La parte incómoda:** el primer paso tiene más campos que antes. Se acepta porque el que se saltea
+  el *dónde* no pierde nada —es opcional— y el que se saltea el **tipo** terminaba con una cuenta
+  comitente contada como plata disponible, sin enterarse.
+
+**Rejected alternatives.**
+- *Solo agregar la opción "no es gastable" al formulario*: tapa el agujero concreto con el mínimo
+  cambio, y deja el tipo y el nombre mezclados, que es lo que hizo que el agujero existiera.
+- *Inferir el tipo del nombre* (un nombre que diga "Balanz" es comitente): adivinar sobre texto libre,
+  y renombrar la cuenta cambiaría la contabilidad.
+- *Un tipo por producto* (billetera virtual, cuenta sueldo, cuenta corriente): son nombres comerciales
+  del mismo objeto. Si dos tipos hacen exactamente lo mismo, no son dos tipos.
+
+**Evidence.** `src/lib/ledger/tipos.ts`, `src/routes/cuentas/nueva/+page.svelte`,
+`src/routes/comenzar/+page.svelte`.
+
+**Verified against what already exists.**
+
+```
+El modelo YA tenia los tres ejes; la pantalla usaba uno:
+
+  kind          asset | liability
+  valuation     balance | accrual | market
+  is_spendable  boolean
+
+  caja de ahorro      asset  balance  spendable=true    -> Disponible
+  cuenta comitente    asset  balance  spendable=FALSE   -> no Disponible
+  tarjeta             liability balance                 -> deuda
+  plazo fijo          asset  accrual                    -> vence
+  posicion            asset  market                     -> unidades x precio
+
+No hizo falta ni una migracion: lo que faltaba era preguntarlo.
+```
+
+**Ningún cambio de esquema.** El modelo distinguía las cinco cosas desde el primer día; la interfaz
+preguntaba por dos.

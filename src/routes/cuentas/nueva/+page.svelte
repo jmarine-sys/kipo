@@ -2,10 +2,18 @@
   import { goto } from '$app/navigation';
   import { onMount } from 'svelte';
   import { createAccount, listAccounts } from '$lib/ledger/api';
+  import { TIPOS_CUENTA, tipoPorId } from '$lib/ledger/tipos';
 
   let name = $state('');
-  let kind = $state<'asset' | 'liability'>('asset');
+  let tipoId = $state<'vista' | 'comitente' | 'tarjeta'>('vista');
   let unit = $state('ARS');
+
+  const tipo = $derived(tipoPorId(tipoId));
+
+  // El nombre es LIBRE y el tipo no lo condiciona: una caja de ahorro se puede
+  // llamar "Banco", "Macro" o "la del sueldo". Lo que no puede es que el nombre
+  // decida como se la trata.
+  $effect(() => { if (!tipo.monedas.includes(unit)) unit = tipo.monedas[0]; });
   let institution = $state('');
   let fxSource = $state('');
   let busy = $state(false);
@@ -19,8 +27,8 @@
     } catch { /* la sugerencia es un lujo: si falla, se escribe a mano */ }
   });
 
-  // Una tarjeta es un pasivo y NO es plata gastable: su saldo es deuda. ADR-004.
-  const spendable = $derived(kind === 'asset');
+  // Ya no se deriva de `kind`: eso hacia que TODA cuenta de activo quedara
+  // disponible, y por eso no habia forma de cargar una cuenta comitente.
 
   async function save(e: SubmitEvent) {
     e.preventDefault();
@@ -28,9 +36,9 @@
     try {
       await createAccount({
         name: name.trim(),
-        kind,
+        kind: tipo.kind,
         unit,
-        is_spendable: spendable,
+        is_spendable: tipo.spendable,
         institution: institution.trim() || null,
         fx_source: fxSource || null
       });
@@ -52,23 +60,25 @@
       <input bind:value={name} required placeholder="Banco Santander" /></label>
 
     <fieldset>
-      <legend class="dim">Qué es</legend>
+      <legend class="dim">Qué tipo de cuenta es</legend>
       <div class="opts">
-        <button type="button" class:on={kind === 'asset'} onclick={() => (kind = 'asset')}>
-          Tengo plata acá
-          <span class="dim sm">efectivo, banco, billetera</span>
-        </button>
-        <button type="button" class:on={kind === 'liability'} onclick={() => (kind = 'liability')}>
-          Debo plata acá
-          <span class="dim sm">tarjeta de crédito, préstamo</span>
-        </button>
+        {#each TIPOS_CUENTA as t}
+          <button type="button" class:on={tipoId === t.id} onclick={() => (tipoId = t.id)}>
+            {t.label}
+            <span class="dim sm">{t.pista}</span>
+          </button>
+        {/each}
       </div>
+      <p class="dim sm note">
+        Un plazo fijo y una posición se cargan aparte, porque piden otros datos:
+        <a href="/cuentas/plazo-fijo">plazo fijo</a> · <a href="/inversiones">posición</a>.
+      </p>
     </fieldset>
 
     <fieldset>
       <legend class="dim">Moneda</legend>
-      <div class="opts row2">
-        {#each ['ARS', 'USD'] as u}
+      <div class="opts row3">
+        {#each tipo.monedas as u}
           <button type="button" class:on={unit === u} onclick={() => (unit = u)}>{u}</button>
         {/each}
       </div>
@@ -123,13 +133,12 @@
   fieldset { border: none; padding: 0; margin: 0; }
   legend { font-size: .85rem; margin-bottom: .35rem; }
   .opts { display: grid; gap: .5rem; }
-  .opts.row2 { grid-template-columns: 1fr 1fr; }
   .opts.row3 { grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)); }
   .opts button {
     display: flex; flex-direction: column; align-items: flex-start; gap: .15rem;
     padding: .7rem .85rem; min-height: var(--tap); text-align: left;
   }
-  .opts.row2 button, .opts.row3 button { align-items: center; justify-content: center; }
+  .opts.row3 button { align-items: center; justify-content: center; }
   .opts button.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--surface)); }
   .sm { font-size: .76rem; }
   .note { margin-top: .5rem; }

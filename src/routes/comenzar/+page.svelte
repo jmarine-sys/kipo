@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { listAccounts, listCategories, createAccount, createCategory } from '$lib/ledger/api';
+  import { tipoPorId } from '$lib/ledger/tipos';
   import type { Category } from '$lib/types';
 
   /**
@@ -16,14 +17,25 @@
    * cuentas al que había que llegar sabiendo que existía.
    */
 
-  // Las cuatro que tiene casi todo el mundo, ya armadas. Un toque, no un
-  // formulario: el que quiere una cuenta rara la agrega abajo con su nombre.
+  /**
+   * Las cuentas que se ofrecen, y por que cada una dice TIPO y no nombre.
+   *
+   * Antes decia «Efectivo», «Banco», «Mercado Pago», «Tarjeta», «Dolares». De
+   * esas, solo dos eran tipos: «Banco» es el DONDE y «Mercado Pago» una
+   * institucion. Una caja de ahorro sigue siendo una caja de ahorro este en el
+   * banco que este, y mezclar las tres preguntas hacia que no se entendiera cual
+   * se estaba contestando.
+   *
+   * Ahora cada fila trae su tipo real, un nombre sugerido que se puede cambiar y
+   * un lugar para decir donde esta.
+   */
   const SUGERIDAS = [
-    { id: 'efectivo', name: 'Efectivo',   kind: 'asset'     as const, unit: 'ARS', spend: true,  pista: 'lo que tenés en la billetera' },
-    { id: 'banco',    name: 'Banco',      kind: 'asset'     as const, unit: 'ARS', spend: true,  pista: 'caja de ahorro, cuenta sueldo' },
-    { id: 'billetera',name: 'Mercado Pago', kind: 'asset'   as const, unit: 'ARS', spend: true,  pista: 'o cualquier billetera virtual', banco: 'Mercado Pago' },
-    { id: 'tarjeta',  name: 'Tarjeta',    kind: 'liability' as const, unit: 'ARS', spend: false, pista: 'lo que gastás y pagás después' },
-    { id: 'dolares',  name: 'Dólares',    kind: 'asset'     as const, unit: 'USD', spend: true,  pista: 'los que tenés guardados' }
+    { id: 'efectivo',  tipo: 'vista'     as const, name: 'Efectivo',       unit: 'ARS', banco: '',              pista: 'lo que tenés en la billetera' },
+    { id: 'caja',      tipo: 'vista'     as const, name: 'Caja de ahorro', unit: 'ARS', banco: '',              pista: 'la del sueldo, en un banco' },
+    { id: 'billetera', tipo: 'vista'     as const, name: 'Mercado Pago',   unit: 'ARS', banco: 'Mercado Pago',  pista: 'también es una cuenta a la vista' },
+    { id: 'tarjeta',   tipo: 'tarjeta'   as const, name: 'Tarjeta',        unit: 'ARS', banco: '',              pista: 'gastás ahora, pagás después' },
+    { id: 'dolares',   tipo: 'vista'     as const, name: 'Dólares',        unit: 'USD', banco: '',              pista: 'los que tenés guardados' },
+    { id: 'broker',    tipo: 'comitente' as const, name: 'Balanz',         unit: 'ARS', banco: '',              pista: 'el efectivo que tenés en un broker' }
   ];
 
   // Sugerencias de categorías: se TILDAN, no vienen creadas. Lo que no elegís no
@@ -35,6 +47,11 @@
 
   let paso = $state<1 | 2>(1);
   let elegidas = $state<Set<string>>(new Set(['efectivo']));
+
+  /** Nombre y banco de cada una, editables. La sugerencia es un punto de partida. */
+  let detalle = $state<Record<string, { name: string; banco: string }>>(
+    Object.fromEntries(SUGERIDAS.map((s) => [s.id, { name: s.name, banco: s.banco }]))
+  );
   let otra = $state('');
   let propias = $state<string[]>([]);
   let cats = $state<Set<string>>(new Set());
@@ -63,12 +80,15 @@
     try {
       for (const s of SUGERIDAS) {
         if (!elegidas.has(s.id)) continue;
+        const t = tipoPorId(s.tipo);
+        const d = detalle[s.id];
         await createAccount({
-          name: s.name, kind: s.kind, unit: s.unit,
-          // Donde la institucion es obvia se deja puesta; el resto se completa
-          // despues desde Cuentas. Preguntar el banco de cada una acá seria
-          // friccion justo en el primer minuto de uso.
-          is_spendable: s.spend, institution: s.banco ?? null, fx_source: null
+          name: d.name.trim() || s.name,
+          kind: t.kind,
+          unit: s.unit,
+          is_spendable: t.spendable,
+          institution: d.banco.trim() || null,
+          fx_source: null
         });
       }
       for (const n of propias) {
@@ -134,11 +154,37 @@
         {#each SUGERIDAS as s}
           <button type="button" class="opcion" class:on={elegidas.has(s.id)}
                   onclick={() => (elegidas = alternar(elegidas, s.id))}>
-            <b>{s.name}</b>
+            <b>{tipoPorId(s.tipo).label}</b>
             <span class="dim sm">{s.pista}</span>
           </button>
         {/each}
       </div>
+
+      <!-- Tres preguntas separadas: qué tipo es (arriba), cómo la llamás y dónde
+           está. Antes eran una sola y no se sabía cuál se estaba contestando. -->
+      {#if elegidas.size}
+        <ul class="detalles">
+          {#each SUGERIDAS.filter((s) => elegidas.has(s.id)) as s (s.id)}
+            <li>
+              <span class="quees dim sm">{tipoPorId(s.tipo).label} · {s.unit}</span>
+              <span class="row">
+                <input bind:value={detalle[s.id].name} placeholder="Cómo la llamás" />
+                <input bind:value={detalle[s.id].banco} list="bancos-nuevos"
+                       placeholder="¿Dónde está?" />
+              </span>
+            </li>
+          {/each}
+        </ul>
+        <datalist id="bancos-nuevos">
+          {#each ['Mercado Pago', 'Balanz', 'Binance', 'Santander', 'Galicia', 'Macro', 'Nación', 'BBVA'] as b}
+            <option value={b}></option>
+          {/each}
+        </datalist>
+        <p class="dim sm">
+          El <b>dónde</b> es opcional, y es lo que después te deja ver juntas todas
+          las cuentas de un mismo banco.
+        </p>
+      {/if}
 
       {#if propias.length}
         <div class="propias">
@@ -215,6 +261,12 @@
     padding: .7rem .8rem; min-height: var(--tap); text-align: left;
   }
   .opcion.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--surface)); }
+
+  .detalles { list-style: none; margin: 0; padding: 0; display: grid; gap: .55rem; }
+  .detalles li { display: flex; flex-direction: column; gap: .2rem; }
+  .detalles .quees { padding-left: .1rem; }
+  .detalles .row { display: flex; gap: .4rem; }
+  .detalles .row input { flex: 1; min-width: 0; }
 
   .wrap, .propias { display: flex; flex-wrap: wrap; gap: .4rem; }
   .chip {

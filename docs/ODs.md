@@ -74,6 +74,7 @@ It is the counterpart of [ADRs.md](ADRs.md): there is **what was decided and why
 | OD-37 | Las cuentas no se agrupan por institución | `decision` | DECIDED | **Un interruptor, no una elección**: `/cuentas` ofrece *Por tipo* —que contesta «¿cuánto puedo gastar hoy?», el punto 8 del brief— y *Por banco* —«¿cuánto tengo en Macro?»—. El campo `institution` ya existía **y `account_balance` ya lo exponía**: no hizo falta nada de esquema. Contra el texto libre, un `datalist` con los bancos ya usados. **Sin entidad `institution` por ahora**: se agregaría el día que haga falta renombrar en un lugar o darle una fuente de dólar propia. **No se confunde con `portfolio` (ADR-026):** institución es *dónde está*, portafolio es *qué se mide junto* | — |
 | OD-38 | Las fechas de la agenda se cargan una por una, sin atajos | `decision` | DECIDED | **Atajos sí, pero *fin de mes* no es un atajo: es una regla.** *Hoy / Día 1 / Día 10 / Día 15* solo escriben una fecha y apuntan al mes siguiente si el día ya pasó. *Fin de mes* enciende `scheduled_event.month_end`, porque `31-ene + 1 mes` da `28-feb` y **de ahí en adelante se queda en 28**. Se resolvió con un **trigger**, no cambiando las funciones que adelantan la agenda: son dos hoy y podrían ser tres, y así el invariante no depende de que nadie se olvide. **No se adivina** por la fecha: un 28-feb puede ser *«el 28»* o *«el último día»*, y solo lo sabe quien lo cargó | — |
 | OD-39 | El flujo de precios cubre 6 de los 16 instrumentos reales del usuario | `risk` | DECIDED | **data912 principal, BYMA de respaldo** → [ADR-029](ADRs.md#adr-029--la-fuente-de-precios-locales-es-data912-con-byma-de-respaldo-y-el-precio-se-guarda-como-se-cotiza). BYMA **no publica obligaciones negociables** en su API libre, así que con ella sola cuatro papeles no tendrían precio nunca. De paso apareció algo peor: **un bono cotiza por cada 100 nominales**, y guardarlo como precio unitario multiplicaba por cien el patrimonio sin fallar. Se resolvió con `instrument.quote_size`. **Reserva:** se depende de un intermediario que puede cerrar | — |
+| OD-40 | Una cuenta pertenece a una sola cartera, y no hay cartera por defecto | `decision` | OPEN | **Detectado por el usuario el 2026-09-18** al preguntar cómo se relacionan institución y cartera. Dos huecos: (a) **no se crea ninguna cartera sola** — hay que armarla y tildar cuenta por cuenta, cuando lo natural sería una por cuenta comitente con sus activos adentro; y (b) `account.portfolio_id` es **un campo, no una lista**, así que una posición no puede estar en *Todo* y además en *Tecnología*. Lo que sí funciona: una cartera puede cruzar brokers, porque cada posición es una cuenta. **Falta decidir** si la pertenencia pasa a ser muchos-a-muchos, que complica el borde de [ADR-026](ADRs.md#adr-026--el-portafolio-es-el-borde-es-flujo-solo-lo-que-lo-cruza): una misma operación podría cruzar el borde de una cartera y no el de otra | Ver la cartera agrupada como uno quiere |
 | OD-26 | El arte del ícono trae su propio fondo: debería ser una capa aparte | `decision` | DECIDED | **Resuelto el 2026-09-16.** Se quitan del vector las dos capas de relleno —el rectángulo blanco y el cuadrado menta— y se compone de nuevo: el bolsillo con la moneda es el frente, el menta es fondo generado. Verificado aplicando el recorte circular **al 80% y al 100%**: no se corta nada. El favicon pasa además a ser cuadrado y recortado al dibujo, porque el original es vertical y a 16 px eso dejaba aire donde menos lugar hay | — |
 | OD-27 | La lista de movimientos corta los nombres de categoría | `decision` | DECIDED | **Resuelto el 2026-09-15.** Se muestra solo la subcategoría y la madre pasa a ser un punto de color, derivado de su nombre con un hash estable. Se quitó además el texto *"no afecta el resultado"* de cada renglón: el color del monto ya lo dice, y el lugar de enseñarlo es el formulario, no una lista que se lee cientos de veces | — |
 | OD-28 | Faltan filtros en movimientos | `decision` | DECIDED | **Resuelto el 2026-09-16.** Filtro por **período** (mes con navegación, 3 y 6 meses, año, o entre dos fechas) y por **categoría madre**, con selección múltiple y el mismo código de color de la lista. Muestra cuántos movimientos quedan y cuánto suman. **Los gráficos NO entran acá**: quedan en OD-29 | — |
@@ -82,8 +83,8 @@ It is the counterpart of [ADRs.md](ADRs.md): there is **what was decided and why
 
 ## The state of the project, read off the register
 
-Actualizado 2026-09-18 (trigésima revisión). Treinta y nueve ítems: **32 `DECIDED`**,
-**7 `OPEN`**, **0 `LEANING`** y **0 `NEEDS-INPUT`**.
+Actualizado 2026-09-18 (trigesimoprimera revisión). Cuarenta ítems: **32 `DECIDED`**,
+**8 `OPEN`**, **0 `LEANING`** y **0 `NEEDS-INPUT`**.
 
 **Veintisiete decisiones** en [ADRs.md](ADRs.md), veinte migraciones verificadas contra PostgreSQL 16
 con 115 aserciones, y una aplicación SvelteKit con trece pantallas, en producción y en uso.
@@ -94,12 +95,14 @@ categorías ajenas, no existía ninguna pantalla de primer uso, y la aplicación
 contador. Nada de eso lo veían las pruebas, **porque todas preguntan si lo construido funciona y
 ninguna pregunta si se entiende**.
 
-De los 7 `OPEN`, ninguno impide usar la aplicación:
+De los 8 `OPEN`, ninguno impide usar la aplicación:
 
 - **Esperan datos que todavía no existen (2):** OD-20 método de costo, OD-29 gráficos.
 - **Riesgo solo evaluable con uso real (4):** OD-10 pausa por inactividad, OD-11 la fricción de la
   tarjeta, OD-22 el reseteo tras la puesta en marcha, OD-25 el preview que apunta a producción.
 - **Diferido por el usuario (1):** OD-32, el plazo fijo UVA.
+- **Salió de explicar cómo funciona (1):** OD-40, una cuenta en una sola cartera y sin cartera por
+  defecto.
 - **Deuda: ninguna abierta.** OD-36 cerró el 2026-09-18.
 
 ---

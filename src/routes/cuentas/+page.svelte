@@ -7,6 +7,7 @@
     listResumenTarjeta, type ResumenTarjeta
   } from '$lib/ledger/api';
   import { adjustment } from '$lib/ledger/entries';
+  import { tipoDeCuenta } from '$lib/ledger/tipos';
   import { signOut } from '$lib/session.svelte';
   import { prefs, elegirTema, alternarPrivado, type Tema } from '$lib/preferencias.svelte';
   import { money, today } from '$lib/format';
@@ -208,7 +209,11 @@
             <li>
               <button class="acc spread" onclick={() => abrir(b)}>
                 <span class="nom">
-                  {b.name}{#if b.kind === 'liability'}<span class="tag">deuda</span>{/if}
+                  {b.name}
+                  <!-- El tipo se deduce de lo que ES, nunca del nombre: renombrar
+                       una cuenta no puede cambiar como se la trata. -->
+                  <span class="tag">{tipoDeCuenta(b)}</span>
+                  {#if b.institution}<span class="dim sm donde">{b.institution}</span>{/if}
                 </span>
                 <b class="money" class:neg={Number(b.balance) < 0}>{money(b.balance, b.unit)}</b>
               </button>
@@ -340,6 +345,8 @@
   .cuotas .meses li { align-items: baseline; gap: .5rem; }
   .cuotas .cap { text-transform: capitalize; }
   .cuotas p { margin: 0; }
+  .nom { display: flex; align-items: baseline; gap: .4rem; flex-wrap: wrap; }
+  .nom .donde { opacity: .8; }
   .vistas { display: grid; grid-template-columns: 1fr 1fr; gap: .4rem; margin-bottom: .2rem; }
   .vistas button { min-height: 40px; font-size: .85rem; }
   .vistas button.on {
