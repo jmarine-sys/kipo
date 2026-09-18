@@ -18,7 +18,10 @@ const LAYOUT = join(RAIZ, '+layout.svelte');
 
 // /login no cuelga de ningun enlace a proposito: se llega por redireccion cuando
 // no hay sesion. Es la unica excepcion legitima.
-const SIN_ENLACE = new Set(['/login']);
+// Se llegan por redireccion a proposito, no por enlace:
+//   /login     cuando no hay sesion
+//   /comenzar  cuando no hay ninguna cuenta todavia (ADR-027)
+const SIN_ENLACE = new Set(['/login', '/comenzar']);
 // Dos, no tres. El defecto real que motivo este script era una pantalla a TRES
 // clicks: con el limite en 3 habria pasado en verde y no habria servido de nada.
 const MAX_PASOS = 2;

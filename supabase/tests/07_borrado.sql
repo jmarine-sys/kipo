@@ -48,8 +48,13 @@ select case when movimientos = :antes_mov
             else format('FALLO  hay %s pero conto %s', :antes_mov, movimientos) end
   from account_balance where name = 'Banco Nacion';
 
-select case when movimientos = 0 then 'ok  category_usage marca en 0 las no usadas'
+-- 'Seguros' la crea la bateria y nadie la usa. Antes esta asercion apuntaba a
+-- 'Transporte', que venia sembrada por el alta; al dejar de sembrarse (ADR-027)
+-- la consulta no devolvia FILA y el CASE no se evaluaba nunca. La suite quedaba
+-- verde con una asercion MENOS, que es la forma silenciosa de perder cobertura.
+select case when count(*) = 0 then 'FALLO  la categoria de control no existe'
+            when min(movimientos) = 0 then 'ok  category_usage marca en 0 las no usadas'
             else 'FALLO  conto de mas' end
-  from category_usage where name = 'Transporte';
+  from category_usage where name = 'Seguros';
 
 reset role;

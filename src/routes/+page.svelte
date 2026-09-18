@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { goto } from '$app/navigation';
   import { listEntries, listBalances, summarize, type EntryDetail, type MonthSummary } from '$lib/ledger/api';
   import { money, monthRange } from '$lib/format';
   import { colorCategoria } from '$lib/categorias';
@@ -40,6 +41,11 @@
     try {
       // Lo esencial: sin esto no hay página que mostrar.
       [entries, balances] = await Promise.all([listEntries(m.from, m.to), listBalances()]);
+
+      // Sin cuentas no hay nada que registrar ni que mostrar: todo movimiento
+      // sale de algun lado. En vez de una pantalla vacia que explica, se lleva a
+      // la puesta en marcha, que es lo que hay que hacer (ADR-027).
+      if (!balances.length) { goto('/comenzar'); return; }
 
       // Lo que se viene es accesorio. Si falla —por ejemplo porque falta
       // aplicar una migración— la página tiene que seguir andando y avisar,

@@ -69,6 +69,8 @@ It is the counterpart of [ADRs.md](ADRs.md): there is **what was decided and why
 | OD-32 | Instrumentos ajustados por inflación (plazo fijo UVA, bonos CER) | `decision` | OPEN | **Anotado como mejora futura** por el usuario el 2026-09-16. Hoy se pueden cargar como plazo fijo con monto final estimado y corregir al vencer, **con una reserva seria**: durante todo el plazo el patrimonio queda subestimado, y en un UVA a doce meses con inflación alta ese salto es enorme. La salida correcta ya se entrevé: un UVA es en realidad **unidades de UVA por su valor del día**, o sea la familia `market` disfrazada de plazo fijo, y modelarlo así haría que el patrimonio se actualice solo | Exactitud del patrimonio si alguna vez abre uno |
 | OD-33 | El rendimiento se mide por posición, no por portafolio | `decision` | DECIDED | **Portafolio explícito**, firmado por el usuario el 2026-09-16 → [ADR-026](ADRs.md#adr-026--el-portafolio-es-el-borde-es-flujo-solo-lo-que-lo-cruza). Una entidad `portfolio` y las cuentas apuntan a ella; pertenecer es opcional, que es lo que lo distingue de agrupar por `institution`. Es flujo solo lo que tiene la contraparte afuera, y eso cierra los tres agujeros sin casos especiales. **Reserva:** una cuenta que se olvida de apuntar a su portafolio no rompe nada, mide mal en silencio — mismo modo de falla que [ADR-025](ADRs.md#adr-025--los-precios-se-traen-solos-todos-los-días-porque-el-de-hoy-no-se-recupera-mañana) | — |
 | OD-34 | Una pantalla terminada puede quedar sin camino, y nadie se entera | `debt` | DECIDED | **Tercera vez que pasa** (recurrentes, y la cartera a tres clicks detrás de *Cuentas*). La auditoría anterior contaba **enlaces por ruta**, que no es lo mismo que recorrer caminos: un enlace puede estar dentro de un `{#if}` que nadie cumple, o colgar de una pantalla a la que tampoco se llega. `scripts/navegacion.mjs` recorre el grafo desde la barra y falla si algo queda a más de 2 clicks; corre dentro de `verificar.sh`. **Verificado por mutación:** sacando la pestaña Cartera, sale 1 | — |
+| OD-35 | La app habla como quien la construyó, no como quien la usa | `risk` | OPEN | **Detectado el 2026-09-18** probándola con alguien ajeno al proyecto. El caso más claro: Inicio dice **«Ajustes»** por los ajustes de saldo, y en cualquier app en español *Ajustes* es **Configuración**. Además *Cartera*, *Posiciones*, *Portafolios*, *Moneda de cotización*, *Acción que representa*, *Capital*, *Nueva obligación*. **Falta decidir** cuáles son jerga inevitable del dominio y cuáles se pueden decir en criollo sin perder precisión | Que alguien que no armó la app pueda usarla |
+| OD-36 | No hay forma de compartir un libro entre dos personas | `debt` | OPEN | `ledger_member` está en el esquema desde el día uno, con sus políticas de RLS, y **en la interfaz no hay nada**: ni invitar, ni aceptar, ni ver quién más está. Hoy cada usuario queda con su libro aislado, que es lo que se buscaba para este caso. **Falta decidir** si alguna vez se abre, y si un invitado puede borrar o solo cargar | Uso compartido (pareja, familia) |
 | OD-26 | El arte del ícono trae su propio fondo: debería ser una capa aparte | `decision` | DECIDED | **Resuelto el 2026-09-16.** Se quitan del vector las dos capas de relleno —el rectángulo blanco y el cuadrado menta— y se compone de nuevo: el bolsillo con la moneda es el frente, el menta es fondo generado. Verificado aplicando el recorte circular **al 80% y al 100%**: no se corta nada. El favicon pasa además a ser cuadrado y recortado al dibujo, porque el original es vertical y a 16 px eso dejaba aire donde menos lugar hay | — |
 | OD-27 | La lista de movimientos corta los nombres de categoría | `decision` | DECIDED | **Resuelto el 2026-09-15.** Se muestra solo la subcategoría y la madre pasa a ser un punto de color, derivado de su nombre con un hash estable. Se quitó además el texto *"no afecta el resultado"* de cada renglón: el color del monto ya lo dice, y el lugar de enseñarlo es el formulario, no una lista que se lee cientos de veces | — |
 | OD-28 | Faltan filtros en movimientos | `decision` | DECIDED | **Resuelto el 2026-09-16.** Filtro por **período** (mes con navegación, 3 y 6 meses, año, o entre dos fechas) y por **categoría madre**, con selección múltiple y el mismo código de color de la lista. Muestra cuántos movimientos quedan y cuánto suman. **Los gráficos NO entran acá**: quedan en OD-29 | — |
@@ -77,32 +79,26 @@ It is the counterpart of [ADRs.md](ADRs.md): there is **what was decided and why
 
 ## The state of the project, read off the register
 
-Actualizado 2026-09-18 (vigesimosegunda revisión). Treinta y cuatro ítems: **25 `DECIDED`**,
-**9 `OPEN`**, **0 `LEANING`** y **0 `NEEDS-INPUT`**.
+Actualizado 2026-09-18 (vigesimotercera revisión). Treinta y seis ítems: **25 `DECIDED`**,
+**11 `OPEN`**, **0 `LEANING`** y **0 `NEEDS-INPUT`**.
 
-**Veintiséis decisiones** en [ADRs.md](ADRs.md), diecinueve migraciones verificadas contra
-PostgreSQL 16 con 115 aserciones, y una aplicación SvelteKit con diez pantallas, en producción y
-en uso.
+**Veintisiete decisiones** en [ADRs.md](ADRs.md), veinte migraciones verificadas contra PostgreSQL 16
+con 115 aserciones, y una aplicación SvelteKit con trece pantallas, en producción y en uso.
 
-Cerró el único pendiente que tenía reloj. OD-31 —el historial de precios que no se reconstruye—
-dejó de correr el 2026-09-16, con una reserva que no se va a poder sacar nunca: **todo lo anterior a
-esa fecha no existe**. Y OD-06 enseñó algo más incómodo que su propio contenido: estuvo marcada
-`DECIDED` mientras nadie la había construido. Una decisión escrita y no ejecutada figura como
-resuelta, que es exactamente lo que este registro existe para evitar.
+El 2026-09-18 la usó por primera vez **alguien que no la había construido** —el padre del usuario— y
+se perdió. Ese solo hecho produjo más hallazgos que cualquier auditoría: el alta imponía veinte
+categorías ajenas, no existía ninguna pantalla de primer uso, y la aplicación habla en vocabulario de
+contador. Nada de eso lo veían las pruebas, **porque todas preguntan si lo construido funciona y
+ninguna pregunta si se entiende**.
 
-OD-33 nació y cerró el mismo día, y es la más importante de la tanda: el rendimiento se medía por
-posición en vez de por portafolio. **Lo detectó el usuario mirando la pantalla, no una prueba** —
-tres agujeros que ninguna aserción existente podía ver, porque todas preguntaban si la cuenta estaba
-bien hecha y ninguna preguntaba si era la cuenta correcta.
+De los 11 `OPEN`, ninguno impide usar la aplicación:
 
-De los 9 `OPEN`, ninguno impide usar la aplicación:
-
-- **Esperan datos que todavía no existen (2):** OD-20 método de costo, OD-29 gráficos. Los dos
-  necesitan meses de uso real antes de decidirse con evidencia en vez de con preferencia.
-- **Riesgo solo evaluable con uso real (4):** OD-10 pausa por inactividad, OD-11 la fricción de la
-  tarjeta, OD-22 el reseteo tras la puesta en marcha, OD-25 el preview que apunta a producción.
+- **Esperan datos que todavía no existen (2):** OD-20 método de costo, OD-29 gráficos.
+- **Riesgo solo evaluable con uso real (5):** OD-10 pausa por inactividad, OD-11 la fricción de la
+  tarjeta, OD-22 el reseteo tras la puesta en marcha, OD-25 el preview que apunta a producción,
+  OD-35 el vocabulario.
 - **Diferidos por el usuario (3):** OD-23 y OD-24 las cuotas, OD-32 los instrumentos UVA.
-- **Deuda: ninguna abierta.** OD-34 nació y cerró el mismo día, con su chequeo automático.
+- **Deuda: una.** OD-36, compartir un libro: el esquema lo soporta y la interfaz no lo expone.
 
 ---
 

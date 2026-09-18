@@ -47,6 +47,7 @@ decision nobody made is fiction, and an agent will believe it.
 | [ADR-024](#adr-024--un-cedear-se-mide-al-ccl-porque-es-el-dólar-que-su-propio-precio-lleva-adentro) | Un CEDEAR se mide al CCL, porque es el dólar que su propio precio lleva adentro | Accepted |
 | [ADR-025](#adr-025--los-precios-se-traen-solos-todos-los-días-porque-el-de-hoy-no-se-recupera-mañana) | Los precios se traen solos todos los días, porque el de hoy no se recupera mañana | Accepted |
 | [ADR-026](#adr-026--el-portafolio-es-el-borde-es-flujo-solo-lo-que-lo-cruza) | El portafolio es el borde: es flujo solo lo que lo cruza | Accepted |
+| [ADR-027](#adr-027--el-alta-siembra-estructura-no-taxonomía-y-la-puesta-en-marcha-pregunta-el-resto) | El alta siembra estructura, no taxonomía, y la puesta en marcha pregunta el resto | Accepted |
 
 ---
 
@@ -1303,3 +1304,79 @@ ok  el aporte lleva la fecha del DEPOSITO, no la de la compra
 
 La tercera y la octava son el ADR entero: **la plata cambió de forma cinco veces adentro y el aporte
 sigue siendo uno solo, con la fecha en que cruzó.**
+
+
+---
+
+## ADR-027 — El alta siembra estructura, no taxonomía, y la puesta en marcha pregunta el resto
+
+**Context.** El usuario le dio la aplicación a su padre y **se perdió**. No es una hipótesis de
+diseño: es la primera vez que kipo la usó alguien que no la había construido.
+
+Al revisar por qué, la primera conclusión fue equivocada y conviene dejarla escrita: creí que había
+un callejón sin salida —el selector de cuenta de `/nuevo` no tenía `{:else}` y quedaba mudo— y resultó
+que el alta **sí** sembraba una cuenta, `Efectivo ARS`. Leí la pantalla y no seguí hasta el trigger
+antes de concluir.
+
+Lo que sí apareció, ya con el bootstrap a la vista: el alta sembraba **20 categorías**. Para cargar un
+café había que elegir entre doce opciones que nadie eligió — `Alquiler / Expensas`, `Servicios`,
+`Seguros`, `Impuestos`, `Suscripciones`, `Supermercado`, `Restaurantes`, `Transporte`,
+`Entretenimiento`, `Compras`, `Salud`, `Donaciones` —. Y no había **ninguna** pantalla de primer uso:
+`grep` de *onboarding*, *bienvenida*, *primer uso* devolvía cero.
+
+**Decision.** El alta siembra solo lo que es estructura —los dos grupos de gasto, los ingresos
+básicos y las dos categorías de sistema— y ninguna cuenta. La puesta en marcha, en `/comenzar`,
+pregunta dónde tenés la plata y en qué se te va.
+
+**Consequences.**
+- **Los padres son estructura; los hijos son opinión.** `Gastos fijos` y `Gastos variables` no son una
+  preferencia: son la corrección del error 2 del análisis —la planilla mezclaba el TIPO de operación
+  con el CONCEPTO— y sin ellos el modelo no se entiende. `Restaurantes` era gusto de quien escribió
+  el bootstrap metido en el libro de otro. De 20 categorías a 6.
+- `Intereses` y `Ajustes` se quedan y no son negociables:
+  [ADR-013](#adr-013--la-cuenta-remunerada-es-una-cuenta-bancaria-su-interés-es-un-ingreso-mensual),
+  [ADR-014](#adr-014--el-plazo-fijo-reconoce-su-interés-al-vencimiento) y
+  [ADR-005](#adr-005--el-ajuste-de-saldo-es-un-movimiento-más-contra-una-categoría-de-sistema)
+  dependen de que existan. Ahora se marcan *del sistema* **en la lista**, no solo al abrirlas:
+  descubrir que no se pueden borrar recién al intentar borrarlas es descubrirlo tarde.
+- Las sugerencias de la puesta en marcha **se tildan, no vienen creadas**. Lo que no elegís no existe.
+- **La parte incómoda:** esto revierte una decisión escrita y razonada. El bootstrap decía *"una
+  cuenta mínima para que el primer gasto se pueda cargar sin configurar nada: el MVP se mide en que
+  registrar un gasto lleve menos de diez segundos"*. Ahora hay dos pasos antes del primer gasto. Se
+  acepta porque **no se puede registrar un gasto sin decir de dónde salió**, y preguntarlo una vez es
+  más honesto que inventar la respuesta — la cuenta inventada igual había que renombrarla o borrarla.
+- Los libros que ya existen no cambian: el trigger solo corre en altas nuevas. Para ver la puesta en
+  marcha hace falta registrarse con otro correo.
+
+**Rejected alternatives.**
+- *Dejar la cuenta sembrada y que la guía se pueda saltear*: protegía el criterio de los diez
+  segundos, pero una guía que no hace falta es una guía que nadie lee, y quedaba una cuenta que el
+  usuario no eligió.
+- *Que la guía muestre `Efectivo ARS` ya creada para confirmar o renombrar*: nadie arranca sin cuenta
+  y nadie se queda con una que no quiso, pero el paso 1 pasa a tener que editar además de crear.
+  Descartada por complejidad frente al beneficio.
+- *No sembrar ninguna categoría*: deja al usuario frente a una taxonomía en blanco, que es una tarea
+  más difícil que elegir de una lista. Y rompería tres ADRs que dependen de las de sistema.
+
+**Evidence.** `supabase/migrations/20260918100000_alta_minima.sql`,
+`src/routes/comenzar/+page.svelte`, `supabase/tests/01_use_cases.sql`.
+
+**Verified against what already exists.**
+
+```
+Al sacar las categorias sembradas la bateria quedo VERDE con 114 aserciones en
+vez de 115. Verde, y con una asercion MENOS.
+
+  ok  category_usage marca en 0 las no usadas    <- apuntaba a 'Transporte'
+
+Sin esa categoria la consulta no devolvia fila, el CASE no se evaluaba nunca y
+nadie se enteraba. Se reescribio para que FALLE si la categoria de control no
+existe, en vez de desaparecer:
+
+  select case when count(*) = 0 then 'FALLO  la categoria de control no existe'
+              when min(movimientos) = 0 then 'ok  ...'
+```
+
+La diferencia se encontró comparando la lista de aserciones contra `git stash -u`.
+**Un `stash` sin `-u` deja las migraciones nuevas en el disco** y la corrida "antes"
+mide el estado equivocado: el primer intento dio un diff de 114 líneas sin sentido.

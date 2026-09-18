@@ -6,8 +6,24 @@ insert into auth.users (id, email) values
 
 select set_config('test.uid', '11111111-1111-1111-1111-111111111111', false);
 
--- el trigger de alta ya creo el libro, las categorias y "Efectivo ARS"
+-- El trigger de alta crea el libro y SOLO la estructura de categorias: los dos
+-- grupos de gasto, los ingresos basicos y las dos de sistema (ADR-027). Las
+-- hojas concretas las crea cada quien, asi que la bateria crea las suyas en vez
+-- de depender de una taxonomia que la app ya no impone.
 create temp view l as select id from ledger limit 1;
+
+insert into category (ledger_id, parent_id, name, kind, sort_order)
+  select l.id, p.id, x.nombre, 'expense', x.orden
+    from l
+    cross join (values
+      ('Gastos fijos',     'Servicios',    12),
+      ('Gastos fijos',     'Seguros',      13),
+      ('Gastos fijos',     'Impuestos',    14),
+      ('Gastos variables', 'Supermercado', 21),
+      ('Gastos variables', 'Restaurantes', 22),
+      ('Gastos variables', 'Donaciones',   31)
+    ) as x(grupo, nombre, orden)
+    join category p on p.ledger_id = l.id and p.name = x.grupo;
 
 -- cuentas del inventario real del usuario
 insert into instrument (ledger_id, symbol, name, kind, quote_currency, decimals, ratio, underlying_symbol)

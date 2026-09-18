@@ -297,6 +297,14 @@
                   onclick={() => { accountId = a.id; if (toAccountId === a.id) toAccountId = null; }}>
             {a.name}{#if a.kind === 'liability'}<span class="tag">tarjeta</span>{/if}
           </button>
+        {:else}
+          <!-- Sin esto la pantalla mostraba un hueco mudo y el boton de guardar
+               no se habilitaba nunca. Un formulario que no se puede completar
+               tiene que decir POR QUE y adonde ir. -->
+          <p class="salida">
+            Todavía no tenés ninguna cuenta de donde sacar la plata.
+            <a href="/comenzar">Empecemos por ahí →</a>
+          </p>
         {/each}
       </div>
     </section>
@@ -394,6 +402,12 @@
   }
   .chip.on { background: var(--accent); color: var(--accent-fg); border-color: transparent; font-weight: 600; }
   .chip.more { border-style: dashed; }
+  .salida {
+    margin: 0; padding: .7rem .85rem; border-radius: 10px; font-size: .86rem;
+    background: color-mix(in srgb, var(--warn) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--warn) 40%, transparent);
+  }
+  .salida a { display: inline-block; margin-top: .3rem; }
   .tag { font-size: .68rem; opacity: .7; }
   .sm { font-size: .85rem; }
   .what { margin: .55rem 0 0; }

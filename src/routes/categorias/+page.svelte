@@ -107,6 +107,9 @@
         <button class="fila madre" onclick={() => abrir(p)}>
           <i class="punto" style="background:{colorCategoria(p.name)}"></i>
           <b>{p.name}</b>
+          <!-- Se marcan porque no se pueden borrar, y descubrirlo recién al
+               intentar borrarlas es descubrirlo tarde. -->
+          {#if p.is_system}<span class="sistema">del sistema</span>{/if}
           <span class="uso dim">{p.movimientos || ''}</span>
         </button>
         {#if abierta === p.category_id}
@@ -119,6 +122,7 @@
               <li>
                 <button class="fila" onclick={() => abrir(c)}>
                   <span class="nom">{c.name}</span>
+                  {#if c.is_system}<span class="sistema">del sistema</span>{/if}
                   <span class="uso dim">{c.movimientos || ''}</span>
                 </button>
                 {#if abierta === c.category_id}
@@ -160,8 +164,14 @@
       <!-- Renombrarlas es seguro: el código las busca por lo que SON
            (is_system + tipo), nunca por su nombre. -->
       <p class="dim sm">
-        La usa el sistema para registrar los ajustes de saldo. Podés renombrarla,
-        pero no quitarla.
+        {#if c.kind === 'income'}
+          Acá va sola la renta que genera tu plata: el interés de una cuenta
+          remunerada y lo que rinde un plazo fijo al vencer.
+        {:else}
+          Acá va sola la diferencia cuando corregís un saldo: lo que se gastó y no
+          se anotó. Si crece mes a mes, algo se está cargando mal.
+        {/if}
+        Podés renombrarla, pero no quitarla: la app la necesita para eso.
       </p>
     {:else}
       <div class="finales">
@@ -182,6 +192,10 @@
   .back { font-size: 1.5rem; text-decoration: none; }
   h1 { font-size: 1.15rem; }
   .sm { font-size: .8rem; }
+  .sistema {
+    font-size: .68rem; padding: .1rem .4rem; border-radius: 999px;
+    background: var(--surface-2); color: var(--text-dim); white-space: nowrap;
+  }
   .modos { display: grid; grid-template-columns: 1fr 1fr; gap: .4rem; }
   .modos button { min-height: 44px; border-radius: 10px; }
   .modos button.on { background: var(--accent); color: var(--accent-fg); border-color: transparent; font-weight: 650; }

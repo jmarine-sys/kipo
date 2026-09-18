@@ -39,6 +39,10 @@
     { href: '/cuentas',      label: 'Cuentas',     icon: 'cuentas' }
   ];
 
+  // Durante la puesta en marcha la barra estorba: ofrece salidas a pantallas que
+  // todavia no tienen nada que mostrar. ADR-027.
+  const enPuestaEnMarcha = $derived(page.url.pathname === '/comenzar');
+
   /** Una subpantalla marca su pestaña: /cartera/portafolios enciende Cartera. */
   const enSeccion = (href: string) =>
     href === '/' ? page.url.pathname === '/' : page.url.pathname.startsWith(href);
@@ -49,7 +53,7 @@
 {:else}
   {@render children()}
 
-  {#if authed && !isLogin}
+  {#if authed && !isLogin && !enPuestaEnMarcha}
     <nav class="tabbar">
       {#each tabs as t}
         <a href={t.href} class:active={enSeccion(t.href)}>

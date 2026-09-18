@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Vacio from '$lib/Vacio.svelte';
   import { onMount } from 'svelte';
   import {
     listBalances, listCategories, createTransaction,
@@ -123,6 +124,12 @@
   {#if loading}
     <p class="dim">Cargando…</p>
   {:else}
+    {#if !grupos.length}
+      <Vacio titulo="Todavía no tenés cuentas."
+             detalle="Una cuenta es cada lugar donde hay plata tuya: el efectivo, el banco, la tarjeta, los dólares. Cada gasto sale de una."
+             href="/cuentas/nueva" accion="Crear la primera" />
+    {/if}
+
     {#each grupos as g}
       <section class="card">
         <header><h2>{g.titulo}</h2> <span class="dim sm">{g.pista}</span></header>
