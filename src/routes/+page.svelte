@@ -105,7 +105,7 @@
           <!-- ADR-005: el ajuste resta del resultado, pero no es un gasto.
                Mezclarlo con "Gastos" mentiría sobre en qué gastaste. -->
           <div>
-            <span class="dim">Ajustes</span>
+            <span class="dim">{sum.adjustmentsName ?? 'Ajuste de saldo'}</span>
             <b class="money" class:neg={sum.adjustments > 0}>{money(-sum.adjustments)}</b>
           </div>
         {/if}

@@ -123,6 +123,6 @@ select mk('income','Vencimiento plazo fijo',date '2026-12-14',
   array[-1000000,1090000,-90000]::numeric[], array['ARS','ARS','ARS']);
 -- 5.13 ajuste de saldo (ADR-005)
 select mk('adjustment','Ajuste banco',date '2026-09-14',
-  array['Banco ARS',null], array[null,'Ajustes'],
+  array['Banco ARS',null], array[null,'Ajuste de saldo'],
   array[-4500,4500]::numeric[], array['ARS','ARS']);
 commit;

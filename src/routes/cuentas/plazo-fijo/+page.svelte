@@ -80,7 +80,7 @@
     </label>
 
     <div class="row dos">
-      <label class="campo"><span>Capital</span>
+      <label class="campo"><span>Cuánto ponés</span>
         <input class="monto" inputmode="decimal" bind:value={capitalRaw} required placeholder="1000000" />
       </label>
       <label class="campo"><span>Vence el</span>

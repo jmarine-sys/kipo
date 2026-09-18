@@ -67,8 +67,8 @@
        subpantalla de Inversiones. La relación se invirtió y con razón — el
        rendimiento es la pregunta, las posiciones son el detalle. -->
   <div class="spread">
-    <h1>Cartera</h1>
-    <a href="/inversiones" class="rend">Posiciones →</a>
+    <h1>Inversiones</h1>
+    <a href="/inversiones" class="rend">Lo que tenés →</a>
   </div>
 
   <!-- ADR-023: toda pantalla que muestre un rendimiento tiene que decir con qué
@@ -184,7 +184,7 @@
           </li>
         {/each}
       </ul>
-      <a class="gestionar" href="/cartera/portafolios">Administrar portafolios →</a>
+      <a class="gestionar" href="/cartera/portafolios">Dónde invertís →</a>
     {:else}
       <a class="gestionar destacado" href="/cartera/portafolios">
         <b>Agrupá tus inversiones por broker</b>

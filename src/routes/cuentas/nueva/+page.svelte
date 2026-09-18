@@ -1,6 +1,7 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
-  import { createAccount } from '$lib/ledger/api';
+  import { onMount } from 'svelte';
+  import { createAccount, listAccounts } from '$lib/ledger/api';
 
   let name = $state('');
   let kind = $state<'asset' | 'liability'>('asset');
@@ -9,6 +10,14 @@
   let fxSource = $state('');
   let busy = $state(false);
   let error = $state<string | null>(null);
+  let bancos = $state<string[]>([]);
+
+  onMount(async () => {
+    try {
+      const cuentas = await listAccounts();
+      bancos = [...new Set(cuentas.map((a) => a.institution?.trim()).filter(Boolean) as string[])].sort();
+    } catch { /* la sugerencia es un lujo: si falla, se escribe a mano */ }
+  });
 
   // Una tarjeta es un pasivo y NO es plata gastable: su saldo es deuda. ADR-004.
   const spendable = $derived(kind === 'asset');
@@ -78,8 +87,22 @@
       </fieldset>
     {/if}
 
+    <!-- Sugiere los bancos que ya usaste: "Macro" y "macro" serían dos grupos
+         distintos en la pantalla de cuentas, y nadie se daría cuenta. Es el
+         mismo riesgo que hizo descartar agrupar portafolios por institución
+         (ADR-026), y acá se mitiga sin tabla nueva. -->
     <label><span class="dim">Dónde está (opcional)</span>
-      <input bind:value={institution} placeholder="Santander, Balanz, Binance…" /></label>
+      <input bind:value={institution} list="bancos"
+             placeholder="Santander, Balanz, Binance…" />
+      <datalist id="bancos">
+        {#each bancos as b}<option value={b}></option>{/each}
+      </datalist>
+      {#if bancos.length}
+        <span class="dim sm pista">
+          Si es de un banco que ya cargaste, elegilo de la lista: así quedan agrupadas.
+        </span>
+      {/if}
+    </label>
 
     <button class="btn-primary" type="submit" disabled={busy || !name.trim()}>
       {busy ? 'Creando…' : 'Crear cuenta'}

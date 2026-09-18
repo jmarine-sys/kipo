@@ -121,8 +121,8 @@
 <div class="page stack">
   <div class="spread">
     <a href="/cuentas" class="back" aria-label="Volver">←</a>
-    <h1>Inversiones</h1>
-    <a href="/cartera" class="rend">Rendimiento →</a>
+    <h1>Lo que tenés</h1>
+    <a href="/cartera" class="rend">¿Cuánto rinde? →</a>
   </div>
 
   {#if error}<p class="err" role="alert">{error}</p>{/if}

@@ -53,7 +53,7 @@
 <div class="page stack">
   <div class="spread">
     <a href="/cartera" class="back" aria-label="Volver">←</a>
-    <h1>Portafolios</h1>
+    <h1>Dónde invertís</h1>
     <span></span>
   </div>
 

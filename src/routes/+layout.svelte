@@ -34,7 +34,7 @@
   const tabs = [
     { href: '/',             label: 'Inicio',      icon: 'casa' },
     { href: '/movimientos',  label: 'Movimientos', icon: 'lista' },
-    { href: '/cartera',      label: 'Cartera',     icon: 'cartera' },
+    { href: '/cartera',      label: 'Inversiones', icon: 'cartera' },
     { href: '/recurrentes',  label: 'Agenda',      icon: 'agenda' },
     { href: '/cuentas',      label: 'Cuentas',     icon: 'cuentas' }
   ];

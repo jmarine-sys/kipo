@@ -129,6 +129,14 @@ export interface MonthSummary {
    * con "Gastos" mentiría sobre en qué gastaste.
    */
   adjustments: number;
+  /**
+   * Como se llama la categoria de ajuste EN ESTE libro.
+   *
+   * Inicio tenia la palabra "Ajustes" escrita a mano, y eso era dos mentiras en
+   * una: se puede renombrar la categoria y el rotulo no se enteraba, y ademas
+   * "Ajustes" en cualquier app en español significa Configuracion.
+   */
+  adjustmentsName: string | null;
   result: number;
   savingRate: number | null;
   byCategory: { name: string; parent: string | null; total: number }[];
@@ -138,6 +146,7 @@ export function summarize(entries: EntryDetail[], unit = 'ARS'): MonthSummary {
   let income = 0;
   let expense = 0;
   let adjustments = 0;
+  let adjustmentsName: string | null = null;
   const byCategory = new Map<string, { name: string; parent: string | null; total: number }>();
 
   for (const e of entries) {
@@ -152,6 +161,7 @@ export function summarize(entries: EntryDetail[], unit = 'ARS'): MonthSummary {
 
     if (e.category_is_system) {
       adjustments += amount;   // resta del resultado, pero no es un gasto
+      adjustmentsName ??= e.category_name ?? null;
       continue;
     }
 
@@ -172,6 +182,7 @@ export function summarize(entries: EntryDetail[], unit = 'ARS'): MonthSummary {
     income,
     expense,
     adjustments,
+    adjustmentsName,
     result,
     savingRate: income > 0 ? result / income : null,
     byCategory: [...byCategory.values()].sort((a, b) => b.total - a.total)

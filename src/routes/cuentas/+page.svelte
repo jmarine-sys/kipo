@@ -28,10 +28,46 @@
     { id: 'market',  titulo: 'Invertido',    pista: 'Se valúa a precio de mercado' }
   ] as const;
 
-  const grupos = $derived(
-    GRUPOS.map((g) => ({ ...g, items: balances.filter((b) => b.valuation === g.id) }))
+  /**
+   * Dos formas de mirar la misma lista, y ninguna sobra — OD-37.
+   *
+   * Por tipo contesta "¿cuánto puedo gastar hoy?", que es el punto 8 del brief.
+   * Por banco contesta "¿cuánto tengo en Macro?", que es como piensa el usuario:
+   * un banco le da pesos, dólares y tarjeta, y en la app quedaban tres cuentas
+   * sueltas sin ninguna relación visible.
+   *
+   * No se elige una: se ofrece el interruptor y que cada quien mire como quiera.
+   */
+  let vista = $state<'tipo' | 'banco'>('tipo');
+
+  const porTipo = $derived(
+    GRUPOS.map((g) => ({ id: g.id as string, titulo: g.titulo, pista: g.pista,
+                         items: balances.filter((b) => b.valuation === g.id) }))
       .filter((g) => g.items.length)
   );
+
+  const porBanco = $derived.by(() => {
+    const mapa = new Map<string, typeof balances>();
+    for (const b of balances) {
+      const clave = b.institution?.trim() || '';
+      mapa.set(clave, [...(mapa.get(clave) ?? []), b]);
+    }
+    // Las que no dicen dónde están van últimas: son un pendiente, no un grupo.
+    return [...mapa.entries()]
+      .sort(([a], [b]) => (a === '' ? 1 : b === '' ? -1 : a.localeCompare(b)))
+      .map(([clave, items]) => ({
+        id: clave || 'sin-banco',
+        titulo: clave || 'Sin indicar dónde',
+        pista: clave ? `${items.length} ${items.length === 1 ? 'cuenta' : 'cuentas'}`
+                     : 'Poneles el banco y se agrupan solas',
+        items
+      }));
+  });
+
+  const grupos = $derived(vista === 'tipo' ? porTipo : porBanco);
+
+  /** Solo tiene sentido ofrecer la vista por banco si hay algo que agrupar. */
+  const hayBancos = $derived(new Set(balances.map((b) => b.institution?.trim()).filter(Boolean)).size > 0);
 
   /**
    * La categoría de ajustes se busca por lo que ES, no por cómo se llama.
@@ -124,6 +160,15 @@
   {#if loading}
     <p class="dim">Cargando…</p>
   {:else}
+    {#if hayBancos}
+      <div class="vistas">
+        {#each [['tipo', 'Por tipo'], ['banco', 'Por banco']] as [id, etiqueta]}
+          <button class:on={vista === id}
+                  onclick={() => (vista = id as typeof vista)}>{etiqueta}</button>
+        {/each}
+      </div>
+    {/if}
+
     {#if !grupos.length}
       <Vacio titulo="Todavía no tenés cuentas."
              detalle="Una cuenta es cada lugar donde hay plata tuya: el efectivo, el banco, la tarjeta, los dólares. Cada gasto sale de una."
@@ -228,6 +273,13 @@
 </div>
 
 <style>
+  .vistas { display: grid; grid-template-columns: 1fr 1fr; gap: .4rem; margin-bottom: .2rem; }
+  .vistas button { min-height: 40px; font-size: .85rem; }
+  .vistas button.on {
+    background: var(--accent); color: var(--accent-fg);
+    border-color: transparent; font-weight: 600;
+  }
+
   .altas { gap: .9rem; }
   .add { text-decoration: none; font-size: .86rem; font-weight: 600; white-space: nowrap; }
   header { margin-bottom: .6rem; }

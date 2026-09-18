@@ -267,7 +267,7 @@
 
     {#if creando}
       <form class="card stack" onsubmit={crear}>
-        <h2>Nueva obligación</h2>
+        <h2>Algo que se repite</h2>
         <label class="campo"><span>Qué es</span>
           <input bind:value={nDesc} required placeholder="Seguro del auto" />
         </label>
@@ -313,7 +313,7 @@
     {:else if items.length}
       <!-- Con la lista vacía la acción ya la ofrece el estado vacío: dos botones
            que hacen lo mismo obligan a elegir entre cosas idénticas. -->
-      <button class="btn-primary nueva" onclick={() => (creando = true)}>+ Nueva obligación</button>
+      <button class="btn-primary nueva" onclick={() => (creando = true)}>+ Algo que se repite</button>
     {/if}
   {/if}
 </div>
