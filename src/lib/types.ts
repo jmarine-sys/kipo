@@ -54,7 +54,12 @@ export interface CategoryUsage {
   parent_id: string | null;
   is_system: boolean;
   sort_order: number;
+  /** Lo imputado a ella directamente. */
   movimientos: number;
+  /** Con sus hijas incluidas: es lo que decide si se puede borrar. */
+  movimientos_arbol: number;
+  /** El OTRO motivo por el que a veces no se puede borrar, aun sin movimientos. */
+  hijas: number;
 }
 
 /** Una pata del movimiento. Exactamente uno de account_id / category_id. */

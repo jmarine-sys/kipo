@@ -23,7 +23,7 @@
   const arbol = $derived(
     madres
       .filter((p) => p.kind === tipo)
-      .map((p) => ({ ...p, hijas: cats.filter((c) => c.parent_id === p.category_id) }))
+      .map((p) => ({ ...p, subcategorias: cats.filter((c) => c.parent_id === p.category_id) }))
   );
 
   function abrir(c: CategoryUsage) {
@@ -48,11 +48,23 @@
     finally { busy = false; }
   }
 
+  /**
+   * Borrar de verdad solo si NADA se pierde ni se rompe.
+   *
+   * Son dos condiciones distintas y antes se miraba una sola: `movimientos` cuenta
+   * lo imputado a esa categoría, y a una madre casi nunca se le imputa nada
+   * directo. "Gastos fijos" marcaba cero con cientos de movimientos abajo, la
+   * pantalla ofrecía Borrar, y la base lo rechazaba por la clave foránea.
+   */
+  const sePuedeBorrar = (c: CategoryUsage) => c.movimientos_arbol === 0 && c.hijas === 0;
+
   async function quitar(c: CategoryUsage) {
-    const puede = c.movimientos === 0;
+    const puede = sePuedeBorrar(c);
     const texto = puede
       ? `¿Borrar "${c.name}" definitivamente? No tiene movimientos, así que no se pierde nada.`
-      : `¿Archivar "${c.name}"? Sus movimientos quedan intactos y la siguen mostrando.`;
+      : c.hijas > 0 && c.movimientos_arbol === 0
+        ? `"${c.name}" tiene ${c.hijas} subcategoría${c.hijas === 1 ? '' : 's'} adentro. ¿Archivarla? Podés borrarla del todo cuando la vacíes.`
+        : `¿Archivar "${c.name}"? Sus movimientos quedan intactos y la siguen mostrando.`;
     if (!confirm(texto)) return;
     busy = true; error = null;
     try {
@@ -116,9 +128,9 @@
           {@render editor(p)}
         {/if}
 
-        {#if p.hijas.length}
+        {#if p.subcategorias.length}
           <ul>
-            {#each p.hijas as c}
+            {#each p.subcategorias as c}
               <li>
                 <button class="fila" onclick={() => abrir(c)}>
                   <span class="nom">{c.name}</span>
@@ -176,12 +188,16 @@
     {:else}
       <div class="finales">
         <button class="peligro" onclick={() => quitar(c)} disabled={busy}>
-          {c.movimientos === 0 ? 'Borrar' : 'Archivar'}
+          {sePuedeBorrar(c) ? 'Borrar' : 'Archivar'}
         </button>
         <span class="dim sm">
-          {c.movimientos === 0
-            ? 'No tiene movimientos'
-            : `${c.movimientos} movimiento${c.movimientos === 1 ? '' : 's'}: no se puede borrar`}
+          {#if sePuedeBorrar(c)}
+            No tiene movimientos
+          {:else if c.movimientos_arbol > 0}
+            {c.movimientos_arbol} movimiento{c.movimientos_arbol === 1 ? '' : 's'}{c.movimientos !== c.movimientos_arbol ? ' contando sus subcategorías' : ''}: no se puede borrar
+          {:else}
+            Tiene {c.hijas} subcategoría{c.hijas === 1 ? '' : 's'}: primero vaciala
+          {/if}
         </span>
       </div>
     {/if}

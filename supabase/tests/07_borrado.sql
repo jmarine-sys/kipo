@@ -58,3 +58,31 @@ select case when count(*) = 0 then 'FALLO  la categoria de control no existe'
   from category_usage where name = 'Seguros';
 
 reset role;
+
+-- ---------------------------------------------------------------------------
+-- Una madre no se puede borrar por DOS motivos distintos, y hay que poder
+-- distinguirlos: la pantalla ofrecia "Borrar" sobre una madre llena porque
+-- contaba en cero lo que estaba abajo.
+-- ---------------------------------------------------------------------------
+set role rls_probe;
+select set_config('test.uid','11111111-1111-1111-1111-111111111111', false);
+
+select case when movimientos = 0 and movimientos_arbol > 0
+            then format('ok  una madre marca 0 propios pero %s en el arbol', movimientos_arbol)
+            else format('FALLO  propios %s, arbol %s', movimientos, movimientos_arbol) end
+  from category_usage where name = 'Gastos variables';
+
+-- Dos, no tres: este mismo archivo borro 'Donaciones' mas arriba. El numero
+-- exacto se deja escrito a proposito —si alguien cambia la fixture, esto falla y
+-- se entera— en vez de un > 0 que pasaria siempre.
+select case when hijas = 2
+            then format('ok  y sabe que tiene %s hijas, que es el otro motivo', hijas)
+            else format('FALLO  conto %s hijas, se esperaban 2', hijas) end
+  from category_usage where name = 'Gastos variables';
+
+select case when movimientos_arbol = 0 and hijas = 0
+            then 'ok  una hoja sin uso sigue siendo borrable'
+            else 'FALLO  la hoja libre no se reconoce' end
+  from category_usage where name = 'Seguros';
+
+reset role;

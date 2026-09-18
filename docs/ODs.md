@@ -71,6 +71,8 @@ It is the counterpart of [ADRs.md](ADRs.md): there is **what was decided and why
 | OD-34 | Una pantalla terminada puede quedar sin camino, y nadie se entera | `debt` | DECIDED | **Tercera vez que pasa** (recurrentes, y la cartera a tres clicks detrás de *Cuentas*). La auditoría anterior contaba **enlaces por ruta**, que no es lo mismo que recorrer caminos: un enlace puede estar dentro de un `{#if}` que nadie cumple, o colgar de una pantalla a la que tampoco se llega. `scripts/navegacion.mjs` recorre el grafo desde la barra y falla si algo queda a más de 2 clicks; corre dentro de `verificar.sh`. **Verificado por mutación:** sacando la pestaña Cartera, sale 1 | — |
 | OD-35 | La app habla como quien la construyó, no como quien la usa | `risk` | OPEN | **Detectado el 2026-09-18** probándola con alguien ajeno al proyecto. El caso más claro: Inicio dice **«Ajustes»** por los ajustes de saldo, y en cualquier app en español *Ajustes* es **Configuración**. Además *Cartera*, *Posiciones*, *Portafolios*, *Moneda de cotización*, *Acción que representa*, *Capital*, *Nueva obligación*. **Falta decidir** cuáles son jerga inevitable del dominio y cuáles se pueden decir en criollo sin perder precisión | Que alguien que no armó la app pueda usarla |
 | OD-36 | No hay forma de compartir un libro entre dos personas | `debt` | OPEN | `ledger_member` está en el esquema desde el día uno, con sus políticas de RLS, y **en la interfaz no hay nada**: ni invitar, ni aceptar, ni ver quién más está. Hoy cada usuario queda con su libro aislado, que es lo que se buscaba para este caso. **Falta decidir** si alguna vez se abre, y si un invitado puede borrar o solo cargar | Uso compartido (pareja, familia) |
+| OD-37 | Las cuentas no se agrupan por institución | `decision` | OPEN | **Propuesto por el usuario el 2026-09-18**: Banco Macro le da pesos, dólares y tarjeta, y en la app quedan sueltas. El campo `institution` **ya existe** (texto libre) y `/cuentas` agrupa por valuación —*Disponible / Inmovilizado / Invertido*—, que es una categoría de kipo, no del usuario. **Falta decidir** entre un selector sobre los valores ya usados (barato, cero esquema) o una entidad como `portfolio`. El riesgo del texto libre es el mismo que hizo rechazar agrupar portafolios por institución en [ADR-026](ADRs.md#adr-026--el-portafolio-es-el-borde-es-flujo-solo-lo-que-lo-cruza): *Macro* y *macro* son dos. **Y hay que dejar legible que serían DOS agrupaciones distintas**: dónde está la plata, y qué se mide junto | Que la pantalla de cuentas se lea como el usuario piensa |
+| OD-38 | Las fechas de la agenda se cargan una por una, sin atajos | `decision` | OPEN | **Propuesto por el usuario el 2026-09-18**: atajos tipo *primera quincena* o *fin de mes* al agendar. No ensucia el diseño —nadie piensa *«el 2026-10-31»*, piensa *«a fin de mes»*— pero **verificado el 2026-09-18 contra PostgreSQL 16**, un atajo que solo escribe una fecha miente: `31-ene + 1 mes` da `28-feb`, y de ahí en adelante `28-mar`, `28-abr`. **Se degrada al 28 y no vuelve nunca.** **Falta decidir** entre atajos que solo escriben la fecha (gratis, honestos salvo el último día del mes) o una regla de verdad en `scheduled_event` —*último día*, *día 15*— que sobreviva al avance | Fidelidad de los vencimientos a fin de mes |
 | OD-26 | El arte del ícono trae su propio fondo: debería ser una capa aparte | `decision` | DECIDED | **Resuelto el 2026-09-16.** Se quitan del vector las dos capas de relleno —el rectángulo blanco y el cuadrado menta— y se compone de nuevo: el bolsillo con la moneda es el frente, el menta es fondo generado. Verificado aplicando el recorte circular **al 80% y al 100%**: no se corta nada. El favicon pasa además a ser cuadrado y recortado al dibujo, porque el original es vertical y a 16 px eso dejaba aire donde menos lugar hay | — |
 | OD-27 | La lista de movimientos corta los nombres de categoría | `decision` | DECIDED | **Resuelto el 2026-09-15.** Se muestra solo la subcategoría y la madre pasa a ser un punto de color, derivado de su nombre con un hash estable. Se quitó además el texto *"no afecta el resultado"* de cada renglón: el color del monto ya lo dice, y el lugar de enseñarlo es el formulario, no una lista que se lee cientos de veces | — |
 | OD-28 | Faltan filtros en movimientos | `decision` | DECIDED | **Resuelto el 2026-09-16.** Filtro por **período** (mes con navegación, 3 y 6 meses, año, o entre dos fechas) y por **categoría madre**, con selección múltiple y el mismo código de color de la lista. Muestra cuántos movimientos quedan y cuánto suman. **Los gráficos NO entran acá**: quedan en OD-29 | — |
@@ -79,8 +81,8 @@ It is the counterpart of [ADRs.md](ADRs.md): there is **what was decided and why
 
 ## The state of the project, read off the register
 
-Actualizado 2026-09-18 (vigesimotercera revisión). Treinta y seis ítems: **25 `DECIDED`**,
-**11 `OPEN`**, **0 `LEANING`** y **0 `NEEDS-INPUT`**.
+Actualizado 2026-09-18 (vigesimocuarta revisión). Treinta y ocho ítems: **25 `DECIDED`**,
+**13 `OPEN`**, **0 `LEANING`** y **0 `NEEDS-INPUT`**.
 
 **Veintisiete decisiones** en [ADRs.md](ADRs.md), veinte migraciones verificadas contra PostgreSQL 16
 con 115 aserciones, y una aplicación SvelteKit con trece pantallas, en producción y en uso.
@@ -91,13 +93,15 @@ categorías ajenas, no existía ninguna pantalla de primer uso, y la aplicación
 contador. Nada de eso lo veían las pruebas, **porque todas preguntan si lo construido funciona y
 ninguna pregunta si se entiende**.
 
-De los 11 `OPEN`, ninguno impide usar la aplicación:
+De los 13 `OPEN`, ninguno impide usar la aplicación:
 
 - **Esperan datos que todavía no existen (2):** OD-20 método de costo, OD-29 gráficos.
 - **Riesgo solo evaluable con uso real (5):** OD-10 pausa por inactividad, OD-11 la fricción de la
   tarjeta, OD-22 el reseteo tras la puesta en marcha, OD-25 el preview que apunta a producción,
   OD-35 el vocabulario.
 - **Diferidos por el usuario (3):** OD-23 y OD-24 las cuotas, OD-32 los instrumentos UVA.
+- **Propuestos por el usuario usándola (2):** OD-37 agrupar cuentas por institución, OD-38 atajos de
+  fecha en la agenda. Los dos salieron de usarla, no de leerla.
 - **Deuda: una.** OD-36, compartir un libro: el esquema lo soporta y la interfaz no lo expone.
 
 ---
