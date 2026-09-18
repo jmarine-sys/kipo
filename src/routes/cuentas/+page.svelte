@@ -3,7 +3,8 @@
   import { onMount } from 'svelte';
   import {
     listBalances, listCategories, createTransaction,
-    archiveAccount, renameAccount, deleteAccount
+    archiveAccount, renameAccount, deleteAccount,
+    listResumenTarjeta, type ResumenTarjeta
   } from '$lib/ledger/api';
   import { adjustment } from '$lib/ledger/entries';
   import { signOut } from '$lib/session.svelte';
@@ -17,6 +18,12 @@
   let error = $state<string | null>(null);
 
   let abierta = $state<string | null>(null);
+  let cuotas = $state<ResumenTarjeta[]>([]);
+
+  const cuotasDe = (id: string) => cuotas.filter((c) => c.account_id === id);
+
+  const mesLargo = (iso: string) =>
+    new Date(iso + 'T12:00:00').toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
   let nombre = $state('');
   let realRaw = $state('');
   let busy = $state(false);
@@ -94,6 +101,8 @@
     loading = true;
     try {
       [balances, categories] = await Promise.all([listBalances(), listCategories()]);
+      // Accesorio: si falla, la pantalla sigue andando sin la proyección.
+      listResumenTarjeta().then((r) => (cuotas = r)).catch(() => {});
     } catch (e) {
       error = e instanceof Error ? e.message : 'No se pudo cargar';
     } finally { loading = false; }
@@ -190,6 +199,25 @@
 
               {#if abierta === b.account_id}
                 <div class="panel stack">
+                  <!-- OD-23: el saldo dice CUANTO debés; esto dice CUANDO. Con dos
+                       compras en cuotas ya es imposible anticiparlo de memoria. -->
+                  {#if b.kind === 'liability' && cuotasDe(b.account_id).length}
+                    <div class="cuotas">
+                      <h3>Lo que viene en cuotas</h3>
+                      <ul class="meses">
+                        {#each cuotasDe(b.account_id) as r}
+                          <li class="spread">
+                            <span class="cap">{mesLargo(r.mes)}</span>
+                            <span class="dim sm">{r.cuotas} {r.cuotas === 1 ? 'cuota' : 'cuotas'}</span>
+                            <b class="money">{money(r.total, r.unit)}</b>
+                          </li>
+                        {/each}
+                      </ul>
+                      <p class="dim sm">
+                        No incluye los consumos de una sola cuota: esos ya están en el saldo.
+                      </p>
+                    </div>
+                  {/if}
                   <label class="campo">
                     <span>Nombre</span>
                     <span class="row">
@@ -273,6 +301,11 @@
 </div>
 
 <style>
+  .cuotas h3 { font-size: .85rem; margin: 0 0 .4rem; }
+  .cuotas .meses { list-style: none; margin: 0 0 .4rem; padding: 0; display: grid; gap: .25rem; }
+  .cuotas .meses li { align-items: baseline; gap: .5rem; }
+  .cuotas .cap { text-transform: capitalize; }
+  .cuotas p { margin: 0; }
   .vistas { display: grid; grid-template-columns: 1fr 1fr; gap: .4rem; margin-bottom: .2rem; }
   .vistas button { min-height: 40px; font-size: .85rem; }
   .vistas button.on {

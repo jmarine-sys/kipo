@@ -19,19 +19,22 @@ const acc = (id: string, amount: number, unit: string): EntryInput =>
 const cat = (id: string, amount: number, unit: string): EntryInput =>
   ({ category_id: id, amount: String(amount), unit });
 
-function tx(kind: TxKind, entries: EntryInput[], occurred_on: string, description: string | null)
-  : TransactionInput {
-  return { kind, entries, occurred_on, description };
+function tx(kind: TxKind, entries: EntryInput[], occurred_on: string, description: string | null,
+            installments: number | null = null): TransactionInput {
+  return { kind, entries, occurred_on, description, installments };
 }
 
 /** Gasto: sale plata de una cuenta hacia una categoria. En una tarjeta, aumenta la deuda. */
 export function expense(o: {
   accountId: string; categoryId: string; amount: number; unit: string;
   date: string; description?: string | null;
+  /** Solo con tarjeta. NO parte el gasto: la deuda entra entera (ADR-004). */
+  installments?: number | null;
 }): TransactionInput {
   const a = Math.abs(o.amount);
   return tx('expense', [acc(o.accountId, -a, o.unit), cat(o.categoryId, a, o.unit)],
-            o.date, o.description ?? null);
+            o.date, o.description ?? null,
+            o.installments && o.installments >= 2 ? o.installments : null);
 }
 
 /** Ingreso: entra plata desde una categoria hacia una cuenta. */

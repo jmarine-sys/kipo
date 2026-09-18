@@ -88,6 +88,7 @@
   // OD-21. La base no puede validar un tipo de cambio -cualquier cociente es
   // aritmeticamente valido- asi que el unico lugar donde se puede mirar es acá,
   // mientras se tipea. La REGLA vive en plausibilidad.ts, no en esta pantalla.
+  let cuotas = $state(1);
   let cotizaciones = $state<Cotizacion[]>([]);
   let rateOk = $state(false);           // "ya lo miré, es correcto"
 
@@ -134,7 +135,7 @@
   });
 
   function setMode(m: Mode) {
-    mode = m; categoryId = null; toAccountId = null; raw2 = '';
+    mode = m; categoryId = null; toAccountId = null; raw2 = ''; cuotas = 1;
     showAllCats = false; search = '';
     recall();
   }
@@ -166,7 +167,8 @@
       const unit = account!.unit;
       const common = { date, description: note || null };
       const input =
-        mode === 'expense' ? expense({ accountId, categoryId: categoryId!, amount, unit, ...common })
+        mode === 'expense' ? expense({ accountId, categoryId: categoryId!, amount, unit, ...common,
+                                       installments: onCard && cuotas > 1 ? cuotas : null })
       : mode === 'income'  ? income({ accountId, categoryId: categoryId!, amount, unit, ...common })
       : isExchange
         ? exchange({ fromId: accountId, fromAmount: amount, fromUnit: unit,
@@ -307,6 +309,26 @@
           </p>
         {/each}
       </div>
+
+      <!-- Solo con tarjeta, para no tocar el camino rápido: el 90% de los gastos
+           no son en cuotas y no tienen que ver este campo. OD-23. -->
+      {#if onCard}
+        <div class="cuotas">
+          <span class="dim sm">¿En cuántas cuotas?</span>
+          <div class="wrap">
+            {#each [1, 3, 6, 9, 12, 18] as n}
+              <button class="chip chico" class:on={cuotas === n}
+                      onclick={() => (cuotas = n)}>{n === 1 ? 'Una' : n}</button>
+            {/each}
+          </div>
+          {#if cuotas > 1 && amount}
+            <p class="dim sm">
+              {cuotas} de <b>{money(amount / cuotas, account?.unit)}</b>.
+              La deuda entra entera hoy — esto sirve para ver en qué resumen cae cada una.
+            </p>
+          {/if}
+        </div>
+      {/if}
     </section>
 
     {#if mode === 'move'}
@@ -408,6 +430,9 @@
     border: 1px solid color-mix(in srgb, var(--warn) 40%, transparent);
   }
   .salida a { display: inline-block; margin-top: .3rem; }
+  .cuotas { margin-top: .7rem; display: flex; flex-direction: column; gap: .35rem; }
+  .cuotas .chip.chico { min-height: 36px; padding: 0 .7rem; font-size: .82rem; }
+  .cuotas p { margin: 0; }
   .tag { font-size: .68rem; opacity: .7; }
   .sm { font-size: .85rem; }
   .what { margin: .55rem 0 0; }

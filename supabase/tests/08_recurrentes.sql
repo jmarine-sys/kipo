@@ -161,3 +161,71 @@ select case when next_on = date '2026-01-10'
   from scheduled_event where description = 'Netflix el 10';
 
 reset role;
+
+-- ---------------------------------------------------------------------------
+-- Cuotas: proyectar cuando cae la deuda, sin contarla dos veces.  OD-23.
+-- ---------------------------------------------------------------------------
+set role rls_probe;
+select set_config('test.uid','11111111-1111-1111-1111-111111111111', false);
+
+-- Una heladera de 120.000 en 12 cuotas, comprada el 15 de octubre.
+select create_transaction(
+  date '2026-10-15', 'expense',
+  jsonb_build_array(
+    jsonb_build_object('account_id', (select id from account where name='Visa'),
+                       'amount','-120000','unit','ARS'),
+    jsonb_build_object('category_id',(select id from category where name='Supermercado'),
+                       'amount','120000','unit','ARS')),
+  'Heladera', 12) as heladera \gset
+
+-- Lo primero y mas importante: la contabilidad NO cambia. La deuda entra entera
+-- el dia 1 (ADR-004) y las cuotas son solo una proyeccion.
+select case when sum(abs(amount)) = 120000
+            then 'ok  la deuda se registra entera: las cuotas no la parten'
+            else format('FALLO  la deuda quedo en %s', sum(abs(amount))) end
+  from entry where transaction_id = :'heladera' and account_id is not null;
+
+select case when count(*) = 12
+            then 'ok  doce cuotas proyectadas de una sola compra'
+            else format('FALLO  proyecto %s', count(*)) end
+  from cuota where transaction_id = :'heladera';
+
+select case when sum(monto) = 120000
+            then 'ok  las doce suman exactamente lo comprado'
+            else format('FALLO  suman %s', sum(monto)) end
+  from cuota where transaction_id = :'heladera';
+
+-- La primera cae en el resumen del mes SIGUIENTE a la compra.
+select case when mes = date '2026-11-01'
+            then 'ok  comprado en octubre, la primera cuota cae en noviembre'
+            else format('FALLO  la primera cae en %s', mes) end
+  from cuota where transaction_id = :'heladera' and numero = 1;
+
+select case when mes = date '2027-10-01'
+            then 'ok  y la ultima, doce meses despues'
+            else format('FALLO  la ultima cae en %s', mes) end
+  from cuota where transaction_id = :'heladera' and numero = 12;
+
+-- El numero que el usuario queria: cuanto viene en cada resumen.
+select case when total = 10000
+            then 'ok  el resumen de noviembre trae 10.000 de esta compra'
+            else format('FALLO  trae %s', total) end
+  from resumen_tarjeta
+ where tarjeta = 'Visa' and mes = date '2026-11-01';
+
+-- Contraprueba: un consumo comun no genera cuotas ni ensucia la proyeccion.
+select create_transaction(
+  date '2026-10-16', 'expense',
+  jsonb_build_array(
+    jsonb_build_object('account_id', (select id from account where name='Visa'),
+                       'amount','-5000','unit','ARS'),
+    jsonb_build_object('category_id',(select id from category where name='Supermercado'),
+                       'amount','5000','unit','ARS')),
+  'Cafe');
+
+select case when count(*) = 0
+            then 'ok  un consumo de una sola cuota no aparece en la proyeccion'
+            else format('FALLO  aparecieron %s cuotas', count(*)) end
+  from cuota where description = 'Cafe';
+
+reset role;

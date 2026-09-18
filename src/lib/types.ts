@@ -75,4 +75,11 @@ export interface TransactionInput {
   description: string | null;
   kind: TxKind;
   entries: EntryInput[];
+  /**
+   * En cuántas cuotas se pagó. null = de una.
+   *
+   * NO parte la deuda: la compra entra entera contra la tarjeta el día 1
+   * (ADR-004). Solo permite proyectar en qué resumen va a caer cada parte.
+   */
+  installments?: number | null;
 }

@@ -69,6 +69,31 @@ export async function cotizacionesVigentes(fecha: string): Promise<Cotizacion[]>
   return out;
 }
 
+/**
+ * Lo que va a caer en cada resumen futuro por compras en cuotas — OD-23.
+ *
+ * NO incluye los consumos de una sola cuota: esos ya están en el saldo y se
+ * pagan en el resumen que viene. Acá solo lo que se estira en el tiempo, que es
+ * justo lo que el saldo no sabe contar.
+ */
+export interface ResumenTarjeta {
+  account_id: string;
+  tarjeta: string;
+  mes: string;
+  unit: string;
+  total: string;
+  cuotas: number;
+}
+
+export async function listResumenTarjeta(): Promise<ResumenTarjeta[]> {
+  const { data, error } = await supabase
+    .from('resumen_tarjeta')
+    .select('*')
+    .order('mes');
+  if (error) fail('No se pudieron leer las cuotas', error);
+  return (data ?? []) as ResumenTarjeta[];
+}
+
 export async function listBalances(): Promise<AccountBalance[]> {
   const { data, error } = await supabase.from('account_balance').select('*').order('name');
   if (error) fail('No se pudieron leer los saldos', error);
@@ -91,7 +116,8 @@ export async function createTransaction(t: TransactionInput): Promise<string> {
     p_occurred_on: t.occurred_on,
     p_kind: t.kind,
     p_entries: t.entries,
-    p_description: t.description
+    p_description: t.description,
+    p_installments: t.installments ?? null
   });
   if (error) fail('No se pudo guardar el movimiento', error);
   return data as string;

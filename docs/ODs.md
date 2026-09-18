@@ -60,7 +60,7 @@ It is the counterpart of [ADRs.md](ADRs.md): there is **what was decided and why
 | OD-20 | Método de costo para la ganancia realizada | `decision` | OPEN | Al vender un activo, la ganancia realizada es precio de venta menos **costo de compra** — pero con compras a distintos precios hay que elegir FIFO o promedio ponderado, y dan números distintos. **No afecta al esquema**: ambos se reconstruyen del historial de entries ([modelo-de-datos.md](modelo-de-datos.md) §5.8). **Falta decidir** cuál, y la app debe poder explicar el número que muestre | Etapa 6 (rendimiento) |
 | OD-21 | La base no puede validar que un tipo de cambio sea razonable | `risk` | DECIDED | **Cerrado el 2026-09-18.** La base no puede: [ADR-010](ADRs.md#adr-010--el-tipo-de-cambio-de-una-operación-se-deduce-de-sus-montos-no-se-guarda) hace del tipo de cambio un cociente, y todo cociente es válido. La comprobación vive en `plausibilidad.ts` —puro y con 10 pruebas sobre cotizaciones reales del respaldo— y compara el implícito contra la banda del día. **Avisa, no bloquea**: un arreglo por fuera del mercado puede ser real y el usuario es quien sabe; pide una confirmación que se invalida sola si cambiás el monto. **Reserva:** sin cotizaciones cargadas no hay referencia y el aviso no aparece | — |
 | OD-22 | Nada impide correr el reseteo después de la puesta en marcha | `risk` | OPEN | [ADR-018](ADRs.md#adr-018--la-puesta-en-marcha-separa-dos-regímenes-de-datos) define dos regímenes de datos, pero **la línea la marca una persona, no el sistema**: no hay bandera de producción en la base. `reset_ledger.sql` con su confirmación explícita borra todo, el día que sea. La mitigación descartada por ahora es una bandera `is_production` en el libro. **Se vuelve real el día de la puesta en marcha**, no antes | Todos los datos, a partir de la puesta en marcha |
-| OD-23 | Las cuotas no tienen calendario: solo se conoce el saldo total de deuda | `decision` | OPEN | **Verificado 2026-09-15**: una compra en cuotas se registra como un solo gasto contra la tarjeta y los pagos del resumen bajan la deuda — funciona sin cambios. Pero el saldo dice *cuánto* debés, no *cuándo*: con varias compras en cuotas no se puede anticipar el resumen del mes que viene. **Una cuota futura es un evento futuro con fecha y monto conocidos**, o sea el mismo objeto de [ADR-016](ADRs.md#adr-016--los-vencimientos-y-los-gastos-recurrentes-comparten-una-sola-tabla): entra gratis en `scheduled_event` | Etapa 3, junto con recurrentes y vencimientos |
+| OD-23 | Las cuotas no tienen calendario: solo se conoce el saldo total de deuda | `decision` | DECIDED | **Y el propio registro se equivocaba**: decía que una cuota *«entra gratis en `scheduled_event`»*. No entra. Un evento agendado es algo que vas a **registrar**, y registrarlo crea un movimiento; la compra en cuotas **ya se registró entera** contra la tarjeta el día 1 ([ADR-004](ADRs.md#adr-004--la-tarjeta-de-crédito-se-modela-como-cuenta-de-pasivo)). Agendarlas habría contado el gasto una vez por cuota. Lo que faltaba no era agendar sino **proyectar**: `transaction.installments` y las vistas `cuota` y `resumen_tarjeta` lo derivan. Un solo dato, y ni siquiera se pregunta el mes de la primera — una compra con tarjeta cae en el resumen siguiente | — |
 | OD-24 | Una compra en cuotas distorsiona el resultado del mes | `risk` | OPEN | El mes de la compra se lleva el total y los siguientes se ven artificialmente buenos (verificado: octubre −120.000 por una heladera de la que se pagaron 10.000). Es **honesto** —ese día el patrimonio bajó 120.000— pero distorsiona la comparación mes contra mes, que es el corazón de la app. Agravante local: con inflación alta el total nominal **sobreestima** el costo real de las cuotas sin interés. **Sin decidir** si se muestra el resultado de otra forma, o solo se aclara | Lectura del resultado mensual. Solo evaluable con uso real |
 | OD-25 | Un preview apunta a la base de PRODUCCIÓN, no a un sandbox | `risk` | OPEN | Los builds de ramas no productivas usan **las mismas variables de entorno** que producción, así que una rama de prueba escribe en la base real. Sirve para probar interfaz; **no** para probar migraciones ni nada destructivo. Un sandbox de verdad exigiría un segundo proyecto de Supabase con sus propias variables — hoy desproporcionado. **Se vuelve real el día que se pruebe algo que escribe distinto** | Integridad de los datos reales al experimentar |
 | OD-29 | Gráficos de evolución y distribución | `decision` | OPEN | **Diferido explícitamente por el usuario**: primero los filtros, que ya están (OD-28). Un gráfico necesita además 3 a 6 meses de datos para decir algo — hoy hay uno. **Sin decidir** cuáles: la regla del brief es que cada visualización exista porque ayuda a decidir algo, no por adorno | Etapa 4 |
@@ -81,8 +81,8 @@ It is the counterpart of [ADRs.md](ADRs.md): there is **what was decided and why
 
 ## The state of the project, read off the register
 
-Actualizado 2026-09-18 (vigesimosexta revisión). Treinta y ocho ítems: **28 `DECIDED`**,
-**10 `OPEN`**, **0 `LEANING`** y **0 `NEEDS-INPUT`**.
+Actualizado 2026-09-18 (vigesimoséptima revisión). Treinta y ocho ítems: **29 `DECIDED`**,
+**9 `OPEN`**, **0 `LEANING`** y **0 `NEEDS-INPUT`**.
 
 **Veintisiete decisiones** en [ADRs.md](ADRs.md), veinte migraciones verificadas contra PostgreSQL 16
 con 115 aserciones, y una aplicación SvelteKit con trece pantallas, en producción y en uso.
@@ -93,12 +93,13 @@ categorías ajenas, no existía ninguna pantalla de primer uso, y la aplicación
 contador. Nada de eso lo veían las pruebas, **porque todas preguntan si lo construido funciona y
 ninguna pregunta si se entiende**.
 
-De los 10 `OPEN`, ninguno impide usar la aplicación:
+De los 9 `OPEN`, ninguno impide usar la aplicación:
 
 - **Esperan datos que todavía no existen (2):** OD-20 método de costo, OD-29 gráficos.
 - **Riesgo solo evaluable con uso real (4):** OD-10 pausa por inactividad, OD-11 la fricción de la
   tarjeta, OD-22 el reseteo tras la puesta en marcha, OD-25 el preview que apunta a producción.
-- **Diferidos por el usuario (3):** OD-23 y OD-24 las cuotas, OD-32 los instrumentos UVA.
+- **Diferidos por el usuario (2):** OD-24 la distorsión que la cuota mete en el mes, OD-32 los
+  instrumentos UVA. OD-24 ahora es más fácil de mirar: la proyección de cuotas ya existe.
 - **Deuda: una.** OD-36, compartir un libro: el esquema lo soporta y la interfaz no lo expone.
 
 ---
