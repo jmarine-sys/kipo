@@ -8,7 +8,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { filasDeMovimientos, totales } from './presentacion.ts';
+import { filasDeMovimientos, summarize, totales } from './presentacion.ts';
 import type { EntryDetail } from './api.ts';
 
 let n = 0;
@@ -75,4 +75,58 @@ test('la transferencia no entra en ningún total', () => {
   const { ingresos, gastos } = totales(filasDeMovimientos(traspaso));
   assert.equal(ingresos, 0);
   assert.equal(gastos, 0);
+});
+
+// ---------------------------------------------------------------------------
+// El resumen del mes, y sobre todo las cuotas — OD-24.
+// ---------------------------------------------------------------------------
+const fila = (o: Partial<EntryDetail> & { transaction_id: string }): EntryDetail => ({
+  id: crypto.randomUUID(),
+  ledger_id: 'l', amount: '0', unit: 'ARS',
+  account_id: null, account_name: null, account_kind: null, account_valuation: null,
+  category_id: null, category_name: null, category_kind: null,
+  category_is_system: false, category_parent: null,
+  occurred_on: '2026-10-15', description: null, tx_kind: 'expense',
+  installments: null, created_at: '2026-10-15T00:00:00Z',
+  ...o
+} as EntryDetail);
+
+/** Una compra: dos líneas, una contra la cuenta y otra contra la categoría. */
+const gasto = (tx: string, monto: number, cuotas: number | null = null) => [
+  fila({ transaction_id: tx, amount: String(-monto), account_id: 'a', account_name: 'Visa',
+          account_kind: 'liability', installments: cuotas }),
+  fila({ transaction_id: tx, amount: String(monto), category_id: 'c', category_name: 'Compras',
+          category_kind: 'expense', installments: cuotas })
+];
+
+test('una compra en cuotas se cuenta UNA vez, no una por línea', () => {
+  const s = summarize(gasto('t1', 120000, 12));
+  assert.equal(s.cuotas.compras, 1);
+  assert.equal(s.cuotas.total, 120000);
+  assert.equal(s.cuotas.porMes, 10000);
+});
+
+test('el resultado del mes se lleva el total, no la cuota', () => {
+  // Es lo honesto: ese día el patrimonio bajó 120.000 enteros.
+  const s = summarize(gasto('t1', 120000, 12));
+  assert.equal(s.expense, 120000);
+  assert.equal(s.result, -120000);
+});
+
+test('un gasto común no aparece como cuota', () => {
+  const s = summarize(gasto('t1', 5000));
+  assert.equal(s.cuotas.compras, 0);
+  assert.equal(s.cuotas.total, 0);
+});
+
+test('dos compras en cuotas suman, cada una con su plazo', () => {
+  const s = summarize([...gasto('t1', 120000, 12), ...gasto('t2', 60000, 6)]);
+  assert.equal(s.cuotas.compras, 2);
+  assert.equal(s.cuotas.total, 180000);
+  assert.equal(s.cuotas.porMes, 20000);   // 10.000 + 10.000
+});
+
+test('una compra en una sola cuota no cuenta como cuotas', () => {
+  const s = summarize(gasto('t1', 5000, 1));
+  assert.equal(s.cuotas.compras, 0);
 });

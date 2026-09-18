@@ -76,3 +76,106 @@ export function totales(filas: Fila[], unit = 'ARS') {
   }
   return { ingresos, gastos };
 }
+
+// ---------------------------------------------------------------------------
+// El resumen del mes.
+//
+// Vivía en `api.ts`, que importa Supabase, así que no se podía probar: `node
+// --test` no resuelve los alias de Vite. Se mudó acá —puro— el día que hubo que
+// contar las compras en cuotas, porque ese cálculo cuenta POR MOVIMIENTO y no
+// por línea, y equivocarse ahí duplica en silencio.
+// ---------------------------------------------------------------------------
+
+export interface MonthSummary {
+  income: number;
+  /** Gastos de verdad. NO incluye los ajustes de saldo. */
+  expense: number;
+  /**
+   * Ajustes de saldo (ADR-005). Restan del resultado igual que un gasto —esa plata
+   * se fue de verdad, aunque no sepamos en qué— pero se muestran aparte: mezclarlos
+   * con "Gastos" mentiría sobre en qué gastaste.
+   */
+  adjustments: number;
+  /**
+   * Como se llama la categoria de ajuste EN ESTE libro.
+   *
+   * Inicio tenia la palabra "Ajustes" escrita a mano, y eso era dos mentiras en
+   * una: se puede renombrar la categoria y el rotulo no se enteraba, y ademas
+   * "Ajustes" en cualquier app en español significa Configuracion.
+   */
+  adjustmentsName: string | null;
+  /**
+   * Cuánto de los gastos del mes vino de compras en cuotas, y cuánto de eso cae
+   * por mes — OD-24.
+   *
+   * El resultado se lleva el TOTAL el día de la compra. Es honesto: ese día tu
+   * patrimonio bajó todo. Pero rompe la comparación mes contra mes, que es el
+   * corazón de la app. La salida NO es mostrar un segundo resultado "como se
+   * paga": serían dos verdades sin decir cuál mirar, y se le cree a la más
+   * amable. Es explicar el único que hay.
+   */
+  cuotas: { total: number; porMes: number; compras: number };
+  result: number;
+  savingRate: number | null;
+  byCategory: { name: string; parent: string | null; total: number }[];
+}
+
+export function summarize(entries: EntryDetail[], unit = 'ARS'): MonthSummary {
+  let income = 0;
+  let expense = 0;
+  let adjustments = 0;
+  let adjustmentsName: string | null = null;
+  let cuotasTotal = 0;
+  let cuotasPorMes = 0;
+  const cuotasVistas = new Set<string>();
+  const byCategory = new Map<string, { name: string; parent: string | null; total: number }>();
+
+  for (const e of entries) {
+    if (!e.category_id || e.unit !== unit) continue;
+    const amount = Number(e.amount);
+
+    // convenio de signos: ingreso negativo, gasto positivo
+    if (e.category_kind === 'income') {
+      income += -amount;
+      continue;
+    }
+
+    if (e.category_is_system) {
+      adjustments += amount;   // resta del resultado, pero no es un gasto
+      adjustmentsName ??= e.category_name ?? null;
+      continue;
+    }
+
+    expense += amount;
+
+    // Se cuenta por MOVIMIENTO, no por línea: una compra puede tener varias.
+    if (e.installments && e.installments >= 2 && !cuotasVistas.has(e.transaction_id)) {
+      cuotasVistas.add(e.transaction_id);
+      cuotasTotal += amount;
+      cuotasPorMes += amount / e.installments;
+    }
+
+    const row = byCategory.get(e.category_id) ?? {
+      name: e.category_name ?? '—',
+      parent: e.category_parent,
+      total: 0
+    };
+    row.total += amount;
+    byCategory.set(e.category_id, row);
+  }
+
+  // El ajuste TIENE que restar: si no, el resultado del mes dejaría de explicar
+  // el cambio de patrimonio, y ese es justamente el punto del modelo.
+  const result = income - expense - adjustments;
+  return {
+    income,
+    expense,
+    adjustments,
+    adjustmentsName,
+    cuotas: { total: cuotasTotal, porMes: cuotasPorMes, compras: cuotasVistas.size },
+    result,
+    savingRate: income > 0 ? result / income : null,
+    byCategory: [...byCategory.values()].sort((a, b) => b.total - a.total)
+  };
+}
+

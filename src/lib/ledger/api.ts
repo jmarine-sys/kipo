@@ -20,6 +20,8 @@ export interface EntryDetail {
   occurred_on: string;
   description: string | null;
   tx_kind: string;
+  /** En cuántas cuotas se pagó el movimiento. null = de una (OD-23). */
+  installments: number | null;
 }
 
 /**
@@ -145,75 +147,6 @@ export async function deleteTransaction(id: string): Promise<void> {
 // El ahorro y las inversiones NO aparecen: no tocan ninguna categoria.
 // ---------------------------------------------------------------------------
 
-export interface MonthSummary {
-  income: number;
-  /** Gastos de verdad. NO incluye los ajustes de saldo. */
-  expense: number;
-  /**
-   * Ajustes de saldo (ADR-005). Restan del resultado igual que un gasto —esa plata
-   * se fue de verdad, aunque no sepamos en qué— pero se muestran aparte: mezclarlos
-   * con "Gastos" mentiría sobre en qué gastaste.
-   */
-  adjustments: number;
-  /**
-   * Como se llama la categoria de ajuste EN ESTE libro.
-   *
-   * Inicio tenia la palabra "Ajustes" escrita a mano, y eso era dos mentiras en
-   * una: se puede renombrar la categoria y el rotulo no se enteraba, y ademas
-   * "Ajustes" en cualquier app en español significa Configuracion.
-   */
-  adjustmentsName: string | null;
-  result: number;
-  savingRate: number | null;
-  byCategory: { name: string; parent: string | null; total: number }[];
-}
-
-export function summarize(entries: EntryDetail[], unit = 'ARS'): MonthSummary {
-  let income = 0;
-  let expense = 0;
-  let adjustments = 0;
-  let adjustmentsName: string | null = null;
-  const byCategory = new Map<string, { name: string; parent: string | null; total: number }>();
-
-  for (const e of entries) {
-    if (!e.category_id || e.unit !== unit) continue;
-    const amount = Number(e.amount);
-
-    // convenio de signos: ingreso negativo, gasto positivo
-    if (e.category_kind === 'income') {
-      income += -amount;
-      continue;
-    }
-
-    if (e.category_is_system) {
-      adjustments += amount;   // resta del resultado, pero no es un gasto
-      adjustmentsName ??= e.category_name ?? null;
-      continue;
-    }
-
-    expense += amount;
-    const row = byCategory.get(e.category_id) ?? {
-      name: e.category_name ?? '—',
-      parent: e.category_parent,
-      total: 0
-    };
-    row.total += amount;
-    byCategory.set(e.category_id, row);
-  }
-
-  // El ajuste TIENE que restar: si no, el resultado del mes dejaría de explicar
-  // el cambio de patrimonio, y ese es justamente el punto del modelo.
-  const result = income - expense - adjustments;
-  return {
-    income,
-    expense,
-    adjustments,
-    adjustmentsName,
-    result,
-    savingRate: income > 0 ? result / income : null,
-    byCategory: [...byCategory.values()].sort((a, b) => b.total - a.total)
-  };
-}
 
 // ---------------------------------------------------------------------------
 // Exportacion — principio de datos exportables del brief §20

@@ -1,7 +1,8 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
-  import { listEntries, listBalances, summarize, type EntryDetail, type MonthSummary } from '$lib/ledger/api';
+  import { listEntries, listBalances, type EntryDetail } from '$lib/ledger/api';
+  import { summarize, type MonthSummary } from '$lib/ledger/presentacion';
   import { money, monthRange } from '$lib/format';
   import { colorCategoria } from '$lib/categorias';
   import { listUpcoming, cuandoFalta, type Upcoming } from '$lib/ledger/recurrentes';
@@ -114,6 +115,20 @@
           <span class="dim sm">
             Estás guardando el {(sum.savingRate * 100).toFixed(0)}% de lo que entró
           </span>
+        {/if}
+
+        <!-- OD-24: el resultado se lleva el TOTAL de una compra en cuotas el día
+             que la hiciste. Es honesto -ese día tu patrimonio bajó todo- pero
+             deja el mes incomparable con los otros si no se dice. Se explica el
+             número que hay; NO se muestra un segundo resultado "como se paga",
+             porque serían dos verdades sin decir cuál mirar. -->
+        {#if sum.cuotas.compras}
+          <p class="cuotas-aviso">
+            Incluye <b>{money(sum.cuotas.total)}</b> de
+            {sum.cuotas.compras === 1 ? 'una compra en cuotas' : `${sum.cuotas.compras} compras en cuotas`}:
+            el mes se lleva el total porque tu patrimonio bajó todo hoy, aunque
+            vayas a pagar <b>{money(sum.cuotas.porMes)}</b> por mes.
+          </p>
         {/if}
       </div>
 
@@ -267,6 +282,13 @@
   .cuanto { display: flex; flex-direction: column; align-items: flex-end; gap: .05rem; flex-shrink: 0; }
   .cuanto b { font-size: .92rem; white-space: nowrap; }
 
+
+  .cuotas-aviso {
+    margin: .6rem 0 0; padding: .55rem .7rem; border-radius: 10px;
+    font-size: .78rem; line-height: 1.4; text-align: left;
+    background: color-mix(in srgb, var(--warn) 10%, transparent);
+    border: 1px solid color-mix(in srgb, var(--warn) 30%, transparent);
+  }
 
   .titulo { display: flex; align-items: baseline; gap: .5rem; flex-wrap: wrap; }
   .libro {
