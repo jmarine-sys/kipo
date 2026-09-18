@@ -52,6 +52,7 @@ decision nobody made is fiction, and an agent will believe it.
 | [ADR-029](#adr-029--la-fuente-de-precios-locales-es-data912-con-byma-de-respaldo-y-el-precio-se-guarda-como-se-cotiza) | La fuente de precios locales es data912, con BYMA de respaldo, y el precio se guarda como se cotiza | Accepted |
 | [ADR-030](#adr-030--qué-tipo-es-cómo-se-llama-y-dónde-está-son-tres-preguntas-distintas) | Qué tipo es, cómo se llama y dónde está son tres preguntas distintas | Accepted |
 | [ADR-031](#adr-031--una-cuenta-puede-estar-en-varias-carteras-y-la-del-broker-se-arma-sola) | Una cuenta puede estar en varias carteras, y la del broker se arma sola | Accepted |
+| [ADR-032](#adr-032--aportar-a-otro-libro-es-gastar-y-son-dos-movimientos-uno-por-libro) | Aportar a otro libro es gastar, y son dos movimientos, uno por libro | Accepted |
 
 ---
 
@@ -1686,3 +1687,84 @@ ok  una caja de ahorro NO crea cartera: tener plata no es invertir
 ```
 
 La tercera y la segunda juntas son el ADR entero: **la misma compra, dos lecturas, las dos ciertas.**
+
+
+---
+
+## ADR-032 — Aportar a otro libro es gastar, y son dos movimientos, uno por libro
+
+**Context.** El usuario planteó el caso de una cuenta compartida con una pareja: harían falta **tres**
+libros —el de cada uno más el común— y poder pasar plata desde los personales al común. Dos cosas lo
+impedían, y solo una era fácil.
+
+**No se podía crear un libro.** El único lugar donde nacía uno era el trigger de alta, así que se era
+dueño de exactamente uno; los demás llegaban solo por invitación, y entonces el "común" tendría que
+ser el de alguno de los dos.
+
+**Y un movimiento no puede cruzar libros**, por diseño:
+
+```sql
+constraint entry_account_same_ledger
+  foreign key (account_id, ledger_id) references account(id, ledger_id)
+```
+
+Eso no es un límite a esquivar: es lo que hace que **cada libro cierre en cero por sí solo**. Si una
+pata viviera afuera, ningún libro cerraría solo y la partida doble dejaría de servir como control.
+
+**Decision.** Se puede crear un libro. Pasar plata a otro libro son **dos movimientos encadenados**,
+uno en cada libro, unidos por una referencia común — y en el libro de origen es un **gasto**.
+
+**Consequences.**
+- **Aportar es gastar, y lo decidió el usuario.** Esa plata ya no la podés usar solo, así que tu
+  patrimonio baja. La alternativa —que siguiera siendo tuya— exigiría modelar **qué parte** del fondo
+  común te pertenece, y esa parte cambia cada vez que cualquiera aporta o el fondo gasta. Es un
+  concepto nuevo, y el más caro de todo lo construido hasta acá.
+- **La parte incómoda:** si el libro común se disuelve y te devuelven la plata, entra como ingreso. Tu
+  historia va a mostrar un gasto y un ingreso donde hubo un ida y vuelta. Es el precio de no modelar
+  participaciones, y se acepta porque la app es de finanzas personales, no de sociedades.
+- `entry_account_same_ledger` **no se tocó.** La regla se cumple: cada mitad vive entera en su libro.
+- Hizo falta arreglar antes cómo se identifica una categoría de sistema. Se buscaban por `is_system`
+  **más el tipo** —"la de sistema de gasto" era la de ajustes—, y eso alcanzaba con dos roles y **se
+  rompe con cuatro**: el aporte enviado también es `is_system` y de gasto, así que el resumen del mes
+  lo habría contado como ajuste de saldo y habría desaparecido de *"en qué se fue"*. Ahora hay
+  `category.system_role`, y `is_system` vuelve a significar solo lo que siempre significó: no se
+  borra.
+- Las categorías de aportes **se crean recién cuando se usan**: quien nunca comparta un libro no tiene
+  por qué verlas.
+- Se agregó una excepción mínima a RLS —`cuentas_de_libro()`— para poder elegir la cuenta de destino:
+  devuelve nombre y moneda, solo de libros a los que pertenecés, y no abre los movimientos ni los
+  saldos del otro libro.
+- Solo entre cuentas de **la misma moneda**: un aporte no es un cambio. Si hay que cambiar, son dos
+  operaciones y conviene que se vean las dos.
+
+**Rejected alternatives.**
+- *Un movimiento con patas en dos libros*: rompe el invariante que hace que cada libro cierre solo.
+- *Una cuenta "Fondo común" en tu libro con lo aportado*: tu patrimonio no baja y el número miente en
+  cuanto el fondo gasta. Solo no se nota porque los libros nunca se suman —
+  [ADR-028](#adr-028--el-libro-activo-vive-en-la-base-y-compartir-uno-se-hace-por-código)— y apoyarse
+  en eso es apoyarse en que nadie mire.
+- *Modelar participaciones en el libro común*: la respuesta completa, y un proyecto entero.
+
+**Evidence.** `supabase/migrations/20260918200000_aportes.sql`, `supabase/tests/15_libros.sql`,
+`src/routes/libros/+page.svelte`.
+
+**Verified against what already exists.**
+
+```
+docker: postgres:16 descartable, suite completa -> 165 aserciones ok
+
+ok  ahora se puede ser duenio de mas de un libro
+ok  el libro nuevo nace con la misma siembra que uno de alta
+ok  en mi libro el aporte SALE de la cuenta
+ok  y se registra como GASTO, no como transferencia
+ok  en el libro comun la plata ENTRA
+ok  las dos mitades quedan unidas por la misma referencia
+ok  ningun movimiento quedo con lineas de dos libros
+
+Y del lado del cliente:
+ok  un aporte a otro libro es un GASTO, no un ajuste de saldo
+ok  el ajuste de saldo sigue siendo un ajuste
+```
+
+La última de la base es la que importa: **se agregó plata entre libros sin que ningún movimiento
+cruce libros.**

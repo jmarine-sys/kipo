@@ -140,7 +140,10 @@ export function summarize(entries: EntryDetail[], unit = 'ARS'): MonthSummary {
       continue;
     }
 
-    if (e.category_is_system) {
+    // Por ROL y no por is_system: desde ADR-032 hay cuatro categorías de sistema,
+    // y un «Aporte a otro libro» es un gasto de verdad. Con la regla vieja se
+    // habría contado como ajuste de saldo y desaparecido de «En qué se fue».
+    if (e.category_role === 'ajuste') {
       adjustments += amount;   // resta del resultado, pero no es un gasto
       adjustmentsName ??= e.category_name ?? null;
       continue;

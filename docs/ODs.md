@@ -67,7 +67,7 @@ It is the counterpart of [ADRs.md](ADRs.md): there is **what was decided and why
 | OD-30 | Qué fuente de cotizaciones usar, y si se guarda la serie | `decision` | DECIDED | **BYMA** directo para CEDEARs en pesos y **Binance** para cripto, ambas sin clave y verificadas en vivo el 2026-09-16 → [ADR-025](ADRs.md#adr-025--los-precios-se-traen-solos-todos-los-días-porque-el-de-hoy-no-se-recupera-mañana). **Sí se guarda la serie**, una fila por día: es la única de las dos preguntas que no se puede contestar después. data912 queda anotada como respaldo si BYMA cierra el endpoint | — |
 | OD-31 | El historial de precios no se puede reconstruir hacia atrás | `risk` | DECIDED | **Detenido el 2026-09-16** con el flujo diario → [ADR-025](ADRs.md#adr-025--los-precios-se-traen-solos-todos-los-días-porque-el-de-hoy-no-se-recupera-mañana). **Corregido el 2026-09-18:** no era parejo para todos los activos. Binance publica el cierre diario de cualquier fecha (`/api/v3/klines`, verificado), así que **cripto SÍ se recupera** con `precios.mjs desde <fecha>`. BYMA no: su histórico da 401. **Reserva, ahora acotada:** lo irrecuperable son los CEDEARs y las acciones anteriores al 2026-09-16 | OD-29, que necesita esta serie |
 | OD-32 | Plazo fijo UVA: el patrimonio queda subestimado todo el plazo | `decision` | OPEN | **Corregido el 2026-09-18, el ítem estaba mal redactado.** Decía *«y bonos CER»*, y un bono CER **ya está soportado**: cotiza, y su precio de mercado lleva el ajuste adentro — es `market`, igual que un AL30. El problema es solo del **plazo fijo UVA**, que no cotiza: hoy se carga como `accrual` con un monto final estimado y durante todo el plazo el patrimonio queda corto, con un salto enorme al vencer. La salida ya se entrevé: son **unidades de UVA por su valor del día**, o sea `market` disfrazado, y la serie de UVA ya la trae el flujo diario | Exactitud del patrimonio si alguna vez abre uno |
-| OD-41 | No se puede ser dueño de más de un libro, ni mover plata entre libros | `decision` | NEEDS-INPUT | **Planteado por el usuario el 2026-09-18**: para una cuenta compartida con una pareja harían falta **tres** libros —el de cada uno más el común—, y hoy **el único lugar donde nace un libro es el trigger de alta**: sos dueño de exactamente uno. Y un movimiento **no puede cruzar libros** por diseño (`entry_account_same_ledger`), que es lo que hace que cada libro cierre en cero solo. **Bloqueado en una pregunta que no podemos contestar nosotros:** cuando ponés plata en el libro común, **¿deja de ser tuya?** Si sí, es un gasto en tu libro y un ingreso en el común, y alcanza con encadenar dos movimientos. Si no, hay que modelar qué parte del fondo común es tuya, y eso es un concepto nuevo | Uso compartido real (pareja, familia) |
+| OD-41 | No se puede ser dueño de más de un libro, ni mover plata entre libros | `decision` | DECIDED | **Aportar es gastar**, firmado por el usuario → [ADR-032](ADRs.md#adr-032--aportar-a-otro-libro-es-gastar-y-son-dos-movimientos-uno-por-libro). `crear_libro()` y `aportar_a_libro()`, que registra **dos movimientos encadenados** —uno por libro, unidos por una referencia— sin que ninguno cruce libros: el invariante que hace que cada libro cierre en cero solo **no se tocó**. Hizo falta arreglar antes `category.system_role`, porque con cuatro categorías de sistema la búsqueda por `is_system + tipo` habría contado los aportes como ajustes de saldo. **Reserva:** si el fondo común se disuelve y te devuelven la plata, entra como ingreso | — |
 | OD-33 | El rendimiento se mide por posición, no por portafolio | `decision` | DECIDED | **Portafolio explícito**, firmado por el usuario el 2026-09-16 → [ADR-026](ADRs.md#adr-026--el-portafolio-es-el-borde-es-flujo-solo-lo-que-lo-cruza). Una entidad `portfolio` y las cuentas apuntan a ella; pertenecer es opcional, que es lo que lo distingue de agrupar por `institution`. Es flujo solo lo que tiene la contraparte afuera, y eso cierra los tres agujeros sin casos especiales. **Reserva:** una cuenta que se olvida de apuntar a su portafolio no rompe nada, mide mal en silencio — mismo modo de falla que [ADR-025](ADRs.md#adr-025--los-precios-se-traen-solos-todos-los-días-porque-el-de-hoy-no-se-recupera-mañana) | — |
 | OD-34 | Una pantalla terminada puede quedar sin camino, y nadie se entera | `debt` | DECIDED | **Tercera vez que pasa** (recurrentes, y la cartera a tres clicks detrás de *Cuentas*). La auditoría anterior contaba **enlaces por ruta**, que no es lo mismo que recorrer caminos: un enlace puede estar dentro de un `{#if}` que nadie cumple, o colgar de una pantalla a la que tampoco se llega. `scripts/navegacion.mjs` recorre el grafo desde la barra y falla si algo queda a más de 2 clicks; corre dentro de `verificar.sh`. **Verificado por mutación:** sacando la pestaña Cartera, sale 1 | — |
 | OD-35 | La app habla como quien la construyó, no como quien la usa | `risk` | DECIDED | **Primera pasada hecha el 2026-09-18**, sobre lo que engaña y lo que está siempre a la vista. **«Ajustes» era lo peor**: en la pantalla principal, con el significado de *Configuración* en cualquier otra app — y encima escrito a mano, así que renombrar la categoría no cambiaba el rótulo. Ahora Inicio muestra **el nombre real** de la categoría, que en los libros nuevos nace como *Ajuste de saldo*. También: la pestaña *Cartera* → **Inversiones**, *Posiciones* → **Lo que tenés**, *Portafolios* → **Dónde invertís**, *Nueva obligación* → **Algo que se repite**, *Capital* → **Cuánto ponés**. **Reserva:** los formularios de inversión siguen en jerga (*Moneda de cotización*, *Acción que representa*) — se dejaron porque los ve solo quien invierte | — |
@@ -84,11 +84,11 @@ It is the counterpart of [ADRs.md](ADRs.md): there is **what was decided and why
 
 ## The state of the project, read off the register
 
-Actualizado 2026-09-18 (trigesimosegunda revisión). Cuarenta y un ítems: **33 `DECIDED`**,
-**7 `OPEN`**, **0 `LEANING`** y **1 `NEEDS-INPUT`**, **0 `LEANING`** y **0 `NEEDS-INPUT`**.
+Actualizado 2026-09-18 (trigesimotercera revisión). Cuarenta y un ítems: **34 `DECIDED`**,
+**7 `OPEN`**, **0 `LEANING`** y **0 `NEEDS-INPUT`**.
 
-**Veintisiete decisiones** en [ADRs.md](ADRs.md), veinte migraciones verificadas contra PostgreSQL 16
-con 115 aserciones, y una aplicación SvelteKit con trece pantallas, en producción y en uso.
+**32 decisiones** en [ADRs.md](ADRs.md), 30 migraciones verificadas contra PostgreSQL 16 con
+165 aserciones, y una aplicación SvelteKit con 14 pantallas, en producción y en uso.
 
 El 2026-09-18 la usó por primera vez **alguien que no la había construido** —el padre del usuario— y
 se perdió. Ese solo hecho produjo más hallazgos que cualquier auditoría: el alta imponía veinte
@@ -104,9 +104,9 @@ De los 7 `OPEN`, ninguno impide usar la aplicación:
 - **Diferido por el usuario (1):** OD-32, el plazo fijo UVA.
 - **Deuda: ninguna abierta.** OD-36 cerró el 2026-09-18.
 
-Y aparte de los abiertos hay **un `NEEDS-INPUT`**, que es la única categoría que no se desbloquea
-trabajando más: **OD-41**, libros múltiples y plata entre libros. Espera una respuesta que solo puede
-dar el usuario — *cuando ponés plata en el libro común, ¿deja de ser tuya?*
+**Ningún `NEEDS-INPUT` abierto.** OD-41 —el único que hubo— cerró el mismo día: esperaba una respuesta
+que solo podía dar el usuario, *«cuando ponés plata en el libro común, ¿deja de ser tuya?»*, y la
+respuesta fue que sí.
 
 ---
 

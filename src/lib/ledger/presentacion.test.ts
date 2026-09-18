@@ -17,7 +17,7 @@ function linea(p: Partial<EntryDetail>): EntryDetail {
     id: `e${n++}`, transaction_id: 't', amount: '0', unit: 'ARS',
     account_id: null, account_name: null, account_kind: null,
     category_id: null, category_name: null, category_kind: null,
-    category_is_system: false, category_parent: null,
+    category_is_system: false, category_role: null, category_parent: null,
     occurred_on: '2026-09-05', description: null, tx_kind: 'expense',
     ...p
   } as EntryDetail;
@@ -85,7 +85,7 @@ const fila = (o: Partial<EntryDetail> & { transaction_id: string }): EntryDetail
   ledger_id: 'l', amount: '0', unit: 'ARS',
   account_id: null, account_name: null, account_kind: null, account_valuation: null,
   category_id: null, category_name: null, category_kind: null,
-  category_is_system: false, category_parent: null,
+  category_is_system: false, category_role: null, category_parent: null,
   occurred_on: '2026-10-15', description: null, tx_kind: 'expense',
   installments: null, created_at: '2026-10-15T00:00:00Z',
   ...o
@@ -129,4 +129,30 @@ test('dos compras en cuotas suman, cada una con su plazo', () => {
 test('una compra en una sola cuota no cuenta como cuotas', () => {
   const s = summarize(gasto('t1', 5000, 1));
   assert.equal(s.cuotas.compras, 0);
+});
+
+test('un aporte a otro libro es un GASTO, no un ajuste de saldo', () => {
+  // ADR-032 agregó categorías de sistema nuevas. Con la regla vieja -«is_system
+  // es un ajuste»- este gasto habría desaparecido de «En qué se fue» y aparecido
+  // como deriva de saldo, que es una acusación distinta.
+  const s = summarize([
+    fila({ transaction_id: 't1', amount: '-50000', account_id: 'a', account_name: 'Caja' }),
+    fila({ transaction_id: 't1', amount: '50000', category_id: 'c',
+           category_name: 'Aporte a otro libro', category_kind: 'expense',
+           category_is_system: true, category_role: 'aporte_enviado' })
+  ]);
+  assert.equal(s.expense, 50000);
+  assert.equal(s.adjustments, 0);
+  assert.equal(s.byCategory[0].name, 'Aporte a otro libro');
+});
+
+test('el ajuste de saldo sigue siendo un ajuste', () => {
+  const s = summarize([
+    fila({ transaction_id: 't2', amount: '-3000', account_id: 'a', account_name: 'Caja' }),
+    fila({ transaction_id: 't2', amount: '3000', category_id: 'c',
+           category_name: 'Ajuste de saldo', category_kind: 'expense',
+           category_is_system: true, category_role: 'ajuste' })
+  ]);
+  assert.equal(s.adjustments, 3000);
+  assert.equal(s.expense, 0);
 });

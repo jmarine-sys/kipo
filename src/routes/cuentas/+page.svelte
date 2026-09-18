@@ -78,13 +78,15 @@
   const hayBancos = $derived(new Set(balances.map((b) => b.institution?.trim()).filter(Boolean)).size > 0);
 
   /**
-   * La categoría de ajustes se busca por lo que ES, no por cómo se llama.
-   * Antes se buscaba por el nombre «Ajustes» y renombrarla —algo que ahora se
-   * puede hacer— habría roto el ajuste de saldo en silencio.
+   * La categoría de ajustes se busca por su ROL, no por su nombre ni por
+   * «is_system + tipo».
+   *
+   * Por el nombre fallaba al renombrarla. Por «is_system + gasto» funcionaba
+   * mientras hubiera una sola de sistema por tipo, y ADR-032 agregó los aportes
+   * entre libros: desde ahí, esa búsqueda podía devolver «Aporte a otro libro» y
+   * el ajuste de saldo se habría registrado contra la categoría equivocada.
    */
-  const catAjuste = $derived(
-    categories.find((c) => c.is_system && c.kind === 'expense') ?? null
-  );
+  const catAjuste = $derived(categories.find((c) => c.system_role === 'ajuste') ?? null);
 
   const abierto = $derived(balances.find((b) => b.account_id === abierta) ?? null);
   const real = $derived(Number(realRaw.replace(/\./g, '').replace(',', '.')) || 0);

@@ -16,6 +16,12 @@ export interface EntryDetail {
   category_name: string | null;
   category_kind: 'income' | 'expense' | null;
   category_is_system: boolean | null;
+  /**
+   * Para qué sirve la categoría de sistema: 'ajuste', 'interes', 'aporte_enviado',
+   * 'aporte_recibido'. Antes se deducía de is_system + kind, que alcanzaba con
+   * dos roles y se rompe con cuatro (ADR-032).
+   */
+  category_role: string | null;
   category_parent: string | null;
   occurred_on: string;
   description: string | null;

@@ -139,3 +139,73 @@ select case when mi_rol() = 'owner'
             else format('FALLO  es %s', mi_rol()) end;
 
 reset role;
+
+-- ---------------------------------------------------------------------------
+-- Tres libros y plata que pasa de uno a otro.  OD-41 / ADR-032.
+-- ---------------------------------------------------------------------------
+set role rls_probe;
+select set_config('test.uid','11111111-1111-1111-1111-111111111111', false);
+
+select ledger_id as mio from mi_libro where role = 'owner' \gset
+select cambiar_libro(:'mio');
+
+insert into account (ledger_id, name, kind, valuation, unit, is_spendable)
+values (my_ledger(), 'Mi caja', 'asset', 'balance', 'ARS', true);
+select id as micaja from account where name = 'Mi caja' \gset
+
+-- Crear un libro: hasta ahora el unico que existia era el del alta.
+select crear_libro('Casa') as casa \gset
+
+select case when count(*) >= 2 then 'ok  ahora se puede ser duenio de mas de un libro'
+            else format('FALLO  tiene %s', count(*)) end
+  from mi_libro where role = 'owner';
+
+select case when count(*) = 6
+            then 'ok  el libro nuevo nace con la misma siembra que uno de alta'
+            else format('FALLO  nacio con %s categorias', count(*)) end
+  from category where ledger_id = :'casa';
+
+-- La cuenta del libro comun se crea ESTANDO en el libro comun.
+insert into account (ledger_id, name, kind, valuation, unit, is_spendable)
+values (:'casa', 'Caja de Casa', 'asset', 'balance', 'ARS', true);
+select id as cajacasa from account where ledger_id = :'casa' and name = 'Caja de Casa' \gset
+
+select cambiar_libro(:'mio');
+select aportar_a_libro(:'casa', :'micaja', :'cajacasa', 50000, current_date, 'Gastos de la casa') as ref \gset
+
+-- En MI libro es un gasto: esa plata ya no la puedo usar sola.
+select case when round(sum(amount)) = -50000
+            then 'ok  en mi libro el aporte SALE de la cuenta'
+            else format('FALLO  la cuenta cambio %s', round(sum(amount))) end
+  from entry where account_id = :'micaja';
+
+select case when c.kind = 'expense' and c.system_role = 'aporte_enviado'
+            then 'ok  y se registra como GASTO, no como transferencia'
+            else format('FALLO  quedo como %s / %s', c.kind, c.system_role) end
+  from category c
+  join entry e on e.category_id = c.id
+  join transaction t on t.id = e.transaction_id
+ where t.cross_ref = :'ref' and t.ledger_id = my_ledger();
+
+-- Y en el libro comun entra.
+select cambiar_libro(:'casa');
+
+select case when round(sum(amount)) = 50000
+            then 'ok  en el libro comun la plata ENTRA'
+            else format('FALLO  entraron %s', round(sum(amount))) end
+  from entry where account_id = :'cajacasa';
+
+select case when count(*) = 1
+            then 'ok  las dos mitades quedan unidas por la misma referencia'
+            else format('FALLO  hay %s movimientos con esa referencia acá', count(*)) end
+  from transaction where cross_ref = :'ref';
+
+-- Y lo que no se rompe: cada libro sigue cerrando en cero por si solo.
+select case when count(*) = 0
+            then 'ok  ningun movimiento quedo con lineas de dos libros'
+            else format('FALLO GRAVE  %s movimientos cruzan libros', count(*)) end
+  from transaction t
+  join entry e on e.transaction_id = t.id
+ where e.ledger_id <> t.ledger_id;
+
+reset role;

@@ -32,6 +32,8 @@ export interface Category {
   is_system: boolean;
   sort_order: number;
   archived_at: string | null;
+  /** Para qué sirve, si es de sistema. Ver ADR-032. */
+  system_role: string | null;
 }
 
 export interface AccountBalance {

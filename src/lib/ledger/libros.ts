@@ -49,3 +49,44 @@ export async function aceptarInvitacion(codigo: string): Promise<void> {
   const { error } = await supabase.rpc('aceptar_invitacion', { p_code: codigo.trim() });
   if (error) fallar('No se pudo aceptar', error);
 }
+
+/** Crear un libro nuevo y pasar a mirarlo. Solo existia el que crea el alta. */
+export async function crearLibro(nombre: string): Promise<void> {
+  const { error } = await supabase.rpc('crear_libro', { p_nombre: nombre.trim() });
+  if (error) fallar('No se pudo crear el libro', error);
+}
+
+export interface CuentaDeOtroLibro {
+  id: string;
+  name: string;
+  unit: string;
+}
+
+/** Las cuentas de un libro tuyo, para elegir adónde va la plata. */
+export async function cuentasDeLibro(ledgerId: string): Promise<CuentaDeOtroLibro[]> {
+  const { data, error } = await supabase.rpc('cuentas_de_libro', { p_ledger: ledgerId });
+  if (error) fallar('No se pudieron leer las cuentas de ese libro', error);
+  return (data ?? []) as CuentaDeOtroLibro[];
+}
+
+/**
+ * Pasar plata a otro libro tuyo.
+ *
+ * NO es una transferencia: en tu libro sale como gasto, porque esa plata ya no
+ * la podés usar sola (ADR-032). Se registran dos movimientos, uno en cada libro,
+ * unidos por la misma referencia.
+ */
+export async function aportarALibro(o: {
+  destino: string; cuentaOrigen: string; cuentaDestino: string;
+  monto: number; fecha?: string | null; detalle?: string | null;
+}): Promise<void> {
+  const { error } = await supabase.rpc('aportar_a_libro', {
+    p_destino: o.destino,
+    p_cuenta_origen: o.cuentaOrigen,
+    p_cuenta_destino: o.cuentaDestino,
+    p_monto: o.monto,
+    p_on: o.fecha ?? null,
+    p_detalle: o.detalle ?? null
+  });
+  if (error) fallar('No se pudo pasar la plata', error);
+}
