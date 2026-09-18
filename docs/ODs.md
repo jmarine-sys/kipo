@@ -98,9 +98,9 @@ De los 9 `OPEN`, ninguno impide usar la aplicación:
 - **Esperan datos que todavía no existen (2):** OD-20 método de costo, OD-29 gráficos.
 - **Riesgo solo evaluable con uso real (4):** OD-10 pausa por inactividad, OD-11 la fricción de la
   tarjeta, OD-22 el reseteo tras la puesta en marcha, OD-25 el preview que apunta a producción.
-- **Diferidos por el usuario (2):** OD-24 la distorsión que la cuota mete en el mes, OD-32 los
-  instrumentos UVA. OD-24 ahora es más fácil de mirar: la proyección de cuotas ya existe.
-- **Deuda: una.** OD-36, compartir un libro: el esquema lo soporta y la interfaz no lo expone.
+- **Diferidos por el usuario (2):** OD-24 la distorsión que la cuota mete en el mes —ahora más fácil
+  de mirar, porque la proyección ya existe— y OD-32 los instrumentos UVA.
+- **Deuda (1):** OD-36, compartir un libro — el esquema lo soporta y la interfaz no lo expone.
 
 ---
 

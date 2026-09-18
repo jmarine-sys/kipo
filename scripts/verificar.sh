@@ -15,6 +15,11 @@ echo "── unitarios ──"
 npm test 2>&1 | grep -E 'ℹ (pass|fail)'
 npm test 2>&1 | grep -q 'ℹ fail 0' || { echo "✗ tests que fallan"; exit 1; }
 
+# El registro es la capa 1 del orden de autoridad: si sus propios numeros no
+# cierran, ensenia a desconfiar de todo lo demas. Ver scripts/registro.mjs.
+echo "── registro ──"
+node scripts/registro.mjs || exit 1
+
 # Una pantalla terminada a la que no se llega no existe. Paso dos veces: los
 # recurrentes y la cartera. Ver scripts/navegacion.mjs.
 echo "── navegación ──"
