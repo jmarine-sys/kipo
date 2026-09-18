@@ -60,7 +60,22 @@
     finally { loading = false; }
   }
 
-  const pendientes = $derived(viene.filter((v) => v.dias <= 30));
+  /**
+   * Solo lo de ESTE mes — OD-45.
+   *
+   * Antes eran «los próximos 30 días», que a fin de mes mete cosas del que
+   * viene y a principio se come medio calendario. Inicio es literalmente la
+   * vista de un mes: mezclarle otro rompe la única promesa que hace.
+   *
+   * Los vencidos entran igual, sean de cuando sean: eso no es del mes que
+   * viene, es una deuda de ahora.
+   */
+  const finDeMes = (() => {
+    const h = new Date();
+    return new Date(h.getFullYear(), h.getMonth() + 1, 0).toISOString().slice(0, 10);
+  })();
+
+  const pendientes = $derived(viene.filter((v) => v.vencido || v.next_on <= finDeMes));
   const vencidos = $derived(pendientes.filter((v) => v.vencido).length);
 
   async function cargar() {

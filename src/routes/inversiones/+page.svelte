@@ -7,9 +7,20 @@
   } from '$lib/ledger/inversiones';
   import { money, today, shortDate } from '$lib/format';
   import Vacio from '$lib/Vacio.svelte';
+  import { cargarCartera } from '$lib/ledger/cartera.datos';
+  import type { ValorInversion } from '$lib/ledger/cartera';
   import type { AccountBalance } from '$lib/types';
 
   let posiciones = $state<Posicion[]>([]);
+
+  /**
+   * Los plazos fijos, acá — OD-45.
+   *
+   * Se creaban desde esta pantalla y NO aparecían en ella: solo en Cuentas y en
+   * Cartera. Ese era el desconcierto real, más que dónde se registra el
+   * vencimiento. Una inversión tiene que verse donde se carga.
+   */
+  let plazos = $state<ValorInversion[]>([]);
   let cuentas = $state<AccountBalance[]>([]);
   let loading = $state(true);
   let error = $state<string | null>(null);
@@ -73,7 +84,12 @@
 
   async function load() {
     loading = true;
-    try { [posiciones, cuentas] = await Promise.all([listPosiciones(), listBalances()]); }
+    try {
+      [posiciones, cuentas] = await Promise.all([listPosiciones(), listBalances()]);
+      cargarCartera()
+        .then((c) => (plazos = c.valores.filter((v) => v.valuation === 'accrual' && !v.cerrada)))
+        .catch(() => {});
+    }
     catch (e) { error = e instanceof Error ? e.message : 'No se pudo cargar'; }
     finally { loading = false; }
   }
@@ -131,6 +147,32 @@
   <div class="altas">
     <a class="add" href="/inversiones/plazo-fijo">+ Plazo fijo</a>
   </div>
+
+  {#if plazos.length}
+    <section class="card stack pf">
+      <h2>Plazos fijos</h2>
+      <ul class="lista">
+        {#each plazos as p}
+          <li class="spread">
+            <span class="txt">
+              <b>{p.name}</b>
+              <span class="dim sm">
+                vence el {shortDate(p.matures_on ?? '')}
+                {#if p.institution}<span class="sep">·</span>{p.institution}{/if}
+              </span>
+            </span>
+            <b class="money">{money(p.valor_nativo ?? 0, p.moneda ?? 'ARS')}</b>
+          </li>
+        {/each}
+      </ul>
+      <!-- Dónde se cobra, dicho acá: el usuario lo cargaba en esta pantalla y el
+           vencimiento aparecía en otra sin que nada lo anticipara. -->
+      <p class="dim sm">
+        El día que vencen aparecen en <a href="/recurrentes">Agenda</a>, que es donde
+        se registran: cobrarlo es un evento con fecha, no una compra.
+      </p>
+    </section>
+  {/if}
 
   {#if error}<p class="err" role="alert">{error}</p>{/if}
 
@@ -338,6 +380,9 @@
   .total .linea { margin-top: .45rem; font-size: .88rem; }
   .pct { font-size: .8rem; margin-left: .3rem; }
   .altas { display: flex; justify-content: flex-end; }
+  .pf h2 { font-size: .95rem; margin: 0; }
+  .pf .lista { list-style: none; margin: 0; padding: 0; display: grid; gap: .5rem; }
+  .pf .txt { display: flex; flex-direction: column; gap: .1rem; }
   .add { font-size: .84rem; text-decoration: none; padding: .35rem .6rem; border-radius: 999px;
          background: var(--surface); border: 1px solid var(--border); }
   .aviso { margin: .7rem 0 0; font-size: .78rem; padding-top: .6rem; border-top: 1px solid var(--border); }
@@ -369,6 +414,9 @@
   .resumen { margin: 0; padding: .65rem .8rem; border-radius: 10px; background: var(--surface-2); font-size: .86rem; }
   .manual { color: var(--warn); }
   .altas { display: flex; justify-content: flex-end; }
+  .pf h2 { font-size: .95rem; margin: 0; }
+  .pf .lista { list-style: none; margin: 0; padding: 0; display: grid; gap: .5rem; }
+  .pf .txt { display: flex; flex-direction: column; gap: .1rem; }
   .add { font-size: .84rem; text-decoration: none; padding: .35rem .6rem; border-radius: 999px;
          background: var(--surface); border: 1px solid var(--border); }
   .aviso {

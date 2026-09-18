@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
+  import { page } from '$app/state';
   import { listAccounts, listCategories, createTransaction, cotizacionesVigentes } from '$lib/ledger/api';
   import { plausibilidad, type Cotizacion } from '$lib/ledger/plausibilidad';
   import { misLibros, cuentasDeLibro, aportarALibro } from '$lib/ledger/libros';
@@ -130,6 +131,49 @@
   let repite = $state(false);
   let frecuencia = $state<Frecuencia>('monthly');
 
+  /**
+   * «¿Ya lo pagaste?» — la pregunta que faltaba, y la que unifica los dos
+   * formularios (OD-44).
+   *
+   * Agenda tenía su propio alta de gastos fijos, casi igual a esta: qué es,
+   * cuánto, cada cuánto, con qué cuenta. Lo único que las diferenciaba era si
+   * además se registraba el movimiento — y eso es UNA pregunta, no otra
+   * pantalla.
+   *
+   *   ya lo pagué   -> se registra el movimiento Y queda agendado
+   *   todavía no    -> solo queda agendado, y la fecha es la PRIMERA vez
+   */
+  let yaPague = $state(true);
+
+  /**
+   * Atajos de fecha — OD-38, mudados acá al unificar los formularios.
+   *
+   * Vivían en el alta de Agenda, que dejó de existir. «Fin de mes» NO es un
+   * atajo que escribe una fecha: enciende una regla en la base, porque
+   * `31-ene + 1 mes` da 28-feb y de ahí en adelante se queda en 28 para siempre.
+   */
+  const ATAJOS = [
+    { id: 'hoy', label: 'Hoy' }, { id: 'dia1', label: 'Día 1' },
+    { id: 'dia10', label: 'Día 10' }, { id: 'quince', label: 'Día 15' },
+    { id: 'fin', label: 'Fin de mes' }
+  ] as const;
+
+  function atajo(id: (typeof ATAJOS)[number]['id']) {
+    const h = new Date();
+    const [y, m, d] = [h.getFullYear(), h.getMonth(), h.getDate()];
+    const iso = (f: Date) =>
+      `${f.getFullYear()}-${String(f.getMonth() + 1).padStart(2, '0')}-${String(f.getDate()).padStart(2, '0')}`;
+    // Si el día ya pasó este mes, apunta al que viene: agendar algo para ayer no
+    // es lo que nadie quiso decir.
+    const dia = (n: number) => iso(new Date(y, n < d ? m + 1 : m, n));
+    date = id === 'hoy' ? iso(h)
+         : id === 'dia1' ? dia(1)
+         : id === 'dia10' ? dia(10)
+         : id === 'quince' ? dia(15)
+         : iso(new Date(y, m + 1, 0));
+  }
+  const soloAgendar = $derived(repite && !yaPague);
+
   /** El último día de su mes: entonces la regla es «fin de mes», no «el 31». */
   const esFinDeMes = $derived.by(() => {
     const d = new Date(date + 'T12:00:00');
@@ -181,6 +225,8 @@
   }
 
   onMount(async () => {
+    // Agenda manda acá con ?repite=1: es el MISMO formulario, no otro.
+    if (page.url.searchParams.get('repite')) { repite = true; yaPague = false; }
     try {
       [accounts, categories] = await Promise.all([listAccounts(), listCategories()]);
       recall();
@@ -207,7 +253,8 @@
   });
 
   function setMode(m: Mode) {
-    mode = m; categoryId = null; toAccountId = null; raw2 = ''; cuotas = 1; repite = false;
+    mode = m; categoryId = null; toAccountId = null; raw2 = ''; cuotas = 1;
+    repite = false; yaPague = true;
     showAllCats = false; search = '';
     recall();
   }
@@ -238,6 +285,23 @@
     try {
       const unit = account!.unit;
       const common = { date, description: note || null };
+
+      // Solo agendar: no hay movimiento que registrar todavía, y la fecha que
+      // pusiste es la PRIMERA vez, no una que ya pasó.
+      if (soloAgendar && categoryId) {
+        await createScheduled({
+          description: note?.trim() || categories.find((c) => c.id === categoryId)?.name || 'Gasto fijo',
+          category_id: categoryId,
+          account_id: accountId,
+          amount,
+          currency: unit,
+          frequency: frecuencia,
+          next_on: date,
+          month_end: esFinDeMes && frecuencia !== 'weekly'
+        });
+        goto('/recurrentes');
+        return;
+      }
 
       // Hacia otro libro no hay UN movimiento: son dos, uno en cada libro, y los
       // arma la base. No puede pasar por create_transaction.
@@ -414,9 +478,31 @@
                         onclick={() => (frecuencia = f.id)}>{f.label}</button>
               {/each}
             </div>
+            {#if !yaPague}
+              <div class="wrap">
+                {#each ATAJOS as a}
+                  <button class="chip chico" onclick={() => atajo(a.id)}>{a.label}</button>
+                {/each}
+              </div>
+            {/if}
+
+            <div class="wrap pagado">
+              {#each [[true, 'Ya lo pagué'], [false, 'Todavía no']] as [v, l]}
+                <button class="chip chico" class:on={yaPague === v}
+                        onclick={() => (yaPague = v as boolean)}>{l}</button>
+              {/each}
+            </div>
+
             <p class="dim sm">
-              La próxima cae el <b>{shortDate(proxima)}</b>{#if esFinDeMes && frecuencia !== 'weekly'}, y como hoy es fin de mes va a seguir cayendo el último día de cada mes{/if}.
-              Lo podés cambiar en <a href="/recurrentes">Agenda</a>.
+              {#if yaPague}
+                Se registra ahora y queda agendado: la próxima cae el <b>{shortDate(proxima)}</b>.
+              {:else}
+                No se registra nada todavía. Queda agendado para el
+                <b>{shortDate(date)}</b>, y lo vas a ver en <a href="/recurrentes">Agenda</a>.
+              {/if}
+              {#if esFinDeMes && frecuencia !== 'weekly'}
+                Como la fecha es fin de mes, va a seguir cayendo el último día de cada mes.
+              {/if}
             </p>
           {/if}
         {/if}
@@ -531,7 +617,7 @@
   </div>
 
   <button class="btn-primary save" onclick={save} disabled={!ready || busy}>
-    {busy ? 'Guardando…' : 'Guardar'}
+    {busy ? 'Guardando…' : soloAgendar ? 'Agendar' : 'Guardar'}
   </button>
 </div>
 
@@ -597,6 +683,7 @@
   }
   .salida a { display: inline-block; margin-top: .3rem; }
   .repite { display: flex; align-items: flex-start; gap: .6rem; margin-top: .8rem; }
+  .pagado { margin-top: .5rem; }
   .bloque { display: block; }
   .frec { margin-top: .5rem; }
   .cuotas { margin-top: .7rem; display: flex; flex-direction: column; gap: .35rem; }

@@ -23,14 +23,9 @@
   let montoRaw = $state('');
   let cuentaElegida = $state<string | null>(null);
 
-  let creando = $state(false);
-  let nDesc = $state('');
   let nCat = $state<string | null>(null);
   let nCuenta = $state<string | null>(null);
-  let nMontoRaw = $state('');
-  let nVariable = $state(false);
   let nFrec = $state<Frecuencia>('monthly');
-  let nDesde = $state(today());
 
   const num = (s: string) => Number(s.replace(/\./g, '').replace(',', '.')) || 0;
 
@@ -39,7 +34,41 @@
     categorias.filter((c) => c.kind === 'expense' && !categorias.some((x) => x.parent_id === c.id))
   );
   const vencidos = $derived(items.filter((i) => i.vencido));
-  const proximos = $derived(items.filter((i) => !i.vencido));
+
+  /**
+   * Este mes y el resto, en tarjetas distintas — OD-45.
+   *
+   * Estaban todos juntos bajo «Próximos», así que un seguro que se paga en tres
+   * meses ocupaba el mismo lugar que el alquiler de pasado mañana. Lo que hay
+   * que hacer AHORA tiene que poder leerse sin filtrar con la vista.
+   */
+  const finDeMes = (() => {
+    const h = new Date();
+    return new Date(h.getFullYear(), h.getMonth() + 1, 0).toISOString().slice(0, 10);
+  })();
+
+  const esteMes = $derived(items.filter((i) => !i.vencido && i.next_on <= finDeMes));
+  const masAdelante = $derived(items.filter((i) => !i.vencido && i.next_on > finDeMes));
+
+  /** Lo de más adelante arranca cerrado: verlo siempre es ruido. */
+  let verMasAdelante = $state(false);
+
+  let nuevaFecha = $state('');
+  let nuevoMonto = $state('');
+
+  async function guardarRegla(i: Upcoming) {
+    busy = true; error = null;
+    try {
+      await updateScheduled(i.id, {
+        next_on: nuevaFecha || i.next_on,
+        amount: nuevoMonto ? num(nuevoMonto) : null
+      });
+      abierto = null;
+      await load();
+    } catch (e) {
+      error = e instanceof Error ? e.message : 'No se pudo cambiar la regla';
+    } finally { busy = false; }
+  }
 
   /** Lo que se viene en los próximos 30 días, que es la proyección útil. */
   const totalMes = $derived(
@@ -123,74 +152,15 @@
     finally { busy = false; }
   }
 
-  let nFinDeMes = $state(false);
 
-  /**
-   * Atajos de fecha — OD-38.
-   *
-   * "Fin de mes" NO es un atajo que escribe una fecha: enciende una regla. Sin
-   * ella, `31-ene + 1 mes` da 28-feb y de ahí en adelante se queda en 28 para
-   * siempre. Verificado contra PostgreSQL, y por eso vive en la base y no acá.
-   */
-  const ATAJOS = [
-    { id: 'hoy',    label: 'Hoy' },
-    { id: 'dia1',   label: 'Día 1' },
-    { id: 'dia10',  label: 'Día 10' },
-    { id: 'quince', label: 'Día 15' },
-    { id: 'fin',    label: 'Fin de mes' }
-  ] as const;
 
-  function aplicar(id: (typeof ATAJOS)[number]['id']) {
-    const hoy = new Date();
-    const y = hoy.getFullYear();
-    const m = hoy.getMonth();
-    const d = hoy.getDate();
-    const iso = (fecha: Date) =>
-      `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}-${String(fecha.getDate()).padStart(2, '0')}`;
-
-    // Si el día ya pasó este mes, se apunta al que viene: agendar algo para ayer
-    // no es lo que nadie quiso decir.
-    const dia = (n: number) => iso(new Date(y, n < d ? m + 1 : m, n));
-
-    nFinDeMes = id === 'fin';
-    nDesde = id === 'hoy'    ? iso(hoy)
-           : id === 'dia1'   ? dia(1)
-           : id === 'dia10'  ? dia(10)
-           : id === 'quince' ? dia(15)
-           : iso(new Date(y, m + 1, 0));   // día 0 del mes siguiente = último de este
-  }
-
-  async function crear(ev: SubmitEvent) {
-    ev.preventDefault();
-    if (!nCat) return;
-    busy = true; error = null;
-    try {
-      await createScheduled({
-        description: nDesc.trim(),
-        category_id: nCat,
-        account_id: nCuenta,
-        amount: nVariable ? null : num(nMontoRaw),
-        currency: 'ARS',
-        frequency: nFrec,
-        next_on: nDesde,
-        month_end: nFinDeMes
-      });
-      nDesc = ''; nMontoRaw = ''; nVariable = false; nFinDeMes = false; creando = false;
-      await load();
-    } catch (e) {
-      error = e instanceof Error ? e.message : 'No se pudo crear';
-    } finally { busy = false; }
-  }
 
   onMount(load);
 </script>
 
 <div class="page stack">
-  <div class="spread">
-    <a href="/" class="back" aria-label="Volver">←</a>
-    <h1>Lo que se viene</h1>
-    <span></span>
-  </div>
+  <!-- Sin flecha de volver: es un destino de la barra, no una subpantalla. -->
+  <h1>Lo que se viene</h1>
 
   {#if error}<p class="err" role="alert">{error}</p>{/if}
 
@@ -204,7 +174,7 @@
       </p>
     {/if}
 
-    {#each [{ t: 'Vencidos', l: vencidos }, { t: 'Próximos', l: proximos }] as grupo}
+    {#each [{ t: 'Vencidos', l: vencidos }, { t: 'Este mes', l: esteMes }] as grupo}
       {#if grupo.l.length}
         <h2 class="lbl">{grupo.t}</h2>
         <ul class="list">
@@ -285,6 +255,27 @@
                   <button class="btn-primary" onclick={() => registrar(i)} disabled={busy || !montoRaw || !cuentaElegida}>
                     {busy ? 'Registrando…' : 'Registrar el pago'}
                   </button>
+                  <!-- Cambiar la regla, que hasta ahora no se podía: el alta de
+                       un gasto fijo decía «lo podés cambiar en Agenda» y acá solo
+                       se podía registrar, saltear o archivar. Una promesa que la
+                       pantalla no cumplía. -->
+                  <details class="cambiar">
+                    <summary>Cambiar la regla</summary>
+                    <div class="row campos">
+                      <label class="campo">
+                        <span>Próxima vez</span>
+                        <input type="date" bind:value={nuevaFecha} />
+                      </label>
+                      <label class="campo">
+                        <span>Importe fijo</span>
+                        <input class="monto" inputmode="decimal" bind:value={nuevoMonto}
+                               placeholder="dejalo vacío si cambia" />
+                      </label>
+                    </div>
+                    <button class="btn-primary chico" disabled={busy}
+                            onclick={() => guardarRegla(i)}>Guardar los cambios</button>
+                  </details>
+
                   <div class="finales">
                     <button onclick={() => saltear(i)} disabled={busy}>Saltear este período</button>
                     <button class="peligro" onclick={() => archivar(i)} disabled={busy}>Archivar</button>
@@ -297,85 +288,46 @@
       {/if}
     {/each}
 
-    {#if !items.length && !creando}
-      <Vacio titulo="Todavía no cargaste ninguna obligación."
-             detalle="Sirven para que la app te anticipe impuestos, seguros, servicios y suscripciones."
-             accion="Cargar la primera" onaccion={() => (creando = true)} />
-    {/if}
-
-    {#if creando}
-      <form class="card stack" onsubmit={crear}>
-        <h2>Algo que se repite</h2>
-        <label class="campo"><span>Qué es</span>
-          <input bind:value={nDesc} required placeholder="Seguro del auto" />
-        </label>
-
-        <label class="campo"><span>Categoría</span>
-          <select bind:value={nCat} required>
-            <option value={null} disabled>Elegí una</option>
-            {#each hojas as c}<option value={c.id}>{c.name}</option>{/each}
-          </select>
-        </label>
-
-        <label class="campo"><span>Se paga con</span>
-          <select bind:value={nCuenta}>
-            <option value={null}>Lo decido cada vez</option>
-            {#each pagables as a}<option value={a.id}>{a.name}</option>{/each}
-          </select>
-        </label>
-
-        <label class="casilla">
-          <input type="checkbox" bind:checked={nVariable} />
-          El importe cambia cada período
-        </label>
-        {#if !nVariable}
-          <label class="campo"><span>Importe</span>
-            <input class="monto" inputmode="decimal" bind:value={nMontoRaw} required placeholder="45000" />
-          </label>
+    {#if masAdelante.length}
+      <section class="card adelante">
+        <button class="cabecera" onclick={() => (verMasAdelante = !verMasAdelante)}>
+          <span>Más adelante</span>
+          <span class="dim sm">
+            {masAdelante.length} {masAdelante.length === 1 ? 'pendiente' : 'pendientes'}
+            <span class="flecha" class:abierta={verMasAdelante}>▾</span>
+          </span>
+        </button>
+        {#if verMasAdelante}
+          <ul class="lejos">
+            {#each masAdelante as i}
+              <li class="spread">
+                <span class="txt">
+                  <b>{i.description}</b>
+                  <span class="dim sm">{shortDate(i.next_on)} · {nombreFrecuencia(i.frequency)}</span>
+                </span>
+                {#if i.amount}<b class="money">{money(i.amount, i.currency)}</b>{/if}
+              </li>
+            {/each}
+          </ul>
+          <p class="dim sm">
+            Se registran cuando llegue el mes. Acá están solo para que sepas que existen.
+          </p>
         {/if}
-
-        <div class="row campos">
-          <label class="campo"><span>Cada cuánto</span>
-            <select bind:value={nFrec}>
-              {#each FRECUENCIAS as f}<option value={f.id}>{f.label}</option>{/each}
-            </select>
-          </label>
-          <label class="campo"><span>Próxima vez</span>
-            <input type="date" bind:value={nDesde} required />
-            <!-- Nadie piensa "el 2026-10-31": piensa "a fin de mes". Los atajos
-                 están más cerca del modelo mental que el calendario. -->
-            <span class="atajos">
-              {#each ATAJOS as a}
-                <button type="button" class="atajo" onclick={() => aplicar(a.id)}>{a.label}</button>
-              {/each}
-            </span>
-            {#if nFinDeMes}
-              <span class="dim sm">
-                Vence <b>el último día de cada mes</b>: 28, 30 o 31 según cuál sea.
-                <button type="button" class="link" onclick={() => (nFinDeMes = false)}>usar el día fijo</button>
-              </span>
-            {/if}
-          </label>
-        </div>
-
-        <button class="btn-primary" type="submit" disabled={busy || !nDesc.trim() || !nCat}>Crear</button>
-        <button type="button" class="link" onclick={() => (creando = false)}>Cancelar</button>
-      </form>
-    {:else if items.length}
-      <!-- Con la lista vacía la acción ya la ofrece el estado vacío: dos botones
-           que hacen lo mismo obligan a elegir entre cosas idénticas. -->
-      <button class="btn-primary nueva" onclick={() => (creando = true)}>+ Algo que se repite</button>
+      </section>
     {/if}
+
+    {#if !items.length}
+      <Vacio titulo="Todavía no cargaste nada que se repita."
+             detalle="Sirve para que la app te anticipe el alquiler, los impuestos, los seguros y las suscripciones."
+             href="/nuevo?repite=1" accion="Cargar el primero" />
+    {/if}
+
+    <a class="btn-primary nueva" href="/nuevo?repite=1">+ Algo que se repite</a>
   {/if}
 </div>
 
 <style>
-  .atajos { display: flex; flex-wrap: wrap; gap: .3rem; margin-top: .35rem; }
-  .atajo {
-    min-height: 34px; padding: 0 .65rem; border-radius: 999px; font-size: .78rem;
-  }
 
-  .back { font-size: 1.5rem; text-decoration: none; }
   h1 { font-size: 1.15rem; }
   .sm { font-size: .78rem; }
   .lbl { font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; color: var(--text-dim); margin: .4rem 0 -.1rem; }
@@ -418,11 +370,21 @@
 
   .monto { text-align: right; }
   /* el botón de cancelar no es un campo: que no pretenda serlo */
-  .link { margin-top: -.35rem; }
 
   .nueva { width: 100%; }
-  .link { border: none; background: none; color: var(--accent); min-height: 38px; }
   h2 { font-size: .95rem; }
+  .adelante { padding: 0; }
+  .adelante .cabecera {
+    width: 100%; display: flex; justify-content: space-between; align-items: center;
+    background: none; border: none; padding: .8rem .85rem; color: inherit;
+    font-size: .9rem; font-weight: 600; min-height: var(--tap);
+  }
+  .adelante .flecha { display: inline-block; transition: transform .15s; margin-left: .3rem; }
+  .adelante .flecha.abierta { transform: rotate(180deg); }
+  .adelante .lejos { list-style: none; margin: 0; padding: 0 .85rem; display: grid; gap: .45rem; }
+  .adelante > p { padding: .5rem .85rem .8rem; margin: 0; }
+  .cambiar summary { font-size: .82rem; cursor: pointer; padding: .3rem 0; }
+  .cambiar[open] { padding-bottom: .3rem; }
   .err {
     background: color-mix(in srgb, var(--neg) 14%, transparent);
     border: 1px solid color-mix(in srgb, var(--neg) 40%, transparent);
