@@ -62,8 +62,18 @@ jobs:
             psql "$DB_URL" -v ON_ERROR_STOP=1 -q -f /precios.sql
           echo "aplicados"
 
-      # Se comprueba contra lo que se PEDIA, no contra un numero fijo: si tenes
-      # cuatro instrumentos y entraron dos, eso es un hueco aunque dos sea > 0.
+      # Se comprueba contra lo que se PEDIA, no contra un numero fijo.
+      #
+      # Y se distingue entre dos cosas que no son lo mismo:
+      #
+      #   cero precios con instrumentos cargados -> algo se ROMPIO. Falla, para
+      #     que GitHub mande el correo. Un aviso amarillo no despierta a nadie, y
+      #     el dia perdido no se recupera: enterarse una semana despues es
+      #     enterarse tarde.
+      #
+      #   algunos si y otros no -> un papel puede no haber operado hoy. Eso es
+      #     aviso, no fallo: hacerlo fallar todos los dias entrena a ignorarlo,
+      #     que es exactamente como se pierde la senial.
       - name: Comprobar que no quedaron huecos
         env:
           DB_URL: ${{ secrets.SUPABASE_DB_URL }}
@@ -73,6 +83,11 @@ jobs:
             "select count(distinct instrument_id) from price
               where on_date = current_date and source in ('byma','binance')")
           echo "instrumentos: $pedidos — con precio de hoy: $guardados"
+
+          if [ "$pedidos" -gt 0 ] && [ "$guardados" -eq 0 ]; then
+            echo "::error::Ningun precio guardado habiendo $pedidos instrumento/s. Ese dia no se recupera."
+            exit 1
+          fi
           if [ "$guardados" -lt "$pedidos" ]; then
-            echo "::warning::$((pedidos - guardados)) instrumento/s sin precio de hoy. Ese dia no se recupera."
+            echo "::warning::$((pedidos - guardados)) instrumento/s sin precio de hoy. Puede ser que no operaran."
           fi
