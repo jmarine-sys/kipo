@@ -1,4 +1,5 @@
 import { supabase } from '$lib/supabase';
+import type { Cotizacion } from './plausibilidad';
 import type {
   Account, AccountBalance, Category, CategoryUsage, TransactionInput
 } from '$lib/types';
@@ -38,6 +39,34 @@ export async function listAccounts(): Promise<Account[]> {
     .order('name');
   if (error) fail('No se pudieron leer las cuentas', error);
   return data ?? [];
+}
+
+/**
+ * Las cotizaciones vigentes a una fecha, una por fuente — para OD-21.
+ *
+ * "Vigente" es la ULTIMA anterior o igual, no la de ese dia exacto: un sabado no
+ * cotiza y el valor que regia es el del viernes. Es el mismo criterio que usa
+ * `cotizacion()` en la base; si los dos no coincidieran, la pantalla avisaria
+ * sobre una banda distinta de la que se usa para medir.
+ */
+export async function cotizacionesVigentes(fecha: string): Promise<Cotizacion[]> {
+  const { data, error } = await supabase
+    .from('fx_rate')
+    .select('base, quote, rate, source, on_date')
+    .lte('on_date', fecha)
+    .order('on_date', { ascending: false })
+    .limit(80);
+  if (error) fail('No se pudieron leer las cotizaciones', error);
+
+  const vista = new Set<string>();
+  const out: Cotizacion[] = [];
+  for (const r of data ?? []) {
+    const clave = `${r.base}/${r.quote}/${r.source}`;
+    if (vista.has(clave)) continue;          // ya tenemos la mas reciente
+    vista.add(clave);
+    out.push({ base: r.base, quote: r.quote, rate: Number(r.rate), source: r.source });
+  }
+  return out;
 }
 
 export async function listBalances(): Promise<AccountBalance[]> {

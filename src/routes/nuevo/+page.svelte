@@ -1,7 +1,8 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
-  import { listAccounts, listCategories, createTransaction } from '$lib/ledger/api';
+  import { listAccounts, listCategories, createTransaction, cotizacionesVigentes } from '$lib/ledger/api';
+  import { plausibilidad, type Cotizacion } from '$lib/ledger/plausibilidad';
   import { expense, income, transfer, exchange, impliedRate } from '$lib/ledger/entries';
   import { money, today } from '$lib/format';
   import { bump, byUse } from '$lib/frequent';
@@ -84,11 +85,29 @@
   const payingOff = $derived(mode === 'move' && toAccount?.kind === 'liability');
   const rate = $derived(isExchange && amount && amount2 ? impliedRate(amount, amount2) : null);
 
+  // OD-21. La base no puede validar un tipo de cambio -cualquier cociente es
+  // aritmeticamente valido- asi que el unico lugar donde se puede mirar es acá,
+  // mientras se tipea. La REGLA vive en plausibilidad.ts, no en esta pantalla.
+  let cotizaciones = $state<Cotizacion[]>([]);
+  let rateOk = $state(false);           // "ya lo miré, es correcto"
+
+  const sospecha = $derived(
+    rate && account && toAccount
+      ? plausibilidad(rate, account.unit, toAccount.unit, cotizaciones)
+      : { estado: 'ok' as const }
+  );
+
+  // Cambiar el monto invalida la confirmación anterior: si no, confirmás un
+  // número y guardás otro.
+  $effect(() => { void rate; rateOk = false; });
+
   const ready = $derived.by(() => {
     if (!amount || !accountId) return false;
     if (mode === 'expense' || mode === 'income') return !!categoryId;
     if (!toAccountId) return false;
-    return isExchange ? !!amount2 : true;
+    if (!isExchange) return true;
+    if (!amount2) return false;
+    return sospecha.estado !== 'sospechoso' || rateOk;
   });
 
   const LAST = 'kipo:last-account';
@@ -106,6 +125,9 @@
     try {
       [accounts, categories] = await Promise.all([listAccounts(), listCategories()]);
       recall();
+      // En segundo plano: si no hay cotizaciones, el aviso no aparece y cargar
+      // sigue siendo igual de rápido. Nunca debe demorar el formulario.
+      cotizacionesVigentes(date).then((c) => (cotizaciones = c)).catch(() => {});
     } catch (e) {
       error = e instanceof Error ? e.message : 'No se pudo cargar';
     } finally { loaded = true; }
@@ -188,9 +210,27 @@
       <span class="dim">{toAccount?.unit}</span>
     </div>
     {#if rate}
-      <p class="rate dim">
+      <p class="rate" class:dim={sospecha.estado !== 'sospechoso'}
+         class:alerta={sospecha.estado === 'sospechoso'}>
         Te queda a <strong>{money(rate, account?.unit)}</strong> por {toAccount?.unit}
       </p>
+    {/if}
+
+    {#if sospecha.estado === 'sospechoso'}
+      <!-- No bloquea: un tipo de cambio raro puede ser real y el usuario es quien
+           sabe. Pero sí obliga a mirarlo una vez. -->
+      <div class="revisar">
+        <p>
+          Ese tipo de cambio está
+          <b>{sospecha.veces > 1 ? `${sospecha.veces.toFixed(0)} veces por encima` : `${(1 / sospecha.veces).toFixed(0)} veces por debajo`}</b>
+          de lo que se operó ese día ({money(sospecha.min, account?.unit)} a {money(sospecha.max, account?.unit)}).
+          ¿Te faltó o te sobró un cero?
+        </p>
+        <label class="casilla">
+          <input type="checkbox" bind:checked={rateOk} />
+          <span>Lo miré, es correcto</span>
+        </label>
+      </div>
     {/if}
   {/if}
 
@@ -335,6 +375,15 @@
     border-radius: var(--radius); min-height: 44px; padding: 0 .6rem;
   }
   .rate { text-align: center; font-size: .82rem; margin: 0 0 .6rem; }
+  .rate.alerta { color: var(--warn); font-weight: 600; }
+  .revisar {
+    margin: 0 0 .7rem; padding: .7rem .85rem; border-radius: 10px;
+    background: color-mix(in srgb, var(--warn) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--warn) 40%, transparent);
+    font-size: .84rem;
+  }
+  .revisar p { margin: 0 0 .5rem; }
+  .revisar .casilla { display: flex; align-items: center; gap: .55rem; min-height: 40px; }
 
   section { margin-bottom: .9rem; }
   .lbl { font-size: .74rem; text-transform: uppercase; letter-spacing: .06em; color: var(--text-dim); margin-bottom: .45rem; }
