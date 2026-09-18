@@ -7,7 +7,7 @@
     listResumenTarjeta, type ResumenTarjeta
   } from '$lib/ledger/api';
   import { adjustment } from '$lib/ledger/entries';
-  import { tipoDeCuenta } from '$lib/ledger/tipos';
+  import { tipoDeCuenta, GRUPOS_CUENTA } from '$lib/ledger/tipos';
   import Cuenta from '$lib/Cuenta.svelte';
   import { money, today } from '$lib/format';
   import type { AccountBalance, Category } from '$lib/types';
@@ -28,13 +28,6 @@
   let realRaw = $state('');
   let busy = $state(false);
 
-  /** El modelo calcula por mecánica (ADR-012); la interfaz agrupa por intuición. */
-  const GRUPOS = [
-    { id: 'balance', titulo: 'Disponible',   pista: 'Plata que podés usar hoy' },
-    { id: 'accrual', titulo: 'Inmovilizado', pista: 'Comprometido hasta su vencimiento' },
-    { id: 'market',  titulo: 'Invertido',    pista: 'Se valúa a precio de mercado' }
-  ] as const;
-
   /**
    * Dos formas de mirar la misma lista, y ninguna sobra — OD-37.
    *
@@ -48,8 +41,8 @@
   let vista = $state<'tipo' | 'banco'>('tipo');
 
   const porTipo = $derived(
-    GRUPOS.map((g) => ({ id: g.id as string, titulo: g.titulo, pista: g.pista,
-                         items: balances.filter((b) => b.valuation === g.id) }))
+    GRUPOS_CUENTA.map((g) => ({ id: g.id as string, titulo: g.titulo, pista: g.pista,
+                                items: balances.filter((b) => g.test(b)) }))
       .filter((g) => g.items.length)
   );
 
@@ -271,7 +264,7 @@
                     </datalist>
                   </label>
 
-                  {#if g.id === 'balance' && catAjuste}
+                  {#if (g.id === 'disponible' || g.id === 'comitente') && catAjuste}
                     <label class="campo">
                       <span>¿Cuánto dice en realidad?</span>
                       <input class="monto" inputmode="decimal" bind:value={realRaw}

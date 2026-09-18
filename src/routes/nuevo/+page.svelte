@@ -594,6 +594,15 @@
             {#if isExchange}
               Cambiás {account?.unit} por {toAccount.unit}. No es un gasto: tu patrimonio
               queda igual, solo cambia de moneda.
+            {:else if account && !account.is_spendable && toAccount.is_spendable}
+              Sacás plata del broker. No es un ingreso: tu patrimonio queda igual —
+              pero <strong>sube lo disponible</strong>, porque vuelve a estar a mano.
+            {:else if account?.is_spendable && !toAccount.is_spendable}
+              <!-- Decia solo "tu patrimonio queda igual", que es cierto y deja
+                   afuera lo que importa: esa plata deja de estar disponible.
+                   El usuario lo marco mandando plata a una cuenta comitente. -->
+              Tu patrimonio queda igual, pero <strong>baja lo disponible</strong>:
+              esa plata deja de estar a mano para gastar.
             {:else}
               Movés plata entre tus cuentas. No es un gasto: tu patrimonio queda igual.
             {/if}

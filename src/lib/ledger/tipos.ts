@@ -102,3 +102,43 @@ export function nombresRepetidos(cuentas: { name: string }[]): Set<string> {
 /** Si esta cuenta necesita que se aclare dónde está. */
 export const esAmbigua = (c: { name: string }, repetidos: Set<string>) =>
   repetidos.has(c.name.trim().toLowerCase());
+
+/**
+ * Cómo se agrupan las cuentas en pantalla — y por qué no alcanza `valuation`.
+ *
+ * La lista agrupaba por `valuation`, y eso metía una CUENTA COMITENTE dentro de
+ * «Disponible»: es `balance` como una caja de ahorro. Pero su plata no está
+ * disponible, y esa es justamente la diferencia que existe entre las dos
+ * (ADR-030). El agrupamiento tiene que usar los mismos ejes que el tipo.
+ *
+ * Una tarjeta SÍ va con las cajas de ahorro, y no por descuido: son las dos
+ * caras de la plata del día a día — lo que tenés y lo que debés de eso mismo.
+ */
+export const GRUPOS_CUENTA = [
+  {
+    id: 'disponible',
+    titulo: 'Disponible',
+    pista: 'Plata que podés usar hoy, y lo que debés de ella',
+    test: (a: { kind: string; valuation: string; is_spendable: boolean }) =>
+      a.valuation === 'balance' && (a.is_spendable || a.kind === 'liability')
+  },
+  {
+    id: 'comitente',
+    titulo: 'En el broker',
+    pista: 'Plata que ya está adentro, esperando para invertirse',
+    test: (a: { kind: string; valuation: string; is_spendable: boolean }) =>
+      a.valuation === 'balance' && !a.is_spendable && a.kind === 'asset'
+  },
+  {
+    id: 'accrual',
+    titulo: 'Inmovilizado',
+    pista: 'Comprometido hasta su vencimiento',
+    test: (a: { valuation: string }) => a.valuation === 'accrual'
+  },
+  {
+    id: 'market',
+    titulo: 'Invertido',
+    pista: 'Se valúa a precio de mercado',
+    test: (a: { valuation: string }) => a.valuation === 'market'
+  }
+] as const;
