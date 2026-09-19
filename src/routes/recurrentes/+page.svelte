@@ -361,10 +361,10 @@
     {#if !items.length}
       <Vacio titulo="Todavía no cargaste nada que se repita."
              detalle="Sirve para que la app te anticipe el alquiler, los impuestos, los seguros y las suscripciones."
-             href="/nuevo?repite=1" accion="Cargar el primero" />
+             href="/nuevo?repite=1&volver=/recurrentes" accion="Cargar el primero" />
     {/if}
 
-    <a class="btn-primary nueva" href="/nuevo?repite=1">+ Nuevo gasto fijo</a>
+    <a class="btn-primary nueva" href="/nuevo?repite=1&volver=/recurrentes">+ Nuevo gasto fijo</a>
   {/if}
 </div>
 

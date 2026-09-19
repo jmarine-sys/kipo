@@ -149,7 +149,7 @@
 
     <form class="card stack" onsubmit={agregar}>
       <h2>Agregar</h2>
-      <input bind:value={nuevoNombre} required placeholder="Nombre" />
+      <input bind:value={nuevoNombre} required maxlength="28" placeholder="Nombre" />
       <select bind:value={nuevoPadre}>
         <option value={null}>Sin agrupar (nivel principal)</option>
         {#each madres.filter((p) => p.kind === tipo && !p.is_system) as p}
@@ -166,7 +166,7 @@
     <label class="campo">
       <span>Nombre</span>
       <span class="row">
-        <input bind:value={nombre} />
+        <input bind:value={nombre} maxlength="28" />
         <button class="btn-primary chico" disabled={busy || !nombre.trim() || nombre.trim() === c.name}
                 onclick={() => guardarNombre(c)}>Guardar</button>
       </span>

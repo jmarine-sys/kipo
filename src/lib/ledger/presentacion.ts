@@ -32,7 +32,15 @@ export interface Fila {
   /** Texto plano, para buscar y como respaldo. Lo que se dibuja son las refs. */
   titulo: string;
   fecha: string;
-  madre: string | null;
+  /**
+   * El grupo al que pertenece, para agrupar y filtrar.
+   *
+   * Es la categoría madre si la tiene, y ELLA MISMA si es de primer nivel. Antes
+   * era solo `category_parent`, que es null para una categoría sin madre: un
+   * gasto imputado directo a «Gastos fijos» no aparecía en el filtro y, peor,
+   * DESAPARECÍA de la lista en cuanto se filtraba por cualquier cosa.
+   */
+  grupo: string | null;
   /**
    * Las cuentas involucradas, como objetos y no como nombres sueltos.
    *
@@ -91,7 +99,7 @@ export function filasDeMovimientos(lineas: EntryDetail[]): Fila[] {
       titulo: cat
         ? (cat.category_name ?? '—')
         : `${neg?.account_name ?? '—'} → ${pos?.account_name ?? '—'}`,
-      madre: cat?.category_parent ?? null,
+      grupo: cat ? (cat.category_parent ?? cat.category_name ?? null) : null,
       cuenta: cat ? (refDe(neg) ?? refDe(pos)) : null,
       desde: cat ? null : refDe(neg),
       hacia: cat ? null : refDe(pos),

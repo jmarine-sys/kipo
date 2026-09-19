@@ -114,6 +114,20 @@
   // OD-21. La base no puede validar un tipo de cambio -cualquier cociente es
   // aritmeticamente valido- asi que el unico lugar donde se puede mirar es acá,
   // mientras se tipea. La REGLA vive en plausibilidad.ts, no en esta pantalla.
+  /**
+   * Adónde volver: a la pantalla que te trajo, o a Inicio.
+   *
+   * Lo manda quien abre el formulario (`?volver=`). No se usa `history.back()`
+   * porque la entrada anterior puede ser de afuera de la app, y volver ahí sería
+   * sacarte de kipo — y el usuario pidió que, ante la duda, sea siempre Inicio.
+   */
+  const volver = $derived.by(() => {
+    const v = page.url.searchParams.get('volver');
+    // Solo rutas internas: un `volver` con una URL de afuera sería una puerta
+    // para mandar a alguien a cualquier lado desde un enlace.
+    return v && v.startsWith('/') && !v.startsWith('//') ? v : '/';
+  });
+
   let cuotas = $state(1);
 
   /**
@@ -298,7 +312,7 @@
           next_on: date,
           month_end: esFinDeMes && frecuencia !== 'weekly'
         });
-        goto('/recurrentes');
+        goto(volver === '/' ? '/recurrentes' : volver);
         return;
       }
 
@@ -314,7 +328,7 @@
           detalle: note || null
         });
         bump(accountId);
-        goto('/');
+        goto(volver);
         return;
       }
       const input =
@@ -351,7 +365,7 @@
       }
       remember(accountId);
       if (categoryId) bump(categoryId);
-      goto('/');
+      goto(volver);
     } catch (e) {
       error = e instanceof Error ? e.message : 'No se pudo guardar';
       busy = false;
@@ -361,7 +375,7 @@
 
 <div class="page">
   <div class="spread top">
-    <a href="/" class="back" aria-label="Volver">←</a>
+    <a href={volver} class="back" aria-label="Volver">←</a>
     <input class="date" type="date" bind:value={date} />
   </div>
 

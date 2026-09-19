@@ -53,7 +53,7 @@ test('un gasto se muestra positivo, con el signo menos', () => {
   assert.equal(f.monto, 25000);
   assert.equal(f.signo, '−');
   assert.equal(f.clase, 'neg');
-  assert.equal(f.madre, 'Gastos variables');
+  assert.equal(f.grupo, 'Gastos variables');
 });
 
 test('una transferencia no lleva signo ni toca el resultado', () => {
@@ -193,4 +193,53 @@ test('y los totales lo cuentan del lado correcto', () => {
   const t = totales([...filasDeMovimientos(ajuste('t1', 5000))]);
   assert.equal(t.ingresos, 5000);
   assert.equal(t.gastos, 0);
+});
+
+// ---------------------------------------------------------------------------
+// El grupo de una fila: la madre si la tiene, ELLA MISMA si es de primer nivel.
+//
+// Antes era solo `category_parent`, que es null para una categoría sin madre.
+// Un gasto imputado directo a «Gastos fijos» no aparecía entre los filtros y,
+// en cuanto se filtraba por cualquier cosa, DESAPARECÍA de la lista.
+// ---------------------------------------------------------------------------
+
+test('una categoría con madre se agrupa bajo la madre', () => {
+  const [f] = filasDeMovimientos([
+    fila({ transaction_id: 't1', amount: '-900', account_id: 'a', account_name: 'Caja' }),
+    fila({ transaction_id: 't1', amount: '900', category_id: 'c', category_name: 'Supermercado',
+           category_kind: 'expense', category_parent: 'Gastos variables' })
+  ]);
+  assert.equal(f.grupo, 'Gastos variables');
+  assert.equal(f.titulo, 'Supermercado');
+});
+
+test('una categoría SIN madre se agrupa bajo ella misma', () => {
+  const [f] = filasDeMovimientos([
+    fila({ transaction_id: 't2', amount: '-900', account_id: 'a', account_name: 'Caja' }),
+    fila({ transaction_id: 't2', amount: '900', category_id: 'c', category_name: 'Gastos fijos',
+           category_kind: 'expense', category_parent: null })
+  ]);
+  assert.equal(f.grupo, 'Gastos fijos');
+  assert.equal(f.titulo, 'Gastos fijos');
+});
+
+test('así, filtrar por un grupo no se come los movimientos de la madre', () => {
+  const filas = filasDeMovimientos([
+    ...[fila({ transaction_id: 'a1', amount: '-100', account_id: 'a', account_name: 'Caja' }),
+        fila({ transaction_id: 'a1', amount: '100', category_id: 'c1', category_name: 'Gastos fijos',
+               category_kind: 'expense', category_parent: null })],
+    ...[fila({ transaction_id: 'a2', amount: '-200', account_id: 'a', account_name: 'Caja' }),
+        fila({ transaction_id: 'a2', amount: '200', category_id: 'c2', category_name: 'Alquiler',
+               category_kind: 'expense', category_parent: 'Gastos fijos' })]
+  ]);
+  const filtradas = filas.filter((f) => f.grupo === 'Gastos fijos');
+  assert.equal(filtradas.length, 2, 'la madre y su hija caen en el mismo grupo');
+});
+
+test('una transferencia no tiene grupo: no es un gasto de ninguna categoría', () => {
+  const [f] = filasDeMovimientos([
+    fila({ transaction_id: 't3', amount: '-500', account_id: 'a', account_name: 'Caja' }),
+    fila({ transaction_id: 't3', amount: '500', account_id: 'b', account_name: 'Banco' })
+  ]);
+  assert.equal(f.grupo, null);
 });

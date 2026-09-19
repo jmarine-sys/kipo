@@ -64,7 +64,11 @@
       <!-- No en /nuevo: ahi el flotante no lleva a ningun lado y tapa el boton
            de guardar, que es lo unico que importa en esa pantalla. -->
       {#if page.url.pathname !== '/nuevo'}
-      <a href="/nuevo" class="fab" aria-label="Registrar movimiento">
+      <!-- Le dice a /nuevo de dónde viene, para que su flecha vuelva ahí y no
+           siempre a Inicio. Explícito y no `history.back()`: la historia puede
+           venir de afuera de la app, y volver ahí sería sacarte de kipo. -->
+      <a href="/nuevo?volver={encodeURIComponent(page.url.pathname)}" class="fab"
+         aria-label="Registrar movimiento">
         <!-- Trazo dibujado, no el caracter '+': una tipografia en peso liviano
              adelgaza el signo hasta volverlo casi invisible sobre el color. -->
         <svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true" focusable="false">

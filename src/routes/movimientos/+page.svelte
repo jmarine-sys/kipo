@@ -48,10 +48,16 @@
     };
   });
 
-  /** Las categorías madre presentes en lo cargado. Solo se ofrece filtrar por lo que existe. */
+  /**
+   * Los grupos presentes en lo cargado. Solo se ofrece filtrar por lo que existe.
+   *
+   * Sale de las FILAS y no de las líneas: una fila ya sabe que su grupo es la
+   * madre o ella misma. Mirando las líneas se perdían las categorías de primer
+   * nivel con movimientos propios.
+   */
   const madresDisponibles = $derived.by(() => {
     const s = new Set<string>();
-    for (const e of entries) if (e.category_parent) s.add(e.category_parent);
+    for (const r of todas) if (r.grupo) s.add(r.grupo);
     return [...s].sort();
   });
 
@@ -63,9 +69,10 @@
 
   // La conversión de líneas a filas vive en $lib/ledger/presentacion: una
   // pantalla pide una fila, nunca interpreta un signo.
+  const todas = $derived(filasDeMovimientos(entries));
+
   const rows = $derived(
-    filasDeMovimientos(entries)
-      .filter((r) => !filtrando || (r.madre !== null && madres.includes(r.madre)))
+    todas.filter((r) => !filtrando || (r.grupo !== null && madres.includes(r.grupo)))
   );
 
   /** Los nombres repetidos de TODO lo que se está viendo, para aclarar el banco
@@ -163,7 +170,7 @@
       {:else}
         <Vacio titulo="Ningún movimiento en este período."
                detalle={periodo === 'mes' ? 'Probá con otro mes.' : null}
-               href="/nuevo" accion="Registrar un movimiento" />
+               href="/nuevo?volver=/movimientos" accion="Registrar un movimiento" />
     {/if}
   {:else}
     <p class="resumen dim">
@@ -177,32 +184,50 @@
         <li class="card">
           <button class="fila" onclick={() => (abierto = abierto === r.id ? null : r.id)}>
             <span class="fecha dim">{shortDate(r.fecha)}</span>
+            <!-- LO OBLIGATORIO Y NADA MÁS: qué fue, de qué cuenta salió, cuánto.
+                 Todo lo demás —el grupo en texto, la nota— se amontonaba en una
+                 línea que no se podía leer. Ahora está al tocar, que además es
+                 donde la nota por fin aparece: hasta hoy se cargaba y no se veía
+                 en ninguna pantalla. -->
             <span class="txt">
-              <!-- Una transferencia se lee como lo que es: de dónde a dónde. Las
-                   dos cuentas con su moneda, igual que en todas las pantallas. -->
-              {#if r.desde || r.hacia}
-                <b class="mov">
-                  {#if r.desde}<Cuenta cuenta={r.desde} ambigua={esAmbigua(r.desde, repetidos)} />{/if}
-                  <span class="flecha" aria-hidden="true">→</span>
-                  {#if r.hacia}<Cuenta cuenta={r.hacia} ambigua={esAmbigua(r.hacia, repetidos)} />{/if}
-                </b>
-              {:else}
-                <b>{r.titulo}</b>
-              {/if}
-              <span class="sub dim">
-                {#if r.madre}<i class="punto" style="background:{colorCategoria(r.madre)}"></i>{r.madre}{/if}
-                {#if r.cuenta}
-                  <span class="sep">·</span>
-                  <Cuenta cuenta={r.cuenta} ambigua={esAmbigua(r.cuenta, repetidos)} />
+              <span class="titulo">
+                {#if r.grupo}
+                  <i class="punto" style="background:{colorCategoria(r.grupo)}"
+                     title={r.grupo}></i>
                 {/if}
-                {#if r.nota}<span class="sep">·</span>{r.nota}{/if}
+                {#if r.desde || r.hacia}
+                  <b class="mov">
+                    {#if r.desde}<Cuenta cuenta={r.desde} ambigua={esAmbigua(r.desde, repetidos)} banco="nunca" />{/if}
+                    <span class="flecha" aria-hidden="true">→</span>
+                    {#if r.hacia}<Cuenta cuenta={r.hacia} ambigua={esAmbigua(r.hacia, repetidos)} banco="nunca" />{/if}
+                  </b>
+                {:else}
+                  <b class="corta">{r.titulo}</b>
+                {/if}
               </span>
+              {#if r.cuenta}
+                <span class="sub dim">
+                  <Cuenta cuenta={r.cuenta} ambigua={esAmbigua(r.cuenta, repetidos)} banco="nunca" />
+                </span>
+              {/if}
             </span>
             <b class="monto money {r.clase}">{r.signo}{money(r.monto, r.unit)}</b>
           </button>
 
           {#if abierto === r.id}
-            <div class="acciones">
+            <div class="detalle">
+              <dl>
+                {#if r.grupo && r.grupo !== r.titulo}
+                  <dt>Grupo</dt><dd>{r.grupo}</dd>
+                {/if}
+                {#if r.cuenta}
+                  <dt>Cuenta</dt>
+                  <dd><Cuenta cuenta={r.cuenta} banco="siempre" /></dd>
+                {/if}
+                {#if r.desde}<dt>Sale de</dt><dd><Cuenta cuenta={r.desde} banco="siempre" /></dd>{/if}
+                {#if r.hacia}<dt>Entra en</dt><dd><Cuenta cuenta={r.hacia} banco="siempre" /></dd>{/if}
+                {#if r.nota}<dt>Nota</dt><dd>{r.nota}</dd>{/if}
+              </dl>
               <button class="borrar" onclick={() => remove(r.id)}>Borrar movimiento</button>
             </div>
           {/if}
@@ -265,7 +290,18 @@
   .fecha { font-size: .72rem; line-height: 1.2; }
   .txt { display: flex; flex-direction: column; min-width: 0; gap: .1rem; }
   .txt b { font-size: .95rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .mov { display: inline-flex; align-items: baseline; gap: .35rem; flex-wrap: wrap; }
+  .titulo { display: flex; align-items: baseline; gap: .4rem; min-width: 0; }
+  /* El nombre de una categoría puede ser largo; la fila, no. Mismo criterio que
+     en la lista de cuentas: se recorta lo que se puede adivinar. */
+  .corta { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mov { display: inline-flex; align-items: baseline; gap: .35rem; min-width: 0; overflow: hidden; }
+  .detalle { padding: .2rem .85rem .8rem; display: grid; gap: .6rem; }
+  .detalle dl {
+    margin: 0; display: grid; grid-template-columns: auto 1fr;
+    gap: .25rem .7rem; font-size: .82rem; align-items: baseline;
+  }
+  .detalle dt { color: var(--text-dim); }
+  .detalle dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
   .flecha { opacity: .5; }
   .sub { font-size: .74rem; display: flex; align-items: center; gap: .3rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .sep { opacity: .5; }
