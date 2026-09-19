@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { listEntries, deleteTransaction, toCSV, download, type EntryDetail } from '$lib/ledger/api';
-  import { filasDeMovimientos, totales } from '$lib/ledger/presentacion';
+  import { filasDeMovimientos, totales, type Fila } from '$lib/ledger/presentacion';
   import { colorCategoria } from '$lib/categorias';
   import Cuenta from '$lib/Cuenta.svelte';
   import { nombresRepetidos, esAmbigua } from '$lib/ledger/tipos';
@@ -48,31 +48,64 @@
     };
   });
 
-  /**
-   * Los grupos presentes en lo cargado. Solo se ofrece filtrar por lo que existe.
-   *
-   * Sale de las FILAS y no de las líneas: una fila ya sabe que su grupo es la
-   * madre o ella misma. Mirando las líneas se perdían las categorías de primer
-   * nivel con movimientos propios.
-   */
-  const madresDisponibles = $derived.by(() => {
-    const s = new Set<string>();
-    for (const r of todas) if (r.grupo) s.add(r.grupo);
-    return [...s].sort();
-  });
-
-  const filtrando = $derived(madres.length > 0);
-
-  function alternarMadre(m: string) {
-    madres = madres.includes(m) ? madres.filter((x) => x !== m) : [...madres, m];
-  }
-
   // La conversión de líneas a filas vive en $lib/ledger/presentacion: una
   // pantalla pide una fila, nunca interpreta un signo.
   const todas = $derived(filasDeMovimientos(entries));
 
+  let hijas = $state<string[]>([]);
+  let buscar = $state('');
+
+  const filtrando = $derived(madres.length > 0 || hijas.length > 0);
+
+  const alternar = (lista: string[], v: string) =>
+    lista.includes(v) ? lista.filter((x) => x !== v) : [...lista, v];
+
+  /**
+   * Los grupos y las categorías presentes, ordenados por cuánto se usan.
+   *
+   * Se ofrecen unos pocos y el resto por buscador, igual que las fechas: una
+   * fila de veinte fichas no es un filtro, es una lista. El criterio es cuántos
+   * movimientos tiene cada una EN LO QUE SE ESTÁ VIENDO — no hace falta
+   * consultar nada, ya están en pantalla.
+   */
+  function porUso(clave: (r: Fila) => string | null, de: Fila[]): [string, number][] {
+    const n = new Map<string, number>();
+    for (const r of de) {
+      const k = clave(r);
+      if (k) n.set(k, (n.get(k) ?? 0) + 1);
+    }
+    return [...n.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  }
+
+  const gruposUsados = $derived(porUso((r) => r.grupo, todas));
+
+  /**
+   * Las hijas que se ofrecen. Al elegir un grupo, solo las de ESE grupo: las de
+   * otro no llevan a ningún lado porque ya quedaron fuera del filtro.
+   */
+  const hijasUsadas = $derived(
+    porUso(
+      (r) => (r.grupo && r.titulo !== r.grupo ? r.titulo : null),
+      madres.length ? todas.filter((r) => r.grupo !== null && madres.includes(r.grupo)) : todas
+    )
+  );
+
+  const coincide = (t: string) =>
+    !buscar.trim() || t.toLowerCase().includes(buscar.trim().toLowerCase());
+
+  /** Unas pocas, más las elegidas y las que coincidan con la búsqueda. */
+  function aOfrecer(lista: [string, number][], elegidas: string[], tope = 6): [string, number][] {
+    const base = buscar.trim()
+      ? lista.filter(([t]) => coincide(t))
+      : [...lista.slice(0, tope), ...lista.filter(([t]) => elegidas.includes(t))];
+    return base.filter(([t], i, a) => a.findIndex(([o]) => o === t) === i);
+  }
+
+  /** Pasa si coincide con CUALQUIER filtro elegido: es lo que espera quien tilda. */
   const rows = $derived(
-    todas.filter((r) => !filtrando || (r.grupo !== null && madres.includes(r.grupo)))
+    todas.filter((r) => !filtrando
+      || (r.grupo !== null && madres.includes(r.grupo))
+      || hijas.includes(r.titulo))
   );
 
   /** Los nombres repetidos de TODO lo que se está viendo, para aclarar el banco
@@ -80,6 +113,10 @@
   const repetidos = $derived(nombresRepetidos(
     rows.flatMap((r) => [r.cuenta, r.desde, r.hacia].filter(Boolean) as { name: string }[])
   ));
+
+  /** La nota, salvo que sea la categoría otra vez: eso no es una nota. */
+  const notaUtil = (r: { nota: string | null; titulo: string; grupo: string | null }) =>
+    r.nota && r.nota !== r.titulo && r.nota !== r.grupo ? r.nota : null;
 
   const suma = $derived(totales(rows));
 
@@ -137,19 +174,47 @@
         </div>
       {/if}
 
-      {#if madresDisponibles.length}
-        <div>
-          <h2 class="lbl">Categoría</h2>
-          <div class="wrap">
-            {#each madresDisponibles as m}
-              <button class="chip" class:on={madres.includes(m)} onclick={() => alternarMadre(m)}>
-                <i class="punto" style="background:{colorCategoria(m)}"></i>{m}
-              </button>
-            {/each}
+      {#if gruposUsados.length}
+        <div class="cats">
+          <div class="spread">
+            <h2 class="lbl">Categoría</h2>
             {#if filtrando}
-              <button class="chip limpiar" onclick={() => (madres = [])}>Quitar filtros</button>
+              <button class="link" onclick={() => { madres = []; hijas = []; buscar = ''; }}>
+                Quitar filtros
+              </button>
             {/if}
           </div>
+
+          <input class="buscar" bind:value={buscar} placeholder="Buscar una categoría…" />
+
+          <span class="lbl chico">Grupos</span>
+          <div class="wrap">
+            {#each aOfrecer(gruposUsados, madres) as [m, n]}
+              <button class="chip" class:on={madres.includes(m)}
+                      onclick={() => (madres = alternar(madres, m))}>
+                <i class="punto" style="background:{colorCategoria(m)}"></i>{m}
+                <span class="cuantos">{n}</span>
+              </button>
+            {:else}
+              <span class="dim sm">Ningún grupo coincide.</span>
+            {/each}
+          </div>
+
+          {#if hijasUsadas.length}
+            <span class="lbl chico">
+              Categorías{#if madres.length} de lo elegido{/if}
+            </span>
+            <div class="wrap">
+              {#each aOfrecer(hijasUsadas, hijas) as [c, n]}
+                <button class="chip" class:on={hijas.includes(c)}
+                        onclick={() => (hijas = alternar(hijas, c))}>
+                  {c}<span class="cuantos">{n}</span>
+                </button>
+              {:else}
+                <span class="dim sm">Ninguna coincide.</span>
+              {/each}
+            </div>
+          {/if}
         </div>
       {/if}
     </div>
@@ -166,7 +231,7 @@
         <Vacio conMascota={false}
                titulo="Nada coincide con el filtro."
                detalle="Probá con otra categoría o ampliá el período."
-               accion="Quitar filtros" onaccion={() => (madres = [])} />
+               accion="Quitar filtros" onaccion={() => { madres = []; hijas = []; buscar = ''; }} />
       {:else}
         <Vacio titulo="Ningún movimiento en este período."
                detalle={periodo === 'mes' ? 'Probá con otro mes.' : null}
@@ -226,7 +291,12 @@
                 {/if}
                 {#if r.desde}<dt>Sale de</dt><dd><Cuenta cuenta={r.desde} banco="siempre" /></dd>{/if}
                 {#if r.hacia}<dt>Entra en</dt><dd><Cuenta cuenta={r.hacia} banco="siempre" /></dd>{/if}
-                {#if r.nota}<dt>Nota</dt><dd>{r.nota}</dd>{/if}
+                <!-- Siempre presente, con «—» cuando no dice nada nuevo. Una
+                     regla creada sin nota se guarda con el nombre de la
+                     categoría como descripción, así que el movimiento mostraba
+                     la categoría repetida haciéndose pasar por nota. -->
+                <dt>Nota</dt>
+                <dd class:dim={!notaUtil(r)}>{notaUtil(r) ?? '—'}</dd>
               </dl>
               <button class="borrar" onclick={() => remove(r.id)}>Borrar movimiento</button>
             </div>
@@ -290,6 +360,13 @@
   .fecha { font-size: .72rem; line-height: 1.2; }
   .txt { display: flex; flex-direction: column; min-width: 0; gap: .1rem; }
   .txt b { font-size: .95rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cats { display: flex; flex-direction: column; gap: .4rem; }
+  .lbl.chico { font-size: .68rem; margin: .2rem 0 0; }
+  .buscar { width: 100%; }
+  .cuantos {
+    font-size: .68rem; opacity: .6; margin-left: .1rem;
+    font-variant-numeric: tabular-nums;
+  }
   .titulo { display: flex; align-items: baseline; gap: .4rem; min-width: 0; }
   /* El nombre de una categoría puede ser largo; la fila, no. Mismo criterio que
      en la lista de cuentas: se recorta lo que se puede adivinar. */
