@@ -8,6 +8,7 @@
   import { createScheduled, FRECUENCIAS, type Frecuencia } from '$lib/ledger/recurrentes';
   import { nombresRepetidos, esAmbigua } from '$lib/ledger/tipos';
   import Cuenta from '$lib/Cuenta.svelte';
+  import SelectorCuenta from '$lib/SelectorCuenta.svelte';
   import { expense, income, transfer, exchange, impliedRate } from '$lib/ledger/entries';
   import { money, today, shortDate, num } from '$lib/format';
   import { bump, byUse } from '$lib/frequent';
@@ -53,7 +54,22 @@
   );
   const account = $derived(accounts.find((a) => a.id === accountId) ?? null);
   const toAccount = $derived(accounts.find((a) => a.id === toAccountId) ?? null);
-  const destinations = $derived(accounts.filter((a) => a.id !== accountId));
+  /**
+   * Adónde se puede mover plata — y adónde NO.
+   *
+   * Antes eran todas las cuentas. Elegir una POSICIÓN o un PLAZO FIJO reventaba
+   * en la base con un error incomprensible: la unidad de una posición es el
+   * símbolo del instrumento, no una moneda, y el invariante lo rechaza. A una
+   * posición se le compra (`comprar_activo`) y un plazo fijo se constituye
+   * (`create_plazo_fijo`): ninguna de las dos es una transferencia.
+   *
+   * Las TARJETAS sí se quedan, y no por descuido: pagar el resumen es
+   * exactamente mover plata a la tarjeta, y es el diseño de ADR-004. Sacarlas
+   * dejaría sin forma de registrar que pagaste.
+   */
+  const destinations = $derived(
+    accounts.filter((a) => a.id !== accountId && a.valuation === 'balance')
+  );
 
   /**
    * Mover plata a una cuenta de OTRO libro — ADR-032.
@@ -474,50 +490,69 @@
         {/if}
 
         {#if mode === 'expense'}
-          <label class="repite">
-            <input type="checkbox" bind:checked={repite} />
-            <span>
-              Esto se repite
-              <span class="dim sm bloque">
-                Además de registrarlo, queda agendado para la próxima.
+          <!-- En su propia caja y EN ORDEN. Estaba todo suelto y encimado: las
+               frecuencias primero, los atajos de fecha en el medio, y el «ya lo
+               pagué» al final — así que tocar «todavía no» hacía aparecer los
+               botones de día ARRIBA de lo que acababas de tocar.
+               Ahora se lee de arriba abajo como se piensa: se repite, ya lo
+               pagaste o no, cuándo, y cada cuánto. -->
+          <div class="repeticion" class:activa={repite}>
+            <label class="repite">
+              <input type="checkbox" bind:checked={repite} />
+              <span>
+                Esto se repite
+                <span class="dim sm bloque">
+                  Queda agendado para la próxima vez.
+                </span>
               </span>
-            </span>
-          </label>
+            </label>
 
-          {#if repite}
-            <div class="wrap frec">
-              {#each FRECUENCIAS as f}
-                <button class="chip chico" class:on={frecuencia === f.id}
-                        onclick={() => (frecuencia = f.id)}>{f.label}</button>
-              {/each}
-            </div>
-            {#if !yaPague}
-              <div class="wrap">
-                {#each ATAJOS as a}
-                  <button class="chip chico" onclick={() => atajo(a.id)}>{a.label}</button>
-                {/each}
+            {#if repite}
+              <div class="paso">
+                <span class="rotulo">¿Ya lo pagaste?</span>
+                <div class="wrap">
+                  {#each [[true, 'Ya lo pagué'], [false, 'Todavía no']] as [v, l]}
+                    <button class="chip chico" class:on={yaPague === v}
+                            onclick={() => (yaPague = v as boolean)}>{l}</button>
+                  {/each}
+                </div>
               </div>
+
+              {#if !yaPague}
+                <div class="paso">
+                  <span class="rotulo">¿Cuándo es la primera vez?</span>
+                  <div class="wrap">
+                    {#each ATAJOS as a}
+                      <button class="chip chico" onclick={() => atajo(a.id)}>{a.label}</button>
+                    {/each}
+                  </div>
+                  <input type="date" bind:value={date} />
+                </div>
+              {/if}
+
+              <div class="paso">
+                <span class="rotulo">¿Cada cuánto?</span>
+                <div class="wrap">
+                  {#each FRECUENCIAS as f}
+                    <button class="chip chico" class:on={frecuencia === f.id}
+                            onclick={() => (frecuencia = f.id)}>{f.label}</button>
+                  {/each}
+                </div>
+              </div>
+
+              <p class="resumen dim sm">
+                {#if yaPague}
+                  Se registra ahora y la próxima cae el <b>{shortDate(proxima)}</b>.
+                {:else}
+                  No se registra nada todavía: queda agendado para el
+                  <b>{shortDate(date)}</b>.
+                {/if}
+                {#if esFinDeMes && frecuencia !== 'weekly'}
+                  Como la fecha es fin de mes, va a seguir cayendo el último día de cada mes.
+                {/if}
+              </p>
             {/if}
-
-            <div class="wrap pagado">
-              {#each [[true, 'Ya lo pagué'], [false, 'Todavía no']] as [v, l]}
-                <button class="chip chico" class:on={yaPague === v}
-                        onclick={() => (yaPague = v as boolean)}>{l}</button>
-              {/each}
-            </div>
-
-            <p class="dim sm">
-              {#if yaPague}
-                Se registra ahora y queda agendado: la próxima cae el <b>{shortDate(proxima)}</b>.
-              {:else}
-                No se registra nada todavía. Queda agendado para el
-                <b>{shortDate(date)}</b>, y lo vas a ver en <a href="/recurrentes">Agenda</a>.
-              {/if}
-              {#if esFinDeMes && frecuencia !== 'weekly'}
-                Como la fecha es fin de mes, va a seguir cayendo el último día de cada mes.
-              {/if}
-            </p>
-          {/if}
+          </div>
         {/if}
       </section>
     {/if}
@@ -526,22 +561,18 @@
       <h2 class="lbl">
         {mode === 'expense' ? 'Pagás con' : mode === 'income' ? 'Entra en' : 'Desde'}
       </h2>
-      <div class="wrap">
-        {#each sources as a}
-          <button class="chip" class:on={accountId === a.id}
-                  onclick={() => { accountId = a.id; if (toAccountId === a.id) toAccountId = null; }}>
-            <Cuenta cuenta={a} ambigua={esAmbigua(a, repetidos)} />
-          </button>
-        {:else}
-          <!-- Sin esto la pantalla mostraba un hueco mudo y el boton de guardar
-               no se habilitaba nunca. Un formulario que no se puede completar
-               tiene que decir POR QUE y adonde ir. -->
-          <p class="salida">
-            Todavía no tenés ninguna cuenta de donde sacar la plata.
-            <a href="/comenzar">Empecemos por ahí →</a>
-          </p>
-        {/each}
-      </div>
+      {#if sources.length}
+        <SelectorCuenta cuentas={sources} valor={accountId}
+                        onelegir={(id) => { accountId = id; if (toAccountId === id) toAccountId = null; }} />
+      {:else}
+        <!-- Sin esto la pantalla mostraba un hueco mudo y el botón de guardar
+             no se habilitaba nunca. Un formulario que no se puede completar
+             tiene que decir POR QUÉ y adónde ir. -->
+        <p class="salida">
+          Todavía no tenés ninguna cuenta de donde sacar la plata.
+          <a href="/comenzar">Empecemos por ahí →</a>
+        </p>
+      {/if}
 
       <!-- Solo con tarjeta, para no tocar el camino rápido: el 90% de los gastos
            no son en cuotas y no tienen que ver este campo. OD-23. -->
@@ -567,16 +598,9 @@
     {#if mode === 'move'}
       <section>
         <h2 class="lbl">Hacia</h2>
-        <div class="wrap">
-          {#each destinations as a}
-            <button class="chip" class:on={toAccountId === a.id}
-                    onclick={() => (toAccountId = a.id)}>
-              <Cuenta cuenta={a} ambigua={esAmbigua(a, repetidos)} />
-            </button>
-          {:else}
-            <p class="dim sm">No tenés otra cuenta a dónde mover.</p>
-          {/each}
-        </div>
+        <SelectorCuenta cuentas={destinations} valor={toAccountId}
+                        onelegir={(id) => (toAccountId = id)}
+                        vacio="No tenés otra cuenta a dónde mover." />
 
         <!-- Las de tus otros libros, aparte y dichas como lo que son. Solo las
              de la misma moneda: un aporte no es un cambio. -->
@@ -657,7 +681,17 @@
   .modes button { min-height: 44px; font-size: .9rem; border-radius: 10px; }
   .modes button.on { background: var(--accent); color: var(--accent-fg); border-color: transparent; font-weight: 650; }
 
-  .amount { display: flex; align-items: baseline; justify-content: center; gap: .5rem; padding: 1.1rem 0 .5rem; }
+  /* Pegado arriba: con los modos, las categorías, las cuentas y lo recurrente
+     abajo, el monto se iba de pantalla y tipeabas a ciegas. Es el único dato que
+     tenés que poder mirar todo el tiempo. */
+  .amount {
+    position: sticky; top: 0; z-index: 5;
+    display: flex; align-items: baseline; justify-content: center; gap: .5rem;
+    padding: .7rem 0 .6rem;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    margin: 0 -1rem .6rem;
+  }
   .cur { color: var(--text-dim); font-size: 1rem; }
   .val { font-size: 2.9rem; font-weight: 600; letter-spacing: -0.02em; }
   .val.empty { color: var(--text-dim); }
@@ -704,10 +738,17 @@
     border: 1px solid color-mix(in srgb, var(--warn) 40%, transparent);
   }
   .salida a { display: inline-block; margin-top: .3rem; }
-  .repite { display: flex; align-items: flex-start; gap: .6rem; margin-top: .8rem; }
-  .pagado { margin-top: .5rem; }
+  .repeticion {
+    margin-top: .9rem; padding: .7rem .8rem; border-radius: 12px;
+    border: 1px solid var(--border); background: var(--surface);
+    display: flex; flex-direction: column; gap: .7rem;
+  }
+  .repeticion.activa { border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); }
+  .repite { display: flex; align-items: flex-start; gap: .6rem; }
+  .paso { display: flex; flex-direction: column; gap: .35rem; }
+  .paso .rotulo { font-size: .74rem; color: var(--text-dim); font-weight: 600; }
+  .repeticion .resumen { margin: 0; }
   .bloque { display: block; }
-  .frec { margin-top: .5rem; }
   .cuotas { margin-top: .7rem; display: flex; flex-direction: column; gap: .35rem; }
   .cuotas .chip.chico { min-height: 36px; padding: 0 .7rem; font-size: .82rem; }
   .cuotas p { margin: 0; }

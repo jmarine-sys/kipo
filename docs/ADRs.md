@@ -55,6 +55,7 @@ decision nobody made is fiction, and an agent will believe it.
 | [ADR-032](#adr-032--aportar-a-otro-libro-es-gastar-y-son-dos-movimientos-uno-por-libro) | Aportar a otro libro es gastar, y son dos movimientos, uno por libro | Accepted |
 | [ADR-033](#adr-033--la-navegación-agrupa-por-significado-y-no-todo-merece-estar-cerca) | La navegación agrupa por significado, y no todo merece estar cerca | Accepted |
 | [ADR-034](#adr-034--una-fila-muestra-lo-obligatorio-y-un-filtro-sugiere-antes-de-listar) | Una fila muestra lo obligatorio, y un filtro sugiere antes de listar | Accepted |
+| [ADR-035](#adr-035--el-alta-de-movimiento-se-lee-de-arriba-abajo) | El alta de movimiento se lee de arriba abajo | Accepted |
 
 ---
 
@@ -1890,4 +1891,63 @@ los movimientos imputados a una categoría madre (OD-47) — con cuatro casos en
 presentacion.test.ts, uno de ellos:
 
   ok  filtrar por un grupo trae la madre Y sus hijas
+```
+
+
+---
+
+## ADR-035 — El alta de movimiento se lee de arriba abajo
+
+**Context.** El formulario fue creciendo —cuotas, plausibilidad del tipo de cambio, aportes entre
+libros, gastos recurrentes— hasta que el usuario dijo *"ya no se entiende nada"*. Cuatro síntomas
+concretos, y ninguno era de estilo:
+
+1. Las cuentas eran **todas** como fichas en fila. Funciona con cuatro y deja de funcionar con doce,
+   que es exactamente lo que ya había pasado con las categorías.
+2. El monto se dibuja arriba y todo lo demás abajo, así que al scrollear para elegir la cuenta **el
+   número se iba de pantalla y tipeabas a ciegas**.
+3. El bloque de repetición tenía las frecuencias primero, los atajos de fecha en el medio y el *«ya lo
+   pagué»* al final: tocar *«todavía no»* hacía aparecer los botones de día **arriba** de lo que
+   acababas de tocar.
+4. En *Mover* se podía elegir una **posición** o un **plazo fijo** como destino.
+
+**Decision.** Un selector de cuentas que sugiere y busca, el monto fijo arriba, el bloque de
+repetición en orden de lectura, y solo destinos que existen.
+
+**Consequences.**
+- El selector de cuentas ordena por **cuánto se usa** y adelanta las de **ARS** entre las que empatan.
+  No es alfabético: lo que hace que un toque alcance es que arriba esté lo de siempre.
+- El monto queda **pegado al borde superior**. Es el único dato que hay que poder mirar todo el tiempo.
+- La repetición se lee como se piensa: *se repite · ya lo pagaste o no · cuándo · cada cuánto*, cada
+  paso con su rótulo y todo dentro de una caja.
+- **Las posiciones y los plazos fijos dejan de ser destino.** No es una restricción de interfaz: la
+  unidad de una posición es el símbolo del instrumento y el invariante de la base rechaza la línea. A
+  una posición se le compra y un plazo fijo se constituye; ninguna de las dos es una transferencia.
+- **Las tarjetas SIGUEN siendo destino, contra lo que pidió el usuario.** Pagar el resumen es
+  literalmente mover plata a la tarjeta — es
+  [ADR-004](#adr-004--la-tarjeta-de-crédito-se-modela-como-cuenta-de-pasivo) — y la pantalla ya lo
+  explica. Sacarlas dejaría sin forma de registrar que pagaste.
+- **La parte incómoda:** el selector agrega un toque cuando la cuenta que querés no está entre las
+  cinco sugeridas. Se acepta porque ese caso se vuelve más raro con el uso, y el anterior empeoraba
+  con el uso.
+
+**Rejected alternatives.**
+- *Sacar las tarjetas de los destinos*, que es lo que se pidió: rompe el ciclo de la tarjeta.
+- *Un teclado numérico propio abajo, al lado del monto*: resuelve la visibilidad y agrega una pieza
+  que hay que mantener, y pierde el teclado del sistema con su autocompletado y su accesibilidad.
+- *Partir el alta en pasos (wizard)*: contra el criterio del MVP, que es registrar un gasto en tres
+  toques.
+
+**Evidence.** `src/lib/SelectorCuenta.svelte`, `src/routes/nuevo/+page.svelte`.
+
+**Verified against what already exists.**
+
+```
+El invariante que hacia fallar una transferencia a una posicion ya estaba
+probado en la bateria:
+
+  ok  rechaza unidad distinta a la de la cuenta
+
+O sea que el formulario ofrecia una operacion que la base ya sabia rechazar: lo
+que faltaba era que no se pudiera elegir.
 ```

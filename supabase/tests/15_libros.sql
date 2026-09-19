@@ -171,7 +171,14 @@ values (:'casa', 'Caja de Casa', 'asset', 'balance', 'ARS', true);
 select id as cajacasa from account where ledger_id = :'casa' and name = 'Caja de Casa' \gset
 
 select cambiar_libro(:'mio');
-select aportar_a_libro(:'casa', :'micaja', :'cajacasa', 50000, current_date, 'Gastos de la casa') as ref \gset
+-- Sin detalle a proposito: se comprueba el texto POR DEFECTO, que es el que
+-- tiene que decir a que libro fue.
+select aportar_a_libro(:'casa', :'micaja', :'cajacasa', 50000, current_date) as ref \gset
+
+select case when description = 'Aporte a Casa'
+            then 'ok  el aporte dice A QUE libro fue, no "a otro libro"'
+            else format('FALLO  dice "%s"', description) end
+  from transaction where cross_ref = :'ref' and ledger_id = my_ledger();
 
 -- En MI libro es un gasto: esa plata ya no la puedo usar sola.
 select case when round(sum(amount)) = -50000
@@ -198,6 +205,11 @@ select case when round(sum(amount)) = 50000
 select case when count(*) = 1
             then 'ok  las dos mitades quedan unidas por la misma referencia'
             else format('FALLO  hay %s movimientos con esa referencia acá', count(*)) end
+  from transaction where cross_ref = :'ref';
+
+select case when description like 'Aporte de %'
+            then format('ok  y del otro lado dice de donde vino: "%s"', description)
+            else format('FALLO  dice "%s"', description) end
   from transaction where cross_ref = :'ref';
 
 -- Y lo que no se rompe: cada libro sigue cerrando en cero por si solo.

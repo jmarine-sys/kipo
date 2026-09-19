@@ -1,16 +1,3 @@
--- GENERADO POR scripts/pendientes.sh — no editar a mano.
---
--- Migraciones desde 20260919100000, en orden. Pegar entero en el SQL Editor de
--- Supabase, en orden. Los ALTER llevan IF NOT EXISTS y los CREATE VIEW van
--- precedidos de DROP, asi que volver a correrlo no rompe nada; un INSERT de
--- datos semilla si podria duplicar, y por eso se avisa en vez de prometer.
---
---   20260919100000_aporte_nombra_libro.sql
-
--- ===========================================================================
--- 20260919100000_aporte_nombra_libro.sql
--- ===========================================================================
-
 -- Un aporte entre libros dice A QUE libro fue, y DE cual vino.
 --
 -- La descripcion por defecto era "Aporte a otro libro" y "Aporte recibido", que
@@ -96,4 +83,3 @@ begin
 
   return v_ref;
 end $$;
-
