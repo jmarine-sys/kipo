@@ -21,6 +21,20 @@ export interface CuentaRef {
   institution: string | null;
 }
 
+/**
+ * Cómo se llama un movimiento entre cuentas.
+ *
+ * Son tres cosas distintas y la diferencia importa: un cambio de moneda no
+ * mueve plata, la convierte; pagar la tarjeta baja una deuda (ADR-004); y el
+ * resto es mover plata de un bolsillo a otro.
+ */
+function nombreDelTraspaso(neg?: EntryDetail, pos?: EntryDetail): string {
+  if (!neg || !pos) return 'Entre cuentas';
+  if (neg.unit !== pos.unit) return 'Cambio de moneda';
+  if (pos.account_kind === 'liability') return 'Pago de tarjeta';
+  return 'Entre cuentas';
+}
+
 const refDe = (e: EntryDetail | undefined): CuentaRef | null =>
   e?.account_name
     ? { name: e.account_name, unit: e.unit, kind: e.account_kind ?? null,
@@ -51,6 +65,15 @@ export interface Fila {
   cuenta: CuentaRef | null;
   desde: CuentaRef | null;
   hacia: CuentaRef | null;
+  /**
+   * Lo que ENTRÓ del otro lado, cuando no es lo mismo que salió.
+   *
+   * La fila muestra la pata que sale. En un cambio ARS→USD eso deja la otra
+   * mitad sin aparecer en ningún lado: veías «$150.000» y no cuántos dólares
+   * entraron. Es null cuando entra exactamente lo que salió, que es el caso de
+   * una transferencia común.
+   */
+  entro: { monto: number; unit: string } | null;
   nota: string | null;
   /** SIEMPRE positivo. El sentido lo llevan `signo` y `clase`. */
   monto: number;
@@ -96,9 +119,10 @@ export function filasDeMovimientos(lineas: EntryDetail[]): Fila[] {
     return {
       id,
       fecha: cab.occurred_on,
-      titulo: cat
-        ? (cat.category_name ?? '—')
-        : `${neg?.account_name ?? '—'} → ${pos?.account_name ?? '—'}`,
+      // Una transferencia se nombra por lo que ES, no listando sus dos cuentas:
+      // en una fila de teléfono, «Caja de ahorro ARS → Banco Santander USD» no
+      // se lee. Las cuentas van en el subtítulo y completas en el desplegado.
+      titulo: cat ? (cat.category_name ?? '—') : nombreDelTraspaso(neg, pos),
       grupo: cat ? (cat.category_parent ?? cat.category_name ?? null) : null,
       cuenta: cat ? (refDe(neg) ?? refDe(pos)) : null,
       desde: cat ? null : refDe(neg),
@@ -112,6 +136,10 @@ export function filasDeMovimientos(lineas: EntryDetail[]): Fila[] {
       // el color ES el mensaje: rojo sale, verde entra, neutro no toca el resultado
       clase: !cat ? 'neutro' : entra ? 'pos' : 'neg',
       afectaResultado: !!cat,
+      entro: !cat && pos && neg &&
+             (pos.unit !== neg.unit || Number(pos.amount) !== Math.abs(Number(neg.amount)))
+        ? { monto: Math.abs(Number(pos.amount)), unit: pos.unit }
+        : null,
       entra,
       esIngreso
     };

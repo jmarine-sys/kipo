@@ -1879,6 +1879,13 @@ El filtro ofrece las más usadas más un buscador, con grupos y categorías sepa
 - *Ofrecer todas las categorías como fichas*: es lo que había. A veinte categorías deja de ser un
   filtro y es una lista.
 
+**Nota posterior (2026-09-19).** Una transferencia se nombraba listando sus dos cuentas —
+`Caja de ahorro ARS → Banco Santander USD`— y en el ancho de un teléfono eso no se lee. Ahora la fila
+dice **qué es** (*Entre cuentas*, *Cambio de moneda*, *Pago de tarjeta*), las cuentas van como
+subtítulo con el nombre pelado, y las completas al desplegar. Y salió a la luz algo peor: la fila
+muestra **la pata que sale**, así que en un cambio ARS→USD *cuántos dólares entraron no aparecía en
+ningún lado*. El desplegado muestra los dos montos y el tipo de cambio.
+
 **Evidence.** `src/routes/movimientos/+page.svelte`, `src/lib/ledger/presentacion.ts`.
 
 **Verified against what already exists.**

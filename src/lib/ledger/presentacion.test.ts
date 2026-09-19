@@ -61,7 +61,7 @@ test('una transferencia no lleva signo ni toca el resultado', () => {
   assert.equal(f.signo, '');
   assert.equal(f.clase, 'neutro');
   assert.equal(f.afectaResultado, false);
-  assert.equal(f.titulo, 'Banco → Ahorro');
+  assert.equal(f.titulo, 'Entre cuentas');
 });
 
 test('los totales NO mezclan ingresos con gastos', () => {
@@ -242,4 +242,45 @@ test('una transferencia no tiene grupo: no es un gasto de ninguna categoría', (
     fila({ transaction_id: 't3', amount: '500', account_id: 'b', account_name: 'Banco' })
   ]);
   assert.equal(f.grupo, null);
+});
+
+// ---------------------------------------------------------------------------
+// Una transferencia se nombra por lo que ES — y un cambio lleva sus dos montos.
+//
+// La fila mostraba «Caja de ahorro ARS → Banco Santander USD», que en el ancho
+// de un teléfono no se lee. Y mostraba solo la pata que sale: en un cambio,
+// cuántos dólares entraron no aparecía en NINGÚN lado.
+// ---------------------------------------------------------------------------
+
+const traspasoEntre = (u1: string, u2: string, m1: number, m2: number,
+                      kind: 'asset' | 'liability' = 'asset') => [
+  fila({ transaction_id: 'x', amount: String(-m1), unit: u1,
+         account_id: 'a', account_name: 'Caja', account_kind: 'asset' }),
+  fila({ transaction_id: 'x', amount: String(m2), unit: u2,
+         account_id: 'b', account_name: 'Broker', account_kind: kind })
+];
+
+test('misma moneda entre cuentas propias: «Entre cuentas»', () => {
+  const [f] = filasDeMovimientos(traspasoEntre('ARS', 'ARS', 5000, 5000));
+  assert.equal(f.titulo, 'Entre cuentas');
+  assert.equal(f.entro, null, 'entra lo mismo que sale: no hace falta repetirlo');
+});
+
+test('distinta moneda: «Cambio de moneda», y guarda lo que entró', () => {
+  const [f] = filasDeMovimientos(traspasoEntre('ARS', 'USD', 150000, 100));
+  assert.equal(f.titulo, 'Cambio de moneda');
+  assert.deepEqual(f.entro, { monto: 100, unit: 'USD' });
+  // Y con eso la pantalla puede decir el tipo de cambio: 150000 / 100.
+  assert.equal(f.monto / (f.entro?.monto ?? 1), 1500);
+});
+
+test('hacia una tarjeta: «Pago de tarjeta»', () => {
+  const [f] = filasDeMovimientos(traspasoEntre('ARS', 'ARS', 80000, 80000, 'liability'));
+  assert.equal(f.titulo, 'Pago de tarjeta');
+});
+
+test('las dos cuentas siguen disponibles para el detalle', () => {
+  const [f] = filasDeMovimientos(traspasoEntre('ARS', 'USD', 150000, 100));
+  assert.equal(f.desde?.name, 'Caja');
+  assert.equal(f.hacia?.name, 'Broker');
 });

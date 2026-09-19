@@ -260,17 +260,17 @@
                   <i class="punto" style="background:{colorCategoria(r.grupo)}"
                      title={r.grupo}></i>
                 {/if}
-                {#if r.desde || r.hacia}
-                  <b class="mov">
-                    {#if r.desde}<Cuenta cuenta={r.desde} ambigua={esAmbigua(r.desde, repetidos)} banco="nunca" />{/if}
-                    <span class="flecha" aria-hidden="true">→</span>
-                    {#if r.hacia}<Cuenta cuenta={r.hacia} ambigua={esAmbigua(r.hacia, repetidos)} banco="nunca" />{/if}
-                  </b>
-                {:else}
-                  <b class="corta">{r.titulo}</b>
-                {/if}
+                <b class="corta">{r.titulo}</b>
               </span>
-              {#if r.cuenta}
+              <!-- En una transferencia el subtítulo son las dos cuentas por su
+                   nombre pelado, sin etiquetas: en el ancho que queda, «Caja de
+                   ahorro ARS → Banco Santander USD» no se lee. Lo completo está
+                   al tocar. -->
+              {#if r.desde || r.hacia}
+                <span class="sub dim corta">
+                  {r.desde?.name ?? '—'} → {r.hacia?.name ?? '—'}
+                </span>
+              {:else if r.cuenta}
                 <span class="sub dim">
                   <Cuenta cuenta={r.cuenta} ambigua={esAmbigua(r.cuenta, repetidos)} banco="nunca" />
                 </span>
@@ -289,8 +289,29 @@
                   <dt>Cuenta</dt>
                   <dd><Cuenta cuenta={r.cuenta} banco="siempre" /></dd>
                 {/if}
-                {#if r.desde}<dt>Sale de</dt><dd><Cuenta cuenta={r.desde} banco="siempre" /></dd>{/if}
-                {#if r.hacia}<dt>Entra en</dt><dd><Cuenta cuenta={r.hacia} banco="siempre" /></dd>{/if}
+                {#if r.desde}
+                  <dt>Sale de</dt>
+                  <dd>
+                    <Cuenta cuenta={r.desde} banco="siempre" />
+                    <b class="money">−{money(r.monto, r.unit)}</b>
+                  </dd>
+                {/if}
+                {#if r.hacia}
+                  <dt>Entra en</dt>
+                  <dd>
+                    <Cuenta cuenta={r.hacia} banco="siempre" />
+                    <!-- Solo cuando difiere: en una transferencia común entra lo
+                         mismo que sale y repetirlo es ruido. En un cambio, es el
+                         dato que no estaba en ningún lado. -->
+                    <b class="money">+{money(r.entro?.monto ?? r.monto, r.entro?.unit ?? r.unit)}</b>
+                  </dd>
+                {/if}
+                {#if r.entro}
+                  <dt>Cotización</dt>
+                  <dd>
+                    1 {r.entro.unit} = {money(r.monto / r.entro.monto, r.unit)}
+                  </dd>
+                {/if}
                 <!-- Siempre presente, con «—» cuando no dice nada nuevo. Una
                      regla creada sin nota se guarda con el nombre de la
                      categoría como descripción, así que el movimiento mostraba
@@ -371,7 +392,8 @@
   /* El nombre de una categoría puede ser largo; la fila, no. Mismo criterio que
      en la lista de cuentas: se recorta lo que se puede adivinar. */
   .corta { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .mov { display: inline-flex; align-items: baseline; gap: .35rem; min-width: 0; overflow: hidden; }
+  .sub.corta { display: block; }
+  .detalle dd { display: flex; align-items: baseline; gap: .5rem; flex-wrap: wrap; }
   .detalle { padding: .2rem .85rem .8rem; display: grid; gap: .6rem; }
   .detalle dl {
     margin: 0; display: grid; grid-template-columns: auto 1fr;
