@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { listEntries, deleteTransaction, toCSV, download, type EntryDetail } from '$lib/ledger/api';
-  import { filasDeMovimientos, totales, type Fila } from '$lib/ledger/presentacion';
+  import { filasDeMovimientos, totales, cotizacionDe, type Fila } from '$lib/ledger/presentacion';
   import { colorCategoria } from '$lib/categorias';
   import Cuenta from '$lib/Cuenta.svelte';
   import { nombresRepetidos, esAmbigua } from '$lib/ledger/tipos';
@@ -307,10 +307,11 @@
                   </dd>
                 {/if}
                 {#if r.entro}
-                  <dt>Cotización</dt>
-                  <dd>
-                    1 {r.entro.unit} = {money(r.monto / r.entro.monto, r.unit)}
-                  </dd>
+                  {@const c = cotizacionDe({ monto: r.monto, unit: r.unit }, r.entro)}
+                  {#if c}
+                    <dt>Cotización</dt>
+                    <dd>1 {c.uno} = {money(c.equivale, c.en)}</dd>
+                  {/if}
                 {/if}
                 <!-- Siempre presente, con «—» cuando no dice nada nuevo. Una
                      regla creada sin nota se guarda con el nombre de la

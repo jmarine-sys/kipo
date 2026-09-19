@@ -19,11 +19,23 @@
    */
   let {
     cuentas,
+    todas = null,
     valor = null,
     onelegir,
     vacio = 'No hay ninguna cuenta para esto.'
   }: {
+    /** Las que se pueden elegir acá. */
     cuentas: Account[];
+    /**
+     * TODAS las del libro, para saber si un nombre se repite.
+     *
+     * Sin esto, la ambigüedad se calculaba sobre la lista ofrecida y cambiaba
+     * de una pantalla a otra: en «Hacia» se excluye la cuenta de origen, así
+     * que si las dos que se llaman igual eran origen y destino, la de destino
+     * dejaba de estar «repetida» y perdía el banco. Que dos cuentas se llamen
+     * igual es un hecho del libro, no de la lista que se está mostrando.
+     */
+    todas?: Account[] | null;
     valor?: string | null;
     onelegir: (id: string) => void;
     vacio?: string;
@@ -42,7 +54,7 @@
   let buscando = $state(false);
   let busca = $state('');
 
-  const repetidos = $derived(nombresRepetidos(cuentas));
+  const repetidos = $derived(nombresRepetidos(todas ?? cuentas));
   const elegida = $derived(cuentas.find((c) => c.id === valor) ?? null);
 
 

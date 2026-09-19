@@ -263,3 +263,23 @@ export function summarize(entries: EntryDetail[], unit = 'ARS'): MonthSummary {
   };
 }
 
+
+/**
+ * El tipo de cambio de un cambio de moneda, en la dirección que se lee.
+ *
+ * Se mostraba siempre como «1 <lo que entra> = <lo que sale>», y para un cambio
+ * de dólares a pesos eso da 100/150000 = 0,00066, que redondeado a dos decimales
+ * es **0**. La pantalla decía «1 ARS = $0».
+ *
+ * La dirección correcta no depende de cuál moneda es: depende de cuál número
+ * queda mayor que uno. Se elige esa y listo.
+ */
+export function cotizacionDe(
+  sale: { monto: number; unit: string },
+  entra: { monto: number; unit: string }
+): { uno: string; equivale: number; en: string } | null {
+  if (!sale.monto || !entra.monto) return null;
+  return sale.monto >= entra.monto
+    ? { uno: entra.unit, equivale: sale.monto / entra.monto, en: sale.unit }
+    : { uno: sale.unit, equivale: entra.monto / sale.monto, en: entra.unit };
+}

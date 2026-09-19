@@ -612,7 +612,7 @@
         {mode === 'expense' ? 'Pagás con' : mode === 'income' ? 'Entra en' : 'Desde'}
       </h2>
       {#if sources.length}
-        <SelectorCuenta cuentas={sources} valor={accountId}
+        <SelectorCuenta cuentas={sources} todas={accounts} valor={accountId}
                         onelegir={(id) => { accountId = id; if (toAccountId === id) toAccountId = null; }} />
       {:else}
         <!-- Sin esto la pantalla mostraba un hueco mudo y el botón de guardar
@@ -648,7 +648,7 @@
     {#if mode === 'move'}
       <section>
         <h2 class="lbl">Hacia</h2>
-        <SelectorCuenta cuentas={destinations} valor={toAccountId}
+        <SelectorCuenta cuentas={destinations} todas={accounts} valor={toAccountId}
                         onelegir={(id) => (toAccountId = id)}
                         vacio="No tenés otra cuenta a dónde mover." />
 

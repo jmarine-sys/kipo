@@ -284,3 +284,33 @@ test('las dos cuentas siguen disponibles para el detalle', () => {
   assert.equal(f.desde?.name, 'Caja');
   assert.equal(f.hacia?.name, 'Broker');
 });
+
+// ---------------------------------------------------------------------------
+// La cotización de un cambio: en la dirección que se puede leer.
+//
+// Se calculaba siempre como «1 <lo que entra> = <lo que sale>». De pesos a
+// dólares daba bien; de dólares a pesos daba 100/150000 = 0,00066, que
+// redondeado es CERO. La pantalla decía «1 ARS = $0».
+// ---------------------------------------------------------------------------
+import { cotizacionDe } from './presentacion.ts';
+
+test('de pesos a dólares: 1 USD = 1500 ARS', () => {
+  assert.deepEqual(cotizacionDe({ monto: 150000, unit: 'ARS' }, { monto: 100, unit: 'USD' }),
+                   { uno: 'USD', equivale: 1500, en: 'ARS' });
+});
+
+test('de dólares a pesos: la MISMA cotización, no cero', () => {
+  assert.deepEqual(cotizacionDe({ monto: 100, unit: 'USD' }, { monto: 150000, unit: 'ARS' }),
+                   { uno: 'USD', equivale: 1500, en: 'ARS' });
+});
+
+test('entre monedas parecidas elige la que da mayor a uno', () => {
+  const c = cotizacionDe({ monto: 100, unit: 'USD' }, { monto: 92, unit: 'EUR' });
+  assert.ok(c && c.equivale >= 1, `dio ${c?.equivale}`);
+  assert.deepEqual(c, { uno: 'EUR', equivale: 100 / 92, en: 'USD' });
+});
+
+test('sin monto no inventa una cotización', () => {
+  assert.equal(cotizacionDe({ monto: 0, unit: 'ARS' }, { monto: 100, unit: 'USD' }), null);
+  assert.equal(cotizacionDe({ monto: 100, unit: 'ARS' }, { monto: 0, unit: 'USD' }), null);
+});
