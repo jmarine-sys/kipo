@@ -46,10 +46,21 @@
   const amount = $derived(num(raw));
   const amount2 = $derived(num(raw2));
 
+  /**
+   * Las cuentas de las que puede salir o entrar plata: las que guardan DINERO.
+   *
+   * Una posición guarda unidades y un plazo fijo devenga; a la primera se le
+   * compra y el segundo se constituye. Ninguna de las dos puede ser la pata de
+   * una transferencia — el invariante de la base rechaza la línea porque la
+   * unidad no coincide.
+   */
   const payable = $derived(accounts.filter((a) => a.valuation === 'balance'));
+
   const sources = $derived(
+    // Un ingreso no entra en una tarjeta: ahí no se recibe plata, se debe.
     mode === 'income' ? payable.filter((a) => a.kind === 'asset')
-    : mode === 'move' ? accounts
+    // En 'move' decía `accounts`: se podía elegir una posición COMO ORIGEN.
+    // Se arreglaron los destinos y quedó el otro lado sin arreglar.
     : payable
   );
   const account = $derived(accounts.find((a) => a.id === accountId) ?? null);
