@@ -1,6 +1,5 @@
 <script lang="ts">
   import Cuenta from '$lib/Cuenta.svelte';
-  import { nombresRepetidos, esAmbigua } from '$lib/ledger/tipos';
   import { byUse } from '$lib/frequent';
   import type { Account } from '$lib/types';
 
@@ -16,6 +15,13 @@
    *   1. las que más usás, que es lo que hace que un toque alcance
    *   2. entre iguales, las de ARS primero — es la moneda del día a día y en la
    *      que se carga casi todo
+   *
+   * EL BANCO VA SIEMPRE, y eso revierte lo que decidí en OD-42. Ahí argumenté
+   * mostrarlo solo cuando dos cuentas se llaman igual, para no alargar las
+   * fichas del camino rápido. El usuario lo probó y lo pidió completo: «Banco
+   * ARS» y «Banco ARS Macro» al lado se leen como cosas distintas cuando son la
+   * misma clase de cosa, y la ficha corta te obliga a acordarte de cuál es cuál.
+   * Cuesta ancho; que la ficha se recorte por el nombre ya está resuelto.
    */
   let {
     cuentas,
@@ -27,13 +33,9 @@
     /** Las que se pueden elegir acá. */
     cuentas: Account[];
     /**
-     * TODAS las del libro, para saber si un nombre se repite.
-     *
-     * Sin esto, la ambigüedad se calculaba sobre la lista ofrecida y cambiaba
-     * de una pantalla a otra: en «Hacia» se excluye la cuenta de origen, así
-     * que si las dos que se llaman igual eran origen y destino, la de destino
-     * dejaba de estar «repetida» y perdía el banco. Que dos cuentas se llamen
-     * igual es un hecho del libro, no de la lista que se está mostrando.
+     * TODAS las del libro. Ya no se usa para decidir si se muestra el banco
+     * —eso ahora es siempre— pero se deja porque el componente lo va a
+     * necesitar el día que tenga que hablar del conjunto y no de su lista.
      */
     todas?: Account[] | null;
     valor?: string | null;
@@ -54,7 +56,6 @@
   let buscando = $state(false);
   let busca = $state('');
 
-  const repetidos = $derived(nombresRepetidos(todas ?? cuentas));
   const elegida = $derived(cuentas.find((c) => c.id === valor) ?? null);
 
 
@@ -114,7 +115,7 @@
   <div class="wrap">
     {#each enPantalla as c}
       <button class="chip" class:on={valor === c.id} onclick={() => elegir(c.id)}>
-        <Cuenta cuenta={c} ambigua={esAmbigua(c, repetidos)} />
+        <Cuenta cuenta={c} banco="siempre" />
       </button>
     {/each}
     {#if cuentas.length > enPantalla.length}
@@ -128,7 +129,7 @@
     <div class="wrap">
       {#each coinciden as c}
         <button class="chip" class:on={valor === c.id} onclick={() => elegir(c.id)}>
-          <Cuenta cuenta={c} ambigua={esAmbigua(c, repetidos)} banco="siempre" />
+          <Cuenta cuenta={c} banco="siempre" />
         </button>
       {:else}
         <p class="dim sm">Nada coincide con «{busca}».</p>
