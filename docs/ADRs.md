@@ -54,6 +54,7 @@ decision nobody made is fiction, and an agent will believe it.
 | [ADR-031](#adr-031--una-cuenta-puede-estar-en-varias-carteras-y-la-del-broker-se-arma-sola) | Una cuenta puede estar en varias carteras, y la del broker se arma sola | Accepted |
 | [ADR-032](#adr-032--aportar-a-otro-libro-es-gastar-y-son-dos-movimientos-uno-por-libro) | Aportar a otro libro es gastar, y son dos movimientos, uno por libro | Accepted |
 | [ADR-033](#adr-033--la-navegación-agrupa-por-significado-y-no-todo-merece-estar-cerca) | La navegación agrupa por significado, y no todo merece estar cerca | Accepted |
+| [ADR-034](#adr-034--una-fila-muestra-lo-obligatorio-y-un-filtro-sugiere-antes-de-listar) | Una fila muestra lo obligatorio, y un filtro sugiere antes de listar | Accepted |
 
 ---
 
@@ -1832,3 +1833,61 @@ Prueba de mutacion, sacando Cartera de la barra:
 
 El chequeo se aflojó y **sigue atrapando el caso que lo originó**. Si no lo atrapara, el límite nuevo
 sería una excusa y no una regla.
+
+
+---
+
+## ADR-034 — Una fila muestra lo obligatorio, y un filtro sugiere antes de listar
+
+**Context.** El usuario dijo que la lista de movimientos estaba *"completamente destruida: se muestran
+muchos datos que se acoplan entre sí y no se entiende nada"*, y pidió decidir **qué datos son
+obligatorios**. La fila metía en una línea el grupo, la cuenta y la nota, además del título.
+
+En la misma pantalla, el filtro de categorías era una fila de fichas con **todas** las madres
+presentes. El usuario lo comparó con el de fechas, que sí funciona: *"te sugiere algunos y luego tienes
+para elegir la fecha propiamente"*.
+
+Y apareció un dato que decide el diseño: **la nota se podía cargar y no se veía en ninguna pantalla.**
+
+**Decision.** La fila muestra fecha, qué fue, la cuenta y el monto; todo lo demás aparece al tocarla.
+El filtro ofrece las más usadas más un buscador, con grupos y categorías separados.
+
+**Consequences.**
+- Lo obligatorio es **cuándo, qué, de dónde salió y cuánto**. El grupo sobrevive como el color del
+  punto —informa sin ocupar texto— y su nombre pasa al desplegado.
+- **La nota encontró dónde vivir.** Es el caso que justifica el cambio entero: un dato que la app pedía
+  y después escondía.
+- El desplegado muestra `—` cuando la nota repite la categoría. No es cosmético: al crear una regla
+  sin nota, la descripción se llena con el nombre de la categoría y de ahí viaja al movimiento.
+- **El conteo de cada ficha sale de las filas que ya están en pantalla**, así que sugerir "las más
+  usadas" no cuesta ninguna consulta. Si algún día el criterio tuviera que mirar más allá del período
+  visible, eso sí sería una consulta y habría que decidirlo de nuevo.
+- **Al elegir un grupo solo se ofrecen sus hijas**: las de otro grupo no llevan a ningún lado porque ya
+  quedaron fuera del filtro.
+- Un filtro coincide por **unión**: tildar dos cosas muestra las dos. Es lo que espera quien tilda.
+- **La parte incómoda:** el que quiera ver la cuenta completa o la nota de veinte movimientos tiene que
+  abrir veinte. Se acepta porque la lista existe para recorrer, no para leer en detalle, y antes no se
+  podía hacer ninguna de las dos cosas.
+
+**Rejected alternatives.**
+- *Un modo «simple» y otro «avanzado»*, que propuso el usuario como alternativa: un modo es una
+  preferencia que hay que **recordar y cambiar**, y el toque para desplegar ya estaba ahí para borrar.
+  Dos formas de ver lo mismo también son dos cosas que mantener.
+- *Dejar todos los datos en la fila y solo achicar la tipografía*: el problema no era el tamaño sino la
+  cantidad.
+- *Ofrecer todas las categorías como fichas*: es lo que había. A veinte categorías deja de ser un
+  filtro y es una lista.
+
+**Evidence.** `src/routes/movimientos/+page.svelte`, `src/lib/ledger/presentacion.ts`.
+
+**Verified against what already exists.**
+
+```
+No aplica a una fuente externa: es una decisión de interfaz.
+
+Lo que sí se verificó por prueba es el error que la motivó — el filtro se comía
+los movimientos imputados a una categoría madre (OD-47) — con cuatro casos en
+presentacion.test.ts, uno de ellos:
+
+  ok  filtrar por un grupo trae la madre Y sus hijas
+```
