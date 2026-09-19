@@ -109,8 +109,16 @@
   const leaves = $derived(
     categories.filter((c) => c.kind === catKind && !categories.some((x) => x.parent_id === c.id))
   );
-  /** Las seis más usadas cubren casi todo. El resto vive detrás de "Todas". */
-  const top = $derived(byUse(leaves).slice(0, 6));
+  /**
+   * Cinco, y la sexta ficha es «Todas».
+   *
+   * Eran seis más el botón: siete fichas en una pantalla que busca ser ágil. El
+   * buscador de acá recorre TODAS las categorías del libro, no solo las que
+   * aparecen — a diferencia del filtro de Movimientos, que solo ofrece las de
+   * los movimientos listados porque ahí filtrar por algo ausente no tendría
+   * sentido.
+   */
+  const top = $derived(byUse(leaves).slice(0, 5));
   const parentOf = (c: Category) => categories.find((p) => p.id === c.parent_id)?.name ?? null;
   const groups = $derived.by(() => {
     const q = search.trim().toLowerCase();

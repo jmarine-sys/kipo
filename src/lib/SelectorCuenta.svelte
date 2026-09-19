@@ -29,7 +29,15 @@
     vacio?: string;
   } = $props();
 
-  const TOPE = 5;
+  /**
+   * Tres, no cinco.
+   *
+   * Esta pantalla busca ser ágil, no completa: la ficha de una cuenta lleva
+   * nombre, moneda y a veces banco, así que tres ya ocupan una fila entera en un
+   * teléfono. El resto está a un toque en «Todas», que además busca entre TODAS
+   * y no solo entre las que aparecen.
+   */
+  const TOPE = 3;
 
   let buscando = $state(false);
   let busca = $state('');
@@ -38,7 +46,18 @@
   const elegida = $derived(cuentas.find((c) => c.id === valor) ?? null);
 
 
-  /** Las más usadas, con las de ARS adelante entre las que empatan en uso. */
+  /**
+   * Las más usadas, con las de ARS adelante entre las que empatan en uso.
+   *
+   * La elegida SIEMPRE está en la fila, aunque no entre en las tres primeras.
+   * Antes, cuando había una elegida, la fila se reemplazaba por una sola ficha
+   * con «cambiar» — y como el formulario recuerda la última cuenta usada, al
+   * entrar NUNCA se veían las sugerencias. Parecía que el selector no existía
+   * en «Pagás con» y sí en «Hacia», que es donde no hay nada recordado.
+   *
+   * Recordar la cuenta se queda: es lo que sostiene el camino de tres toques.
+   * Lo que se va es esconder el resto.
+   */
   const sugeridas = $derived.by(() => {
     // `byUse` ya las ordenó por cuánto se usan. Acá solo se adelantan las de
     // ARS entre las que empatan, sin romper ese orden: el índice original
@@ -51,6 +70,13 @@
       .slice(0, TOPE)
       .map((x) => x.c);
   });
+
+  /** Lo que se dibuja: las sugeridas, y la elegida si quedó afuera. */
+  const enPantalla = $derived(
+    elegida && !sugeridas.some((c) => c.id === elegida.id)
+      ? [elegida, ...sugeridas].slice(0, TOPE + 1)
+      : sugeridas
+  );
 
   const coinciden = $derived(
     cuentas.filter((c) =>
@@ -72,22 +98,14 @@
 
 {#if !cuentas.length}
   <p class="dim sm">{vacio}</p>
-{:else if elegida && !buscando}
-  <!-- Elegida: una sola ficha y el resto se va del camino. -->
-  <div class="wrap">
-    <button class="chip on" onclick={() => (buscando = true)}>
-      <Cuenta cuenta={elegida} ambigua={esAmbigua(elegida, repetidos)} />
-      <span class="tag">cambiar</span>
-    </button>
-  </div>
 {:else if !buscando}
   <div class="wrap">
-    {#each sugeridas as c}
-      <button class="chip" onclick={() => elegir(c.id)}>
+    {#each enPantalla as c}
+      <button class="chip" class:on={valor === c.id} onclick={() => elegir(c.id)}>
         <Cuenta cuenta={c} ambigua={esAmbigua(c, repetidos)} />
       </button>
     {/each}
-    {#if cuentas.length > sugeridas.length}
+    {#if cuentas.length > enPantalla.length}
       <button class="chip more" onclick={() => (buscando = true)}>Todas ▾</button>
     {/if}
   </div>
@@ -116,10 +134,6 @@
   }
   .chip.on { background: var(--accent); color: var(--accent-fg); border-color: transparent; font-weight: 600; }
   .chip.more { border-style: dashed; }
-  .tag {
-    font-size: .66rem; padding: .05rem .3rem; border-radius: 4px;
-    background: color-mix(in srgb, currentColor 16%, transparent);
-  }
   .todas { display: flex; flex-direction: column; gap: .5rem; }
   .search { width: 100%; }
   .link { background: none; border: none; align-self: flex-start; padding: .2rem 0; min-height: 0; }
