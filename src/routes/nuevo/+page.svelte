@@ -319,12 +319,28 @@
     search = '';
   }
 
+  /**
+   * Cuál de los dos montos recibe lo que tecleás — OD-53.
+   *
+   * El teclado en pantalla escribía SOLO en el monto que sale. En un cambio de
+   * moneda el otro era un `<input>` común, así que las dos mitades de la misma
+   * operación se cargaban de dos maneras distintas: una con los botones de la
+   * app y la otra con el teclado del teléfono, que además tapa media pantalla.
+   */
+  let foco = $state<'sale' | 'entra'>('sale');
+
+  // Al salir del cambio, el foco vuelve solo: si no, el teclado seguiría
+  // escribiendo en un monto que ya no está en pantalla.
+  $effect(() => { if (!isExchange) foco = 'sale'; });
+
   function tap(k: string) {
-    if (k === '⌫') { raw = raw.slice(0, -1); return; }
-    if (k === ',') { if (!raw.includes(',')) raw += raw ? ',' : '0,'; return; }
-    if (raw.includes(',') && raw.split(',')[1].length >= 2) return;
-    if (raw === '0') raw = '';
-    raw += k;
+    const actual = foco === 'sale' ? raw : raw2;
+    const poner = (v: string) => { if (foco === 'sale') raw = v; else raw2 = v; };
+
+    if (k === '⌫') { poner(actual.slice(0, -1)); return; }
+    if (k === ',') { if (!actual.includes(',')) poner(actual + (actual ? ',' : '0,')); return; }
+    if (actual.includes(',') && actual.split(',')[1].length >= 2) return;
+    poner((actual === '0' ? '' : actual) + k);
   }
 
   async function save() {
@@ -421,17 +437,32 @@
     {/each}
   </div>
 
-  <div class="amount">
-    <span class="cur">{account?.unit ?? ''}</span>
-    <span class="val money" class:empty={!raw}>{raw || '0'}</span>
+  <!-- Los dos montos viven acá arriba, pegados, y los dos se cargan con el
+       mismo teclado: se toca el que se quiere escribir. Antes el de abajo era un
+       input suelto que se iba con el scroll y pedía el teclado del sistema. -->
+  <div class="amount" class:doble={isExchange}>
+    <button class="monto" class:activo={foco === 'sale'} class:solo={!isExchange}
+            onclick={() => (foco = 'sale')}>
+      {#if isExchange}<span class="rot dim">Sale</span>{/if}
+      <span class="linea">
+        <span class="cur">{account?.unit ?? ''}</span>
+        <span class="val money" class:empty={!raw}>{raw || '0'}</span>
+      </span>
+    </button>
+
+    {#if isExchange}
+      <button class="monto" class:activo={foco === 'entra'}
+              onclick={() => (foco = 'entra')}>
+        <span class="rot dim">Entra</span>
+        <span class="linea">
+          <span class="cur">{toAccount?.unit ?? ''}</span>
+          <span class="val money" class:empty={!raw2}>{raw2 || '0'}</span>
+        </span>
+      </button>
+    {/if}
   </div>
 
   {#if isExchange}
-    <div class="second">
-      <span class="dim">Recibís</span>
-      <input class="money" inputmode="decimal" bind:value={raw2} placeholder="0" />
-      <span class="dim">{toAccount?.unit}</span>
-    </div>
     {#if rate}
       <p class="rate" class:dim={sospecha.estado !== 'sospechoso'}
          class:alerta={sospecha.estado === 'sospechoso'}>
@@ -705,22 +736,31 @@
      tenés que poder mirar todo el tiempo. */
   .amount {
     position: sticky; top: 0; z-index: 5;
-    display: flex; align-items: baseline; justify-content: center; gap: .5rem;
-    padding: .7rem 0 .6rem;
+    display: flex; justify-content: center; gap: .4rem;
+    padding: .55rem .6rem;
     background: var(--bg);
     border-bottom: 1px solid var(--border);
     margin: 0 -1rem .6rem;
   }
+  .amount.doble { gap: .5rem; }
+  .monto {
+    flex: 1; min-width: 0; background: none; border: 1px solid transparent;
+    border-radius: 12px; padding: .3rem .5rem; min-height: 0;
+    display: flex; flex-direction: column; align-items: center; gap: .05rem;
+  }
+  /* Con un solo monto no hay nada que elegir: no se marca como seleccionable. */
+  .monto.solo { pointer-events: none; }
+  .amount.doble .monto.activo {
+    border-color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 10%, transparent);
+  }
+  .monto .rot { font-size: .66rem; text-transform: uppercase; letter-spacing: .05em; }
+  .monto .linea { display: flex; align-items: baseline; gap: .35rem; min-width: 0; }
+  .amount.doble .val { font-size: 1.5rem; }
   .cur { color: var(--text-dim); font-size: 1rem; }
   .val { font-size: 2.9rem; font-weight: 600; letter-spacing: -0.02em; }
   .val.empty { color: var(--text-dim); }
 
-  .second { display: flex; align-items: center; gap: .5rem; justify-content: center; margin-bottom: .4rem; }
-  .second input {
-    width: 8rem; text-align: right; font-size: 1.3rem;
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: var(--radius); min-height: 44px; padding: 0 .6rem;
-  }
   .rate { text-align: center; font-size: .82rem; margin: 0 0 .6rem; }
   .rate.alerta { color: var(--warn); font-weight: 600; }
   .revisar {
