@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { createAccount, listAccounts } from '$lib/ledger/api';
   import { TIPOS_CUENTA, tipoPorId } from '$lib/ledger/tipos';
+  import { FUENTES_DOLAR, dolarSugerido } from '$lib/ledger/dolares';
 
   /**
    * El formulario de alta de una cuenta — uno solo, para las dos pantallas.
@@ -38,6 +39,19 @@
   // llamar «Banco», «Macro» o «la del sueldo». Lo que no puede es que el nombre
   // decida cómo se la trata.
   $effect(() => { if (!tipo.monedas.includes(unit)) unit = tipo.monedas[0]; });
+
+  /**
+   * La sugerencia de dólar sigue al tipo y a la moneda hasta que la tocás.
+   *
+   * Sin `tocada` la sugerencia pisaría tu elección cada vez que cambiás de
+   * moneda, que es el modo de falla clásico de un campo autocompletado: parece
+   * que no responde.
+   */
+  let tocada = $state(false);
+  $effect(() => {
+    const s = dolarSugerido(tipoId, unit);
+    if (!tocada) fxSource = s ?? '';
+  });
 
   async function cargarBancos() {
     try {
@@ -106,18 +120,42 @@
     </div>
   </fieldset>
 
-  {#if unit === 'USD'}
-    <!-- ADR-011: la fuente de cotización es propiedad de la CUENTA.
-         Los dólares comprados en blue se valúan con blue; los del broker con MEP. -->
-    <fieldset>
-      <legend class="dim">Con qué cotización se valúa</legend>
-      <div class="opts row3">
-        {#each [['', 'La de siempre'], ['blue', 'Blue'], ['mep', 'MEP'], ['ccl', 'CCL'], ['oficial', 'Oficial']] as [v, l]}
-          <button type="button" class:on={fxSource === v} onclick={() => (fxSource = v)}>{l}</button>
-        {/each}
-      </div>
-    </fieldset>
-  {/if}
+  <!-- ADR-011: la fuente es propiedad de la CUENTA. Se preguntaba SOLO si la
+       moneda era USD, donde casi no decide nada —medido en dólares, un dólar es
+       un dólar; la fuente ahí solo pesa al medir en UVAs— y NO se preguntaba en
+       las cuentas en pesos, que es donde decide todo (OD-59).
+
+       Es además lo que hace innecesario recuperar «efectivo» como tipo: un fajo
+       de pesos y una caja de ahorro se valúan y se gastan igual, y en lo único
+       que se distinguen es en qué dólar conseguís con ellos. Eso es este campo. -->
+  <fieldset>
+    <legend class="dim">
+      {unit === 'ARS' ? 'Con qué dólar se miden estos pesos' : 'Con qué dólar se pasan a pesos'}
+    </legend>
+    <div class="opts">
+      <button type="button" class:on={fxSource === ''}
+              onclick={() => { tocada = true; fxSource = ''; }}>
+        El del libro
+        <span class="dim sm">se cambia una vez en Ajustes</span>
+      </button>
+      {#each FUENTES_DOLAR as f}
+        <button type="button" class:on={fxSource === f.id}
+                onclick={() => { tocada = true; fxSource = f.id; }}>
+          {f.label}
+          <span class="dim sm">{f.pista}</span>
+        </button>
+      {/each}
+    </div>
+    <p class="dim sm pie">
+      {#if unit === 'ARS'}
+        Es el dólar que <b>realmente conseguirías</b> con esta plata: los pesos del
+        banco no se realizan igual que los de la mano.
+      {:else}
+        Un dólar es un dólar al medir en dólares. Esto pesa cuando kipo compara tu
+        patrimonio contra la <b>inflación</b>, que se mide en pesos.
+      {/if}
+    </p>
+  </fieldset>
 
   <!-- Sugiere los bancos que ya usaste: «Macro» y «macro» serían dos grupos
        distintos en la pantalla de cuentas, y nadie se daría cuenta. -->
@@ -144,13 +182,6 @@
   label > span:first-child { font-size: .78rem; color: var(--text-dim); }
   fieldset { border: none; padding: 0; margin: 0; }
   legend { font-size: .85rem; margin-bottom: .35rem; }
-  .opts { display: grid; gap: .5rem; }
-  .opts.row3 { grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)); }
-  .opts button {
-    display: flex; flex-direction: column; align-items: flex-start; gap: .15rem;
-    padding: .7rem .85rem; min-height: var(--tap); text-align: left;
-  }
-  .opts.row3 button { align-items: center; justify-content: center; }
-  .opts button.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--surface)); }
   .sm { font-size: .76rem; }
+  .pie { margin: .45rem 0 0; }
 </style>

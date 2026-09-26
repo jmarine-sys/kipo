@@ -9,6 +9,8 @@
   import { prefs, elegirMedida, elegirObjetivo } from '$lib/preferencias.svelte';
   import { money, shortDate } from '$lib/format';
   import Vacio from '$lib/Vacio.svelte';
+  import { dolaresEnUso, type DolarEnUso } from '$lib/ledger/dolares.datos';
+  import { etiquetaDolar } from '$lib/ledger/dolares';
 
   let flujos = $state<FlujoInversion[]>([]);
   let valores = $state<ValorInversion[]>([]);
@@ -23,6 +25,8 @@
 
   // ADR-026: el borde es el portafolio. Cada uno entra como una unidad y las
   // inversiones sueltas por su cuenta, sin contar las de adentro dos veces.
+  let dolares = $state<DolarEnUso[]>([]);
+
   const total = $derived(calcularTodo(portafolios, valores, flujosPf, flujos, medida));
 
   const carteras = $derived(
@@ -59,6 +63,10 @@
     } catch (e) {
       error = e instanceof Error ? e.message : 'No se pudo cargar';
     } finally { loading = false; }
+
+    // Aparte y sin bloquear: si falla, la pantalla pierde una aclaración, no
+    // los números.
+    try { dolares = await dolaresEnUso(); } catch { /* se omite la aclaración */ }
   });
 </script>
 
@@ -146,6 +154,22 @@
             </b>
           </div>
         </div>
+        <!-- ADR-011 se lo exige a sí misma: «toda pantalla que muestre un total
+             en dólares debe poder decir qué cotización usó». Las posiciones y
+             los portafolios lo decían; ESTA, que es la del total, no. Y cuando
+             hay más de una fuente hay que decirlo: el total sigue siendo
+             correcto, pero ya no se explica con un solo número (OD-60). -->
+        {#if dolares.length === 1}
+          <p class="dim sm nota">
+            Tus pesos se pasaron a dólares al <b>{etiquetaDolar(dolares[0].fuente)}</b>.
+          </p>
+        {:else if dolares.length > 1}
+          <p class="dim sm nota">
+            Tus pesos no se midieron todos con el mismo dólar:
+            {#each dolares as d, i}<b>{etiquetaDolar(d.fuente)}</b> en {d.cuentas} cuenta{d.cuentas === 1 ? '' : 's'}{i < dolares.length - 1 ? ', ' : ''}{/each}.
+            El total es correcto y <a href="/ajustes">se elige en Ajustes</a>.
+          </p>
+        {/if}
         {#if total.dias}
           <p class="dim sm nota">
             Medido sobre {total.dias} días desde tu primer aporte.

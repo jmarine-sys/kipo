@@ -1,6 +1,9 @@
 <script lang="ts">
   import { prefs, elegirTema, alternarPrivado, elegirObjetivo, type Tema } from '$lib/preferencias.svelte';
   import { signOut } from '$lib/session.svelte';
+  import { onMount } from 'svelte';
+  import { misLibros, cambiarDolar, type Libro } from '$lib/ledger/libros';
+  import { FUENTES_DOLAR } from '$lib/ledger/dolares';
 
   /**
    * Ajustes — lo que se toca una vez y no se vuelve a mirar.
@@ -10,6 +13,35 @@
    * está bien para lo que se usa seguido; aplicada a TODO, amontona en el camino
    * rápido cosas que se tocan una vez por año.
    */
+
+  /**
+   * Con qué dólar mide el libro — OD-60.
+   *
+   * Nacía en `mep` y no había ninguna pantalla para verlo ni cambiarlo, así que
+   * el dólar con el que se convierte casi todo era invisible. Es lo que
+   * [ADR-011](docs/ADRs.md) llama «la fuente por defecto para el resto», y sin
+   * esto esa mitad de la decisión nunca existió de verdad.
+   */
+  let libro = $state<Libro | null>(null);
+  let guardando = $state(false);
+  let errorDolar = $state<string | null>(null);
+
+  async function elegirDolar(id: string) {
+    if (!libro || libro.dolar === id) return;
+    guardando = true; errorDolar = null;
+    const antes = libro.dolar;
+    libro = { ...libro, dolar: id };   // responde en el acto; si falla, vuelve
+    try { await cambiarDolar(id); }
+    catch (e) {
+      libro = { ...libro, dolar: antes };
+      errorDolar = e instanceof Error ? e.message : 'No se pudo cambiar';
+    } finally { guardando = false; }
+  }
+
+  onMount(async () => {
+    try { libro = (await misLibros()).find((l) => l.activo) ?? null; }
+    catch { /* sin esto la pantalla sigue sirviendo para todo lo demás */ }
+  });
 </script>
 
 <div class="page stack">
@@ -24,6 +56,38 @@
     <a class="link" href="/categorias">Categorías →</a>
     <a class="link" href="/libros">Libros y personas →</a>
   </section>
+
+  {#if libro}
+    <section class="card stack">
+      <h2>Con qué dólar medís</h2>
+      <p class="dim sm ayuda">
+        Tus dólares ya son dólares. Esto es para <b>tus pesos</b>: los mismos pesos
+        valen distinto según a qué dólar los pases, y kipo tiene que elegir uno para
+        poder contestarte cuánto tenés. Una cuenta puede usar otro.
+      </p>
+
+      {#if errorDolar}<p class="err" role="alert">{errorDolar}</p>{/if}
+
+      {#if libro.role === 'owner'}
+        <div class="opts">
+          {#each FUENTES_DOLAR as f}
+            <button class:on={libro.dolar === f.id} disabled={guardando}
+                    onclick={() => elegirDolar(f.id)}>
+              {f.label}
+              <span class="dim sm">{f.pista}</span>
+            </button>
+          {/each}
+        </div>
+      {:else}
+        <!-- Cambiarlo reescribe los totales de todos los que comparten el libro,
+             igual que crear una cuenta (ADR-031). -->
+        <p class="dim sm ayuda">
+          Este libro mide al <b>{FUENTES_DOLAR.find((f) => f.id === libro?.dolar)?.label ?? libro.dolar}</b>.
+          Solo quien lo creó puede cambiarlo.
+        </p>
+      {/if}
+    </section>
+  {/if}
 
   <section class="card stack">
     <h2>Cómo se ve</h2>

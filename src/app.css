@@ -250,6 +250,26 @@ input[type='checkbox'] {
   border-color: transparent; font-weight: 600;
 }
 
+/* Un grupo de opciones grandes, una debajo de la otra: elegir el tipo de cuenta,
+   la familia de una inversion, con que dolar se mide. Cada una lleva su nombre y
+   abajo, chiquito, COMO se llega a eso — que es lo que la vuelve elegible.
+
+   Distinto de `.chip`: la ficha es corta y va en fila, esto es una decision que
+   se lee. Vivia solo en el alta de cuenta, y la de inversion tenia su propia
+   copia con otro nombre: `.familias` y `.opcion`. (OD-46) */
+.opts { display: grid; gap: .5rem; }
+.opts button {
+  display: flex; flex-direction: column; align-items: flex-start; gap: .15rem;
+  padding: .7rem .85rem; min-height: var(--tap); text-align: left;
+}
+.opts button.on {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
+}
+/* En fila cuando las opciones son una palabra y no necesitan explicacion. */
+.opts.row3 { grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)); }
+.opts.row3 button { align-items: center; justify-content: center; }
+
 .page {
   max-width: 680px; margin: 0 auto;
   /* El ultimo boton de una pantalla quedaba a medias debajo de la barra: 6rem

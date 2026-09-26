@@ -133,9 +133,9 @@
   {#if error}<p class="err" role="alert">{error}</p>{/if}
 
   <!-- Las tres familias con el mismo trato, como los tres tipos de cuenta. -->
-  <div class="familias">
+  <div class="opts">
     {#each FAMILIAS_INVERSION as f}
-      <button type="button" class="opcion" class:on={familia === f.id}
+      <button type="button" class:on={familia === f.id}
               onclick={() => elegirFamilia(f.id)}>
         {f.label}<span class="dim sm">{f.pista}</span>
       </button>
@@ -293,12 +293,6 @@
 <style>
   .back { font-size: 1.5rem; text-decoration: none; }
   .sm { font-size: .78rem; }
-  .familias { display: grid; gap: .5rem; }
-  .opcion {
-    display: flex; flex-direction: column; align-items: flex-start; gap: .15rem;
-    padding: .7rem .85rem; min-height: var(--tap); text-align: left;
-  }
-  .opcion.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--surface)); }
   fieldset { border: none; padding: 0; margin: 0; }
   legend { font-size: .85rem; margin-bottom: .35rem; }
   .campo { display: flex; flex-direction: column; gap: .3rem; }

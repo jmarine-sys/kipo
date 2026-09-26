@@ -16,6 +16,8 @@ export interface Libro {
   /** Cuántos movimientos tiene. Decide si se puede borrar o solo archivar. */
   movimientos: number;
   joined_at: string;
+  /** Con qué dólar se miden los pesos de este libro (ADR-011, OD-59). */
+  dolar: string;
 }
 
 function fallar(contexto: string, error: { message: string } | null): never {
@@ -38,6 +40,17 @@ export async function misLibros(): Promise<Libro[]> {
 export async function cambiarLibro(ledgerId: string): Promise<void> {
   const { error } = await supabase.rpc('cambiar_libro', { p_ledger: ledgerId });
   if (error) fallar('No se pudo cambiar de libro', error);
+}
+
+/**
+ * Cambiar con qué dólar mide el libro. Solo el dueño.
+ *
+ * Es una RPC y no un `update`: ADR-020 le deja al cliente solo SELECT sobre
+ * `ledger`, así que se expone la operación y no la tabla.
+ */
+export async function cambiarDolar(fuente: string): Promise<void> {
+  const { error } = await supabase.rpc('cambiar_dolar', { p_fuente: fuente });
+  if (error) fallar('No se pudo cambiar el dólar', error);
 }
 
 /** Devuelve el código para pasarle a la otra persona. Solo el dueño puede. */

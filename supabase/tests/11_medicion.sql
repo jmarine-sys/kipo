@@ -76,3 +76,43 @@ select case when convertir(140000,'ARS',date '2026-03-17','USD') < 100
             else 'FALLO  dieron lo mismo' end;
 
 reset role;
+
+-- ---------------------------------------------------------------------------
+-- Con que dolar mide cada cosa, elegible y visible.  OD-59, OD-60
+-- ---------------------------------------------------------------------------
+select case when (select default_fx_source from ledger where id = my_ledger()) = 'mep'
+            then 'ok  un libro nace midiendo al mep'
+            else 'FALLO  nacio con otro' end;
+
+select cambiar_dolar('blue');
+select case when (select dolar from mi_libro where activo) = 'blue'
+            then 'ok  el duenio puede cambiar el dolar del libro, y se ve'
+            else 'FALLO  no cambio o no se ve' end;
+
+-- La UVA no es un dolar: es la OTRA vara de medicion (ADR-023). Elegirla como
+-- fuente haria que el patrimonio "en dolares" se calculara dividiendo por el
+-- valor de la UVA, y el numero saldria perfectamente creible.
+--
+-- Va envuelto en una funcion y no en un `do $$`: este archivo se lee con
+-- grep '^(ok|FALLO)' y un `raise notice` sale con el prefijo de psql. La
+-- excepcion hay que atraparla en algun lado, y una funcion que DEVUELVE el
+-- resultado entra en el molde del resto del archivo.
+reset role;
+create or replace function _prueba_uva() returns text
+language plpgsql as $$
+begin
+  perform cambiar_dolar('uva');
+  return 'FALLO  acepto la uva como dolar del libro';
+exception when check_violation then
+  return 'ok  rechaza la uva como dolar del libro: es la otra vara';
+end $$;
+select _prueba_uva();
+drop function _prueba_uva();
+set role rls_probe;
+
+select cambiar_dolar('mep');   -- se deja como estaba para lo que venga despues
+
+-- Y la aclaracion que ADR-011 se exige: que dolar uso cada cosa.
+select case when exists (select 1 from dolar_en_uso where fuente = 'mep')
+            then 'ok  se puede decir con que dolar se midio'
+            else 'FALLO  dolar_en_uso no lo dice' end;
