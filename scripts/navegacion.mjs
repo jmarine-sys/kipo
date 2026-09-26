@@ -125,7 +125,26 @@ while (cola.length) {
   }
 }
 
+// Y al reves: un enlace que apunta a una pantalla que NO EXISTE.
+//
+// Este chequeo solo miraba pantallas sin camino de entrada, asi que el caso
+// simetrico -un camino sin pantalla- era invisible. Habia uno vivo: el alta de
+// cuenta enlazaba a /cuentas/plazo-fijo, que nunca fue una ruta. Un 404 a la
+// vista, en la pantalla que le explica al que recien empieza donde se cargan las
+// otras cosas.
+const conocidas = new Set(rutas);
+const rotos = [];
+for (const [origen, destinos] of enlaces) {
+  for (const d of destinos) if (!conocidas.has(d)) rotos.push(`${origen} -> ${d}`);
+}
+for (const d of salida) if (!conocidas.has(d)) rotos.push(`la barra -> ${d}`);
+
 let malas = 0;
+if (rotos.length) {
+  for (const r of [...new Set(rotos)]) console.log(`  ${r}  NO EXISTE`);
+  malas += new Set(rotos).size;
+}
+
 for (const r of rutas) {
   const d = pasos.get(r);
   if (SIN_ENLACE.has(r)) { console.log(`  ${r.padEnd(24)} por redireccion`); continue; }
@@ -138,7 +157,7 @@ for (const r of rutas) {
 }
 
 if (malas) {
-  console.error(`\n${malas} pantalla/s sin camino razonable desde la barra.`);
+  console.error(`\n${malas} problema/s de navegacion: pantallas sin camino, o enlaces sin pantalla.`);
   process.exit(1);
 }
 console.log(`  ${rutas.length} pantallas: las de uso diario a ${MAX_RAPIDO} clicks, el resto a ${MAX_PASOS}`);

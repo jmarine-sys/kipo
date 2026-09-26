@@ -775,11 +775,6 @@
   section { margin-bottom: .9rem; }
   .lbl { font-size: .74rem; text-transform: uppercase; letter-spacing: .06em; color: var(--text-dim); margin-bottom: .45rem; }
 
-  .chip {
-    min-height: 42px; padding: 0 .85rem; border-radius: 999px; font-size: .88rem;
-    display: inline-flex; align-items: center; gap: .4rem;
-  }
-  .chip.on { background: var(--accent); color: var(--accent-fg); border-color: transparent; font-weight: 600; }
   .chip.more { border-style: dashed; }
   .chip.ajena { border-style: dashed; }
   .chip .tag.libro { font-size: .66rem; padding: .05rem .3rem; border-radius: 4px;

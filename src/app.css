@@ -230,6 +230,26 @@ input[type='checkbox'] {
 .spread { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
 .wrap   { display: flex; flex-wrap: wrap; gap: .5rem; }
 
+/* Una ficha: la opcion suelta que se toca para elegir algo — una cuenta, una
+   categoria, un tipo de activo, una moneda.
+
+   Estaba definida CUATRO veces, una por pantalla, y las cuatro ya habian
+   derivado: 42, 40, 38 y 42 de alto; .88, .86, .84 y .88 de letra. Nadie decidio
+   ninguna de esas diferencias. Y en inversiones se usaba la clase sin definirla
+   en ningun lado, asi que ahi las fichas no eran fichas: eran botones comunes.
+
+   Los modificadores que SI son de cada pantalla —`.more`, `.limpiar`, `.ajena`—
+   se quedan donde estan. Lo que sube es lo que tiene que verse igual. (OD-46)
+*/
+.chip {
+  min-height: 42px; padding: 0 .85rem; border-radius: 999px; font-size: .88rem;
+  display: inline-flex; align-items: center; gap: .4rem; max-width: 100%;
+}
+.chip.on {
+  background: var(--accent); color: var(--accent-fg);
+  border-color: transparent; font-weight: 600;
+}
+
 .page {
   max-width: 680px; margin: 0 auto;
   /* El ultimo boton de una pantalla quedaba a medias debajo de la barra: 6rem

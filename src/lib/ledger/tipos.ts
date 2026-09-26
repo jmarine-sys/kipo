@@ -19,9 +19,10 @@
  *   qué tipo es  ·  cómo la llamás  ·  dónde está
  *
  * Acá viven solo los tres tipos que se cargan con el formulario general. Los otros
- * dos del modelo tienen pantalla propia porque piden datos que ninguno de estos
- * necesita: el plazo fijo su vencimiento (`/cuentas/plazo-fijo`) y la posición su
- * instrumento y su precio (`/inversiones`).
+ * dos del modelo se cargan en `/inversiones`, porque piden datos que ninguno de
+ * estos necesita: el plazo fijo su vencimiento y la posición su instrumento y su
+ * precio. Son las tres familias de `FAMILIAS_INVERSION`, y se eligen igual que
+ * estos tres tipos.
  */
 export interface TipoDeCuenta {
   id: 'vista' | 'comitente' | 'tarjeta';

@@ -82,6 +82,9 @@ It is the counterpart of [ADRs.md](ADRs.md): there is **what was decided and why
 | OD-53 | Las dos mitades de un cambio se cargaban de dos maneras distintas | `risk` | DECIDED | **Detectado por el usuario el 2026-09-19.** El teclado en pantalla escribía solo en el monto que sale; el que entra era un `<input>` suelto que pedía el teclado del sistema —que tapa media pantalla— y que además se iba con el scroll. Ahora los dos montos viven pegados arriba y **el mismo teclado escribe en el que toques**. Con un solo monto no hay nada que elegir y no se marca como seleccionable | — |
 | OD-54 | Invertir se hacía de dos maneras según en qué invirtieras | `decision` | DECIDED | El plazo fijo era un botón suelto arriba y la compra otro abajo. Ahora hay **una sola entrada con tres familias** —plazo fijo, activo bursátil, cripto— como los tres tipos de cuenta, y el formulario se adapta a cada una: elegir la familia ya fija el tipo y la moneda. La lista también se separa por familia: un CEDEAR en pesos y un bitcoin en dólares no se comparan ni se leen igual. **Se quitó el «Nombre (opcional)»**: para eso está el ticker, y pedir las dos cosas era dejar que discrepen | — |
 | OD-55 | ¿Bloquear un gasto si el saldo pasa a negativo? | `decision` | DECIDED | **No: avisar, no impedir.** Las unidades se cuentan y por eso vender de más SÍ se bloquea; **la plata se estima** —es la razón de ser de [ADR-005](ADRs.md#adr-005--el-ajuste-de-saldo-es-un-movimiento-más-contra-una-categoría-de-sistema)— así que bloquear haría que la app se niegue a registrar algo que ya pasó, y un movimiento faltante es peor que un saldo negativo. Además rompe cargar en desorden. **Pendiente de construir:** el aviso | Que un saldo negativo se note |
+| OD-56 | El plazo fijo elegía su familia acá y se iba a otra pantalla | `decision` | DECIDED | **Detectado por el usuario el 2026-09-26**, una vuelta después de unificar el alta ([OD-54](#el-registro)). Los tres botones prometían tres formularios y el tercero era una mudanza. El formulario del plazo fijo vive ahora al lado de los otros dos y `/inversiones/plazo-fijo` **dejó de existir**: mantener las dos es la sexta vez que algo definido dos veces se desincroniza en este proyecto. Al borrarla apareció que `/cuentas/nueva` enlazaba a `/cuentas/plazo-fijo`, **una ruta que nunca existió** | — |
+| OD-57 | «Moneda» en el alta de una inversión se leía como la de la cuenta | `decision` | DECIDED | **Pregunta del usuario el 2026-09-26**, y la respuesta es que eran dos cosas distintas pedidas como una: es la moneda del **precio** (`instrument.quote_currency`), no la de la cuenta con la que pagás. Un CEDEAR cotiza en pesos aunque lo pagues con dólares del broker. Era un campo de **texto libre** pegado al símbolo —escribir «usdt» o «dolares» creaba un instrumento que ninguna fuente iba a cotizar nunca—; ahora es una elección por familia (ARS/USD, USDT/USD) rotulada **«En qué cotiza»**, y el monto dice la moneda de la cuenta. Cierra la reserva de [OD-35](#el-registro) sobre la jerga *«Moneda de cotización»* | — |
+| OD-58 | `invertido` y `ganancia` restan monedas distintas | `risk` | OPEN | **Encontrado el 2026-09-26 al contestar OD-57, y reproducido contra PostgreSQL 16.** La vista `posicion` calcula `invertido` como la suma cruda de las contrapartes, **sin convertir**, y `valor` en la moneda de cotización. Si las dos no coinciden, `ganancia` resta peras de manzanas. Caso corriente, no rebuscado: mandar pesos a Binance y comprar bitcoin → 1.500.000 ARS por 0,01 BTC a 100.000 USDT da `invertido=1500000`, `valor=1000`, **`ganancia=-1499000`** con el precio **sin moverse**, y la pantalla lo rotula en USDT. Ninguna prueba lo agarró porque todas compran con una cuenta en la misma moneda que cotiza el activo. **Falta decidir** con qué cotización se convierte —la del día de CADA compra, que es lo único que conserva el rendimiento real— y si USDT se trata como USD, aproximación que el proyecto ya acepta en `scripts/precios.mjs`. Pide migración | Que el rendimiento por posición se pueda leer |
 | OD-33 | El rendimiento se mide por posición, no por portafolio | `decision` | DECIDED | **Portafolio explícito**, firmado por el usuario el 2026-09-16 → [ADR-026](ADRs.md#adr-026--el-portafolio-es-el-borde-es-flujo-solo-lo-que-lo-cruza). Una entidad `portfolio` y las cuentas apuntan a ella; pertenecer es opcional, que es lo que lo distingue de agrupar por `institution`. Es flujo solo lo que tiene la contraparte afuera, y eso cierra los tres agujeros sin casos especiales. **Reserva:** una cuenta que se olvida de apuntar a su portafolio no rompe nada, mide mal en silencio — mismo modo de falla que [ADR-025](ADRs.md#adr-025--los-precios-se-traen-solos-todos-los-días-porque-el-de-hoy-no-se-recupera-mañana) | — |
 | OD-34 | Una pantalla terminada puede quedar sin camino, y nadie se entera | `debt` | DECIDED | **Tercera vez que pasa** (recurrentes, y la cartera a tres clicks detrás de *Cuentas*). La auditoría anterior contaba **enlaces por ruta**, que no es lo mismo que recorrer caminos: un enlace puede estar dentro de un `{#if}` que nadie cumple, o colgar de una pantalla a la que tampoco se llega. `scripts/navegacion.mjs` recorre el grafo desde la barra y falla si algo queda a más de 2 clicks; corre dentro de `verificar.sh`. **Verificado por mutación:** sacando la pestaña Cartera, sale 1 | — |
 | OD-35 | La app habla como quien la construyó, no como quien la usa | `risk` | DECIDED | **Primera pasada hecha el 2026-09-18**, sobre lo que engaña y lo que está siempre a la vista. **«Ajustes» era lo peor**: en la pantalla principal, con el significado de *Configuración* en cualquier otra app — y encima escrito a mano, así que renombrar la categoría no cambiaba el rótulo. Ahora Inicio muestra **el nombre real** de la categoría, que en los libros nuevos nace como *Ajuste de saldo*. También: la pestaña *Cartera* → **Inversiones**, *Posiciones* → **Lo que tenés**, *Portafolios* → **Dónde invertís**, *Nueva obligación* → **Algo que se repite**, *Capital* → **Cuánto ponés**. **Reserva:** los formularios de inversión siguen en jerga (*Moneda de cotización*, *Acción que representa*) — se dejaron porque los ve solo quien invierte | — |
@@ -98,11 +101,13 @@ It is the counterpart of [ADRs.md](ADRs.md): there is **what was decided and why
 
 ## The state of the project, read off the register
 
-Actualizado 2026-09-26 (cuadragesimosegunda revisión). Cincuenta y cinco ítems: **46 `DECIDED`**,
-**9 `OPEN`**, **0 `LEANING`** y **0 `NEEDS-INPUT`**.
+Actualizado 2026-09-26 (cuadragesimotercera revisión). Cincuenta y ocho ítems: **48 `DECIDED`**,
+**10 `OPEN`**, **0 `LEANING`** y **0 `NEEDS-INPUT`**.
 
-**32 decisiones** en [ADRs.md](ADRs.md), 30 migraciones verificadas contra PostgreSQL 16 con
-165 aserciones, y una aplicación SvelteKit con 14 pantallas, en producción y en uso.
+**32 decisiones** en [ADRs.md](ADRs.md), 32 migraciones verificadas contra PostgreSQL 16, y una
+aplicación SvelteKit con 14 pantallas, en producción y en uso. Las aserciones de base las cuenta
+`./scripts/verificar.sh` en cada corrida: decían 165 acá cuando ya eran 173, y una cifra que nadie
+comprueba envejece igual que un ítem cerrado marcado abierto.
 
 El 2026-09-18 la usó por primera vez **alguien que no la había construido** —el padre del usuario— y
 se perdió. Ese solo hecho produjo más hallazgos que cualquier auditoría: el alta imponía veinte
@@ -110,14 +115,18 @@ categorías ajenas, no existía ninguna pantalla de primer uso, y la aplicación
 contador. Nada de eso lo veían las pruebas, **porque todas preguntan si lo construido funciona y
 ninguna pregunta si se entiende**.
 
-De los 9 `OPEN`, ninguno impide usar la aplicación:
+De los 10 `OPEN`, ninguno impide usar la aplicación:
 
 - **Esperan datos que todavía no existen (3):** OD-20 método de costo, OD-29 gráficos, OD-48 el árbol
   de categorías —que solo se puede decidir con las categorías reales cargadas.
 - **Riesgo solo evaluable con uso real (4):** OD-10 pausa por inactividad, OD-11 la fricción de la
   tarjeta, OD-22 el reseteo tras la puesta en marcha, OD-25 el preview que apunta a producción.
 - **Diferido por el usuario (1):** OD-32, el plazo fijo UVA.
-- **Deuda (1):** OD-46, lo común copiado en cada pantalla — primera pasada hecha, falta el resto.
+- **Deuda (1):** OD-46, lo común copiado en cada pantalla — segunda pasada hecha (`.chip` estaba
+  escrita cuatro veces, y las cuatro ya habían derivado), falta `.tag` y `.panel`.
+- **Mide mal y hay que decidir cómo arreglarlo (1):** OD-58, `invertido` y `ganancia` restan monedas
+  distintas cuando pagás en una moneda algo que cotiza en otra. **Este sí importa**: no espera datos
+  ni uso, espera una decisión y una migración.
 
 **Ningún `NEEDS-INPUT` abierto.** Los dos que hubo —OD-41 y OD-43— cerraron el mismo día que se
 plantearon: los dos esperaban una decisión que solo podía tomar el usuario, y la tomó.

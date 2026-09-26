@@ -360,11 +360,6 @@
     min-height: 42px; padding: 0 .6rem; width: 100%;
     background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
   }
-  .chip {
-    min-height: 38px; padding: 0 .8rem; border-radius: 999px; font-size: .84rem;
-    display: inline-flex; align-items: center; gap: .4rem;
-  }
-  .chip.on { background: var(--accent); color: var(--accent-fg); border-color: transparent; font-weight: 600; }
   .chip.limpiar { color: var(--neg); border-style: dashed; }
 
   .resumen { font-size: .82rem; margin: 0; }

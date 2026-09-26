@@ -123,28 +123,44 @@ export const TIPOS_ACTIVO = [
  *   plazo fijo   vencimiento y cuánto vuelve — no cotiza, devenga
  *   bursátil     un ticker que cotiza en pesos, y a veces un ratio
  *   cripto       un ticker que cotiza en dólares las 24 horas
+ *
+ * Y el plazo fijo eligió su familia en el mismo lugar pero se iba a OTRA
+ * PANTALLA, así que los tres botones prometían tres formularios y entregaban dos
+ * y una mudanza. El formulario del plazo fijo vive ahora acá al lado de los
+ * otros dos, y la pantalla suelta dejó de existir: un alta hecha en dos lugares
+ * es la sexta vez en este proyecto que algo definido dos veces se desincroniza.
  */
 export const FAMILIAS_INVERSION = [
   {
     id: 'plazo' as const,
     label: 'Plazo fijo',
-    pista: 'sabés cuánto vuelve y cuándo',
-    /** Tiene pantalla propia: pide vencimiento y monto final, que no piden los otros. */
-    ruta: '/inversiones/plazo-fijo'
+    pista: 'sabés cuánto vuelve y cuándo'
   },
   {
     id: 'bursatil' as const,
     label: 'Activo bursátil',
     pista: 'CEDEARs, acciones, bonos, ETFs',
     kinds: ['cedear', 'stock', 'bond', 'etf', 'fund'] as const,
-    moneda: 'ARS'
+    /**
+     * En qué puede COTIZAR, que no es la moneda con la que pagás.
+     *
+     * Son dos cosas distintas y el formulario las pedía como si fueran una: un
+     * campo de texto libre llamado «Moneda», al lado del símbolo. Un CEDEAR
+     * cotiza en pesos aunque lo pagues con los dólares parados en el broker, y
+     * el bitcoin cotiza en dólares aunque lo pagues transfiriendo pesos.
+     *
+     * La primera es la de siempre. Los bonos en dólares —la serie D— son la
+     * excepción que obliga a que haya más de una.
+     */
+    monedas: ['ARS', 'USD'] as const
   },
   {
     id: 'cripto' as const,
     label: 'Cripto',
     pista: 'bitcoin, ether, lo que sea',
     kinds: ['crypto'] as const,
-    moneda: 'USDT'
+    /** USDT primero porque es contra lo que cotiza Binance, que es la fuente. */
+    monedas: ['USDT', 'USD'] as const
   }
 ];
 

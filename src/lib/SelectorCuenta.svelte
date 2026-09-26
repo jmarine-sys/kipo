@@ -141,11 +141,6 @@
 
 <style>
   .wrap { display: flex; flex-wrap: wrap; gap: .4rem; }
-  .chip {
-    min-height: 42px; padding: 0 .85rem; border-radius: 999px; font-size: .88rem;
-    display: inline-flex; align-items: center; gap: .4rem; max-width: 100%;
-  }
-  .chip.on { background: var(--accent); color: var(--accent-fg); border-color: transparent; font-weight: 600; }
   .chip.more { border-style: dashed; }
   .todas { display: flex; flex-direction: column; gap: .5rem; }
   .search { width: 100%; }

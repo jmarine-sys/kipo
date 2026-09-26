@@ -4,8 +4,10 @@
   import {
     listPosiciones, comprarActivo, venderActivo, guardarPrecio,
     rendimiento, TIPOS_ACTIVO, FAMILIAS_INVERSION, etiquetaDeKind, familiaDe,
+    crearPlazoFijo, tasaImplicita, diasEntre,
     type Posicion
   } from '$lib/ledger/inversiones';
+  import { cotizaSola, porQueNoCotiza } from '$lib/ledger/precios';
   import { money, today, shortDate, num } from '$lib/format';
   import Vacio from '$lib/Vacio.svelte';
   import { cargarCartera } from '$lib/ledger/cartera.datos';
@@ -33,10 +35,12 @@
   let vMonto = $state('');
   let vHacia = $state<string | null>(null);
 
+  type Familia = (typeof FAMILIAS_INVERSION)[number]['id'];
+
   let comprando = $state(false);
   let cSymbol = $state('');
   let cKind = $state('crypto');
-  let familia = $state<'bursatil' | 'cripto' | null>(null);
+  let familia = $state<Familia | null>(null);
 
   const familiaElegida = $derived(FAMILIAS_INVERSION.find((f) => f.id === familia) ?? null);
 
@@ -48,12 +52,13 @@
       items: posiciones.filter((p) => familiaDe(p.kind) === 'cripto') }
   ]);
 
-  /** Elegir la familia fija lo que esa familia ya sabe: el tipo y la moneda. */
-  function elegirFamilia(id: 'bursatil' | 'cripto') {
+  /** Elegir la familia fija lo que esa familia ya sabe: el tipo y en qué cotiza. */
+  function elegirFamilia(id: Familia) {
     familia = id;
+    error = null;
     const f = FAMILIAS_INVERSION.find((x) => x.id === id);
     cKind = f?.kinds?.[0] ?? 'crypto';
-    cMoneda = f?.moneda ?? 'ARS';
+    cMoneda = f?.monedas?.[0] ?? 'ARS';
   }
   let cMoneda = $state('USDT');
   let cDecimals = $state(8);
@@ -66,20 +71,26 @@
 
   const efectivo = $derived(cuentas.filter((c) => c.valuation === 'balance' && c.kind === 'asset'));
 
-  /**
-   * Si esta posición recibe precio automático.
-   *
-   * Tiene que decir lo MISMO que `scripts/precios.mjs`, que es quien de verdad
-   * los trae. Si las dos reglas se separan, la pantalla miente: dice "cotiza
-   * sola" sobre algo que nadie va a cotizar.
-   */
-  function cotizaSola(p: Posicion) {
-    if (p.kind === 'crypto') return p.quote_currency === 'USD' || p.quote_currency === 'USDT';
-    if (['cedear', 'stock', 'etf'].includes(p.kind)) {
-      return p.quote_currency === 'ARS' && !!(p.underlying_symbol ?? p.symbol);
-    }
-    return false;
-  }
+  /** La cuenta con la que se paga: es la que dice en qué moneda está el monto. */
+  const cuentaOrigen = $derived(efectivo.find((c) => c.account_id === cDesde) ?? null);
+
+  // --- Plazo fijo ---------------------------------------------------------
+  // Vivía en /inversiones/plazo-fijo, una pantalla aparte. Los tres botones
+  // prometían tres formularios y el tercero era una mudanza.
+  let pfNombre = $state('');
+  let pfCapital = $state('');
+  let pfEsperado = $state('');
+  let pfVence = $state('');
+  let pfDonde = $state('');
+
+  const pfOrigen = $derived(efectivo.find((c) => c.account_id === cDesde) ?? null);
+  const pfDias = $derived(pfVence ? diasEntre(today(), pfVence) : 0);
+  const pfInteres = $derived(num(pfEsperado) > num(pfCapital) ? num(pfEsperado) - num(pfCapital) : 0);
+  const pfTna = $derived(tasaImplicita(num(pfCapital), num(pfEsperado), pfDias));
+  const pfListo = $derived(
+    !!pfNombre.trim() && !!cDesde && num(pfCapital) > 0 &&
+    num(pfEsperado) > num(pfCapital) && pfDias > 0
+  );
 
   /** Los totales solo suman lo que tiene precio: de lo demás no sabemos. */
   const conPrecio = $derived(posiciones.filter((p) => p.valor !== null));
@@ -145,10 +156,44 @@
         ratio: cKind === 'cedear' && cRatio ? num(cRatio) : null,
         subyacente: cKind === 'cedear' ? (cSubyacente.trim() || null) : null
       });
-      cSymbol = ''; cMonto = ''; cUnidades = ''; comprando = false;
+      cSymbol = ''; cMonto = ''; cUnidades = '';
+      cerrar();
       await load();
     } catch (err) { error = err instanceof Error ? err.message : 'No se pudo comprar'; }
     finally { busy = false; }
+  }
+
+  /**
+   * Constituir un plazo fijo, desde esta misma pantalla.
+   *
+   * Es otra función de base que la compra —crea la cuenta, mueve el capital y
+   * agenda el vencimiento de una vez (ADR-014, ADR-016)— pero es el mismo acto:
+   * poner plata a rendir. Por eso comparte el selector de familia y la cuenta de
+   * origen, y no la pantalla entera.
+   */
+  async function crearPF(e: SubmitEvent) {
+    e.preventDefault();
+    if (!pfListo || !cDesde) return;
+    busy = true; error = null;
+    try {
+      await crearPlazoFijo({
+        nombre: pfNombre.trim(), desdeId: cDesde, capital: num(pfCapital),
+        vence: pfVence, esperado: num(pfEsperado),
+        institucion: pfDonde.trim() || null, fecha: today()
+      });
+      pfNombre = ''; pfCapital = ''; pfEsperado = ''; pfVence = '';
+      cerrar();
+      await load();
+    } catch (err) {
+      error = err instanceof Error ? err.message : 'No se pudo constituir';
+    } finally { busy = false; }
+  }
+
+  /** Cerrar el alta vuelve a dejar los tres botones sin elegir. */
+  function cerrar() {
+    comprando = false;
+    familia = null;
+    error = null;
   }
 
   onMount(load);
@@ -191,9 +236,12 @@
 
   {#if loading}
     <p class="dim">Cargando…</p>
-  {:else if !posiciones.length && !comprando}
+  {:else if !posiciones.length && !plazos.length && !comprando}
+    <!-- Los plazos fijos cuentan. Se constituyen desde esta misma pantalla, así
+         que sin ellos en la condición el primero que cargabas te dejaba mirando
+         su tarjeta arriba y "todavía no registraste ninguna inversión" abajo. -->
     <Vacio titulo="Todavía no registraste ninguna inversión."
-           detalle="Cripto, CEDEARs, acciones o fondos: todo lo que se valúe por unidades y precio."
+           detalle="Un plazo fijo, cripto, CEDEARs, acciones o fondos."
            accion="Registrar la primera" onaccion={() => (comprando = true)} />
   {:else}
     {#if conPrecio.length}
@@ -265,14 +313,11 @@
                 </span>
               </label>
               {#if !cotizaSola(p)}
+                <!-- El motivo lo da el mismo módulo que decide quién cotiza, así
+                     que no puede explicar algo distinto de lo que hace. -->
                 <p class="dim sm nota">
                   Esta posición <b>no cotiza sola</b>: hay que cargarle el precio acá.
-                  {#if p.kind === 'cedear'}
-                    Le falta el símbolo de la acción que representa, que es con el que
-                    se le pide el precio a BYMA.
-                  {:else}
-                    No hay fuente automática configurada para {p.kind} en {p.quote_currency}.
-                  {/if}
+                  {porQueNoCotiza(p)}
                 </p>
               {/if}
               {#if p.precio_al}
@@ -313,105 +358,170 @@
     {/each}
 
     {#if comprando}
-      <form class="card stack" onsubmit={comprar}>
+      <section class="card stack">
         <h2>Registrar una inversión</h2>
 
-        <!-- Las tres familias en un solo lugar. El plazo fijo era un botón
-             suelto arriba y la compra otro abajo, así que «invertir» se hacía de
-             dos maneras según en qué invirtieras. -->
+        <!-- Las tres familias en un solo lugar Y con el mismo trato. El plazo
+             fijo elegía acá y se iba a otra pantalla, así que de los tres
+             botones dos abrían un formulario y el tercero mudaba. -->
         <div class="familias">
           {#each FAMILIAS_INVERSION as f}
-            {#if f.ruta}
-              <a class="opcion" href={f.ruta}>
-                {f.label}<span class="dim sm">{f.pista}</span>
-              </a>
-            {:else}
-              <button type="button" class="opcion" class:on={familia === f.id}
-                      onclick={() => elegirFamilia(f.id as 'bursatil' | 'cripto')}>
-                {f.label}<span class="dim sm">{f.pista}</span>
-              </button>
-            {/if}
+            <button type="button" class="opcion" class:on={familia === f.id}
+                    onclick={() => elegirFamilia(f.id)}>
+              {f.label}<span class="dim sm">{f.pista}</span>
+            </button>
           {/each}
         </div>
 
-        {#if familiaElegida}
-          {#if (familiaElegida.kinds?.length ?? 0) > 1}
-            <fieldset>
-              <legend class="dim">Qué es</legend>
-              <div class="wrap">
-                {#each familiaElegida.kinds ?? [] as k}
-                  <button type="button" class="chip" class:on={cKind === k}
-                          onclick={() => (cKind = k)}>{etiquetaDeKind(k)}</button>
-                {/each}
-              </div>
-            </fieldset>
-          {/if}
+        {#if familia === 'plazo'}
+          <form class="stack" onsubmit={crearPF}>
+            <label class="campo"><span>Cómo lo llamás</span>
+              <input bind:value={pfNombre} required maxlength="36" placeholder="Plazo fijo 90 días" />
+            </label>
 
-          <div class="row campos">
+            <label class="campo"><span>Sale de</span>
+              <select bind:value={cDesde} required>
+                <option value={null} disabled>Elegí una cuenta</option>
+                {#each efectivo as c}<option value={c.account_id}>{c.name} · {money(c.balance, c.unit)}</option>{/each}
+              </select>
+            </label>
+
+            <div class="row campos">
+              <label class="campo"><span>Cuánto ponés</span>
+                <input class="monto" inputmode="decimal" bind:value={pfCapital} required placeholder="1000000" />
+              </label>
+              <label class="campo"><span>Vence el</span>
+                <input type="date" bind:value={pfVence} required min={today()} />
+              </label>
+            </div>
+
+            <label class="campo"><span>Cuánto vuelve al vencimiento</span>
+              <input class="monto" inputmode="decimal" bind:value={pfEsperado} required placeholder="1090000" />
+            </label>
+
+            <label class="campo"><span>Dónde</span>
+              <input bind:value={pfDonde} maxlength="24" placeholder="Santander" />
+            </label>
+
+            {#if pfInteres && pfDias > 0}
+              <!-- La tasa no se guarda: se deduce de capital, monto final y plazo.
+                   Es el número con el que se comparan las ofertas, así que
+                   conviene verlo mientras se carga, no después. -->
+              <p class="resumen">
+                Ganás <b class="money pos">{money(pfInteres, pfOrigen?.unit ?? 'ARS')}</b> en {pfDias} días
+                {#if pfTna}· equivale a una tasa anual de <b>{pfTna.toFixed(1)}%</b>{/if}
+              </p>
+            {/if}
+
+            <button class="btn-primary" type="submit" disabled={busy || !pfListo}>
+              {busy ? 'Constituyendo…' : 'Constituir'}
+            </button>
+            <p class="dim sm nota">
+              La plata sale de tu cuenta y queda inmovilizada: tu patrimonio no cambia,
+              pero baja lo disponible. El día del vencimiento aparece en la
+              <a href="/recurrentes">Agenda</a> para registrar la vuelta.
+            </p>
+          </form>
+        {:else if familiaElegida}
+          <form class="stack" onsubmit={comprar}>
+            {#if (familiaElegida.kinds?.length ?? 0) > 1}
+              <fieldset>
+                <legend class="dim">Qué es</legend>
+                <div class="wrap">
+                  {#each familiaElegida.kinds ?? [] as k}
+                    <button type="button" class="chip" class:on={cKind === k}
+                            onclick={() => (cKind = k)}>{etiquetaDeKind(k)}</button>
+                  {/each}
+                </div>
+              </fieldset>
+            {/if}
+
             <!-- Sin «Nombre»: para eso está el ticker. Pedir las dos cosas era
                  pedir dos veces lo mismo y dejar que discrepen. -->
             <label class="campo"><span>Símbolo</span>
               <input bind:value={cSymbol} required maxlength="12"
                      placeholder={familia === 'cripto' ? 'BTC' : 'AAPL'} />
             </label>
-            <label class="campo"><span>Moneda</span>
-              <input bind:value={cMoneda} required maxlength="6" />
+
+            <!-- EN QUÉ COTIZA, que no es con qué pagás. Era un campo de texto
+                 libre llamado «Moneda» pegado al símbolo, y ahí se leía como la
+                 moneda de la operación. Escribir «usdt» en minúscula o «dolares»
+                 creaba un instrumento que ninguna fuente iba a cotizar nunca. -->
+            {#if (familiaElegida.monedas?.length ?? 0) > 1}
+              <fieldset>
+                <legend class="dim">En qué cotiza</legend>
+                <div class="wrap">
+                  {#each familiaElegida.monedas ?? [] as m}
+                    <button type="button" class="chip" class:on={cMoneda === m}
+                            onclick={() => (cMoneda = m)}>{m}</button>
+                  {/each}
+                </div>
+                <p class="dim sm nota">
+                  La moneda del <b>precio</b>, no la de la cuenta con la que pagás:
+                  un CEDEAR cotiza en pesos aunque lo pagues con dólares del broker.
+                </p>
+              </fieldset>
+            {/if}
+
+            <label class="campo"><span>Sale de</span>
+              <select bind:value={cDesde} required>
+                <option value={null} disabled>Elegí una cuenta</option>
+                {#each efectivo as c}<option value={c.account_id}>{c.name} · {money(c.balance, c.unit)}</option>{/each}
+              </select>
             </label>
-          </div>
 
-          <label class="campo"><span>Sale de</span>
-            <select bind:value={cDesde} required>
-              <option value={null} disabled>Elegí una cuenta</option>
-              {#each efectivo as c}<option value={c.account_id}>{c.name} · {money(c.balance, c.unit)}</option>{/each}
-            </select>
-          </label>
-
-          <div class="row campos">
-            <label class="campo"><span>Cuánto pagaste</span>
-              <input class="monto" inputmode="decimal" bind:value={cMonto} required />
-            </label>
-            <label class="campo"><span>Cuántas unidades</span>
-              <input class="monto" inputmode="decimal" bind:value={cUnidades} required />
-            </label>
-          </div>
-
-          {#if num(cMonto) && num(cUnidades)}
-            <!-- ADR-010: el precio no se guarda, es el cociente. Se muestra para
-                 que puedas comprobar que no te equivocaste de orden de magnitud. -->
-            <p class="resumen">
-              Te quedó a <b class="money">{money(num(cMonto) / num(cUnidades), cMoneda)}</b> por unidad
-            </p>
-          {/if}
-
-          <label class="campo"><span>Dónde</span>
-            <input bind:value={cBroker} maxlength="24"
-                   placeholder={familia === 'cripto' ? 'Binance' : 'Balanz'} />
-          </label>
-
-          {#if cKind === 'cedear'}
             <div class="row campos">
-              <label class="campo"><span>Ratio</span>
-                <input class="monto" inputmode="decimal" bind:value={cRatio} placeholder="20" />
+              <label class="campo"><span>Cuánto pagaste{#if cuentaOrigen} ({cuentaOrigen.unit}){/if}</span>
+                <input class="monto" inputmode="decimal" bind:value={cMonto} required />
               </label>
-              <label class="campo"><span>Acción que representa</span>
-                <input bind:value={cSubyacente} placeholder="AAPL" required />
+              <label class="campo"><span>Cuántas unidades</span>
+                <input class="monto" inputmode="decimal" bind:value={cUnidades} required />
               </label>
             </div>
-            <p class="aviso">
-              Se mide al <b>contado con liqui</b>: el precio en pesos ya lo lleva
-              adentro, y usarlo separa lo que rindió la acción de lo que se movió
-              el dólar. El símbolo de la acción es además con lo que se le pide el
-              precio a la fuente — sin él, hay que cargarlo a mano.
-            </p>
-          {/if}
 
-          <button class="btn-primary" type="submit" disabled={busy || !cSymbol.trim() || !cDesde}>
-            Registrar la compra
-          </button>
+            {#if num(cMonto) && num(cUnidades)}
+              <!-- ADR-010: el precio no se guarda, es el cociente. Se muestra para
+                   que puedas comprobar que no te equivocaste de orden de magnitud.
+                   Va en la moneda de la CUENTA, que es en la que está el monto:
+                   decía `cMoneda` y eso etiquetaba pesos como dólares cada vez
+                   que las dos monedas no coincidían. -->
+              <p class="resumen">
+                Te quedó a
+                <b class="money">{money(num(cMonto) / num(cUnidades), cuentaOrigen?.unit ?? cMoneda)}</b>
+                por unidad
+              </p>
+            {/if}
+
+            <label class="campo"><span>Dónde</span>
+              <input bind:value={cBroker} maxlength="24"
+                     placeholder={familia === 'cripto' ? 'Binance' : 'Balanz'} />
+            </label>
+
+            {#if cKind === 'cedear'}
+              <div class="row campos">
+                <label class="campo"><span>Ratio</span>
+                  <input class="monto" inputmode="decimal" bind:value={cRatio} placeholder="20" />
+                </label>
+                <label class="campo"><span>Acción que representa</span>
+                  <input bind:value={cSubyacente} placeholder="AAPL" required />
+                </label>
+              </div>
+              <p class="aviso">
+                Se mide al <b>contado con liqui</b>: el precio en pesos ya lo lleva
+                adentro, y usarlo separa lo que rindió la acción de lo que se movió
+                el dólar. El símbolo de la acción es además con lo que se le pide el
+                precio a la fuente — sin él, hay que cargarlo a mano.
+              </p>
+            {/if}
+
+            <button class="btn-primary" type="submit" disabled={busy || !cSymbol.trim() || !cDesde}>
+              Registrar la compra
+            </button>
+          </form>
         {/if}
 
-        <button type="button" class="link" onclick={() => (comprando = false)}>Cancelar</button>
-      </form>
+        <button type="button" class="link" onclick={cerrar}>Cancelar</button>
+      </section>
     {:else}
       <button class="btn-primary nueva" onclick={() => (comprando = true)}>+ Nueva inversión</button>
     {/if}
@@ -431,7 +541,7 @@
     display: flex; flex-direction: column; align-items: flex-start; gap: .15rem;
     padding: .7rem .85rem; min-height: var(--tap); text-align: left;
     border: 1px solid var(--border); border-radius: var(--radius);
-    background: var(--surface); color: inherit; text-decoration: none;
+    background: var(--surface); color: inherit;
   }
   .opcion.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--surface)); }
   fieldset { border: none; padding: 0; margin: 0; }

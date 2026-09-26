@@ -8,7 +8,7 @@
 // dias. Lo verificaba con un script de una sola vez, escrito a mano cada vez, y
 // una de esas veces el script fallo DESPUES de escribir el archivo: el registro
 // quedo inconsistente y el commit salio igual.
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 
 const REG = 'docs/ODs.md';
 const texto = readFileSync(REG, 'utf8');
@@ -44,6 +44,26 @@ if (desde > 0 && hasta > desde) {
   }
   const suma = [...resumen.matchAll(/\((\d+)\):/g)].reduce((t, m) => t + Number(m[1]), 0);
   if (suma !== abiertos.length) fallos.push(`los grupos del resumen suman ${suma} y hay ${abiertos.length} abiertos`);
+}
+
+// 3. Los numeros que el registro dice de SI MISMO, contados de verdad.
+//
+// Decia "30 migraciones" con 32 en disco, "165 aserciones" con 173, y "14
+// pantallas" cuando habia 15. Ninguno de los tres se lee como sospechoso: se
+// leen como datos. La regla 6 del registro dice que un item cerrado marcado
+// abierto ensenia a desconfiar de todo lo demas, y una cifra vieja hace lo
+// mismo, solo que mas callada. Se comprueba lo que se puede contar sin correr
+// nada; la cuenta de aserciones ya no vive aca, la imprime verificar.sh.
+const contar = (dir, filtro) => readdirSync(dir, { recursive: true })
+  .filter((f) => filtro.test(String(f))).length;
+
+const migraciones = contar('supabase/migrations', /\.sql$/);
+const pantallas = contar('src/routes', /\+page\.svelte$/);
+
+for (const [n, que] of [[migraciones, 'migraciones'], [pantallas, 'pantallas']]) {
+  const m = texto.match(new RegExp(`(\\d+) ${que}`));
+  if (!m) fallos.push(`el resumen ya no dice cuantas ${que} hay`);
+  else if (Number(m[1]) !== n) fallos.push(`el resumen dice ${m[1]} ${que} y hay ${n}`);
 }
 
 // 3. Un ADR referenciado tiene que existir.

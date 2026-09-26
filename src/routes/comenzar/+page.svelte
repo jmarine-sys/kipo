@@ -158,11 +158,6 @@
 
 
   .wrap { display: flex; flex-wrap: wrap; gap: .4rem; }
-  .chip {
-    min-height: 40px; padding: 0 .8rem; border-radius: 999px; font-size: .86rem;
-    display: inline-flex; align-items: center; gap: .35rem;
-  }
-  .chip.on { background: var(--accent); color: var(--accent-fg); border-color: transparent; font-weight: 600; }
 
 
   .btn-primary.grande { padding: .85rem; border-radius: 12px; font-size: .95rem; }

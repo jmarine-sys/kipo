@@ -26,6 +26,11 @@
 // El tercer campo es coalesce(underlying_symbol, symbol): un CEDEAR se puede
 // llamar "AAPL-CEDEAR" en tu libro y "AAPL" en BYMA.
 
+// Quien cotiza que, definido UNA vez. Se importa el .ts directo: node le quita
+// los tipos desde la 22 -verificado contra node:22.23.3-, y el modulo no importa
+// nada, que es justo la condicion para que este script pueda leerlo.
+import { fuenteDe } from '../src/lib/ledger/precios.ts';
+
 const BYMA = 'https://open.bymadata.com.ar/vanoms-be-core/rest/api/bymadata/free';
 const DATA912 = 'https://data912.com/live';
 
@@ -287,11 +292,16 @@ if (!pedidos.length) {
 
 // Un precio en la moneda equivocada es peor que ningun precio: valuaria una
 // posicion en pesos con un numero en dolares y nadie lo notaria.
-const enPesos = pedidos.filter((p) => ['cedear', 'stock', 'etf', 'bond'].includes(p.kind) && p.moneda === 'ARS');
-const enDolares = pedidos.filter((p) => p.kind === 'crypto' && ['USD', 'USDT'].includes(p.moneda));
+//
+// El reparto NO se decide aca: lo decide `src/lib/ledger/precios.ts`, que es el
+// mismo modulo con el que la pantalla de inversiones le dice al usuario si esa
+// posicion va a cotizar sola. Estaba escrito en los dos lados y ya se habian
+// separado -este cotiza bonos en pesos y la pantalla los daba por manuales-.
+const enPesos = pedidos.filter((p) => fuenteDe(p) === 'byma');
+const enDolares = pedidos.filter((p) => fuenteDe(p) === 'binance');
 
 for (const p of pedidos) {
-  if (!enPesos.includes(p) && !enDolares.includes(p)) {
+  if (!fuenteDe(p)) {
     p.falta = `${p.kind} en ${p.moneda}: ninguna fuente configurada`;
   }
 }
