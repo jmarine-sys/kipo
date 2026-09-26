@@ -3,7 +3,8 @@
   import { listBalances } from '$lib/ledger/api';
   import {
     listPosiciones, comprarActivo, venderActivo, guardarPrecio,
-    rendimiento, TIPOS_ACTIVO, type Posicion
+    rendimiento, TIPOS_ACTIVO, FAMILIAS_INVERSION, etiquetaDeKind, familiaDe,
+    type Posicion
   } from '$lib/ledger/inversiones';
   import { money, today, shortDate, num } from '$lib/format';
   import Vacio from '$lib/Vacio.svelte';
@@ -34,8 +35,26 @@
 
   let comprando = $state(false);
   let cSymbol = $state('');
-  let cNombre = $state('');
   let cKind = $state('crypto');
+  let familia = $state<'bursatil' | 'cripto' | null>(null);
+
+  const familiaElegida = $derived(FAMILIAS_INVERSION.find((f) => f.id === familia) ?? null);
+
+  /** Las posiciones separadas por familia, en el mismo orden que el alta. */
+  const GRUPOS_POSICION = $derived([
+    { id: 'bursatil', titulo: 'Bursátil',
+      items: posiciones.filter((p) => familiaDe(p.kind) === 'bursatil') },
+    { id: 'cripto', titulo: 'Cripto',
+      items: posiciones.filter((p) => familiaDe(p.kind) === 'cripto') }
+  ]);
+
+  /** Elegir la familia fija lo que esa familia ya sabe: el tipo y la moneda. */
+  function elegirFamilia(id: 'bursatil' | 'cripto') {
+    familia = id;
+    const f = FAMILIAS_INVERSION.find((x) => x.id === id);
+    cKind = f?.kinds?.[0] ?? 'crypto';
+    cMoneda = f?.moneda ?? 'ARS';
+  }
   let cMoneda = $state('USDT');
   let cDecimals = $state(8);
   let cDesde = $state<string | null>(null);
@@ -118,13 +137,15 @@
     busy = true; error = null;
     try {
       await comprarActivo({
-        symbol: cSymbol, nombre: cNombre, kind: cKind, moneda: cMoneda,
+        // El nombre ya no se pide: el ticker lo es. Se manda igual porque la
+        // función lo exige, y duplicarlo acá no puede discrepar.
+        symbol: cSymbol, nombre: cSymbol.trim().toUpperCase(), kind: cKind, moneda: cMoneda,
         decimals: cDecimals, desdeId: cDesde, monto: num(cMonto),
         unidades: num(cUnidades), broker: cBroker.trim() || null, fecha: today(),
         ratio: cKind === 'cedear' && cRatio ? num(cRatio) : null,
         subyacente: cKind === 'cedear' ? (cSubyacente.trim() || null) : null
       });
-      cSymbol = ''; cNombre = ''; cMonto = ''; cUnidades = ''; comprando = false;
+      cSymbol = ''; cMonto = ''; cUnidades = ''; comprando = false;
       await load();
     } catch (err) { error = err instanceof Error ? err.message : 'No se pudo comprar'; }
     finally { busy = false; }
@@ -143,10 +164,6 @@
   <!-- Un plazo fijo es una inversión y se espera verlo acá. Vivía colgado de
        Cuentas, donde nadie lo iba a buscar: por dentro se parece a una cuenta,
        pero lo que importa es qué significa para quien lo usa. ADR-033. -->
-  <div class="altas">
-    <a class="add" href="/inversiones/plazo-fijo">+ Plazo fijo</a>
-  </div>
-
   {#if plazos.length}
     <section class="card stack pf">
       <h2>Plazos fijos</h2>
@@ -166,12 +183,7 @@
       </ul>
       <!-- Dónde se cobra, dicho acá: el usuario lo cargaba en esta pantalla y el
            vencimiento aparecía en otra sin que nada lo anticipara. -->
-      <p class="dim sm">
-        Cuando el vencimiento entra en el mes, aparecen en
-        <a href="/recurrentes">Agenda</a>, que es donde se cobran: cobrarlo es un
-        evento con fecha, no una compra. Verlos con días de anticipación es a
-        propósito — es plata que vuelve y conviene saber cuándo.
-      </p>
+      <p class="dim sm">Se cobran desde <a href="/recurrentes">Agenda</a> al vencer.</p>
     </section>
   {/if}
 
@@ -210,8 +222,14 @@
       </section>
     {/if}
 
-    <ul class="list">
-      {#each posiciones as p}
+    <!-- Una tarjeta por familia. Todo junto en una lista mezclaba un CEDEAR en
+         pesos con un bitcoin en dólares, que no se comparan entre sí ni se leen
+         igual: la unidad de uno son acciones y la del otro decimales. -->
+    {#each GRUPOS_POSICION as g}
+      {#if g.items.length}
+      <h2 class="lbl">{g.titulo}</h2>
+      <ul class="list">
+      {#each g.items as p}
         <li class="card">
           <button class="fila" onclick={() => abrir(p)}>
             <span class="txt">
@@ -290,83 +308,112 @@
           {/if}
         </li>
       {/each}
-    </ul>
+      </ul>
+      {/if}
+    {/each}
 
     {#if comprando}
       <form class="card stack" onsubmit={comprar}>
-        <h2>Registrar una compra</h2>
-        <div class="row campos">
-          <label class="campo"><span>Símbolo</span>
-            <input bind:value={cSymbol} required placeholder="BTC" />
-          </label>
-          <label class="campo"><span>Tipo</span>
-            <select bind:value={cKind}>
-              {#each TIPOS_ACTIVO as t}<option value={t.id}>{t.label}</option>{/each}
-            </select>
-          </label>
-        </div>
-        <label class="campo"><span>Nombre (opcional)</span>
-          <input bind:value={cNombre} placeholder="Bitcoin" />
-        </label>
-        <label class="campo"><span>Sale de</span>
-          <select bind:value={cDesde} required>
-            <option value={null} disabled>Elegí una cuenta</option>
-            {#each efectivo as c}<option value={c.account_id}>{c.name} · {money(c.balance, c.unit)}</option>{/each}
-          </select>
-        </label>
-        <div class="row campos">
-          <label class="campo"><span>Cuánto pagaste</span>
-            <input class="monto" inputmode="decimal" bind:value={cMonto} required />
-          </label>
-          <label class="campo"><span>Cuántas unidades</span>
-            <input class="monto" inputmode="decimal" bind:value={cUnidades} required />
-          </label>
-        </div>
-        {#if num(cMonto) && num(cUnidades)}
-          <!-- ADR-010: el precio no se guarda, es el cociente. Se muestra para que
-               puedas comprobar que no te equivocaste de orden de magnitud. -->
-          <p class="resumen">
-            Te quedó a <b class="money">{money(num(cMonto) / num(cUnidades), cMoneda)}</b> por unidad
-          </p>
-        {/if}
-        <div class="row campos">
-          <label class="campo"><span>Moneda de cotización</span>
-            <input bind:value={cMoneda} required />
-          </label>
-          <label class="campo"><span>Dónde</span>
-            <input bind:value={cBroker} placeholder="Binance" />
-          </label>
+        <h2>Registrar una inversión</h2>
+
+        <!-- Las tres familias en un solo lugar. El plazo fijo era un botón
+             suelto arriba y la compra otro abajo, así que «invertir» se hacía de
+             dos maneras según en qué invirtieras. -->
+        <div class="familias">
+          {#each FAMILIAS_INVERSION as f}
+            {#if f.ruta}
+              <a class="opcion" href={f.ruta}>
+                {f.label}<span class="dim sm">{f.pista}</span>
+              </a>
+            {:else}
+              <button type="button" class="opcion" class:on={familia === f.id}
+                      onclick={() => elegirFamilia(f.id as 'bursatil' | 'cripto')}>
+                {f.label}<span class="dim sm">{f.pista}</span>
+              </button>
+            {/if}
+          {/each}
         </div>
 
-        {#if cKind === 'cedear'}
-          <!-- OD-17: el precio de un CEDEAR en pesos ya lleva el CCL adentro, así
-               que se mide con ese mismo dólar. Eso aísla lo que rindió la acción
-               de lo que se movió el tipo de cambio. -->
+        {#if familiaElegida}
+          {#if (familiaElegida.kinds?.length ?? 0) > 1}
+            <fieldset>
+              <legend class="dim">Qué es</legend>
+              <div class="wrap">
+                {#each familiaElegida.kinds ?? [] as k}
+                  <button type="button" class="chip" class:on={cKind === k}
+                          onclick={() => (cKind = k)}>{etiquetaDeKind(k)}</button>
+                {/each}
+              </div>
+            </fieldset>
+          {/if}
+
           <div class="row campos">
-            <label class="campo"><span>Ratio</span>
-              <input class="monto" inputmode="decimal" bind:value={cRatio} placeholder="20" />
+            <!-- Sin «Nombre»: para eso está el ticker. Pedir las dos cosas era
+                 pedir dos veces lo mismo y dejar que discrepen. -->
+            <label class="campo"><span>Símbolo</span>
+              <input bind:value={cSymbol} required maxlength="12"
+                     placeholder={familia === 'cripto' ? 'BTC' : 'AAPL'} />
             </label>
-            <label class="campo"><span>Acción que representa</span>
-              <input bind:value={cSubyacente} placeholder="AAPL" required />
+            <label class="campo"><span>Moneda</span>
+              <input bind:value={cMoneda} required maxlength="6" />
             </label>
           </div>
-          <p class="aviso">
-            Los CEDEARs se miden al <b>contado con liqui</b>, no al MEP. Su precio en
-            pesos ya lleva ese dólar adentro, así que usarlo es lo que separa
-            <em>cuánto rindió la acción</em> de <em>cuánto se movió el dólar</em>.
-          </p>
-          <p class="aviso">
-            El símbolo de la acción es además <b>cómo se le pide el precio a BYMA</b>.
-            Sin él la posición no cotiza sola y hay que cargarle el precio a mano.
-          </p>
+
+          <label class="campo"><span>Sale de</span>
+            <select bind:value={cDesde} required>
+              <option value={null} disabled>Elegí una cuenta</option>
+              {#each efectivo as c}<option value={c.account_id}>{c.name} · {money(c.balance, c.unit)}</option>{/each}
+            </select>
+          </label>
+
+          <div class="row campos">
+            <label class="campo"><span>Cuánto pagaste</span>
+              <input class="monto" inputmode="decimal" bind:value={cMonto} required />
+            </label>
+            <label class="campo"><span>Cuántas unidades</span>
+              <input class="monto" inputmode="decimal" bind:value={cUnidades} required />
+            </label>
+          </div>
+
+          {#if num(cMonto) && num(cUnidades)}
+            <!-- ADR-010: el precio no se guarda, es el cociente. Se muestra para
+                 que puedas comprobar que no te equivocaste de orden de magnitud. -->
+            <p class="resumen">
+              Te quedó a <b class="money">{money(num(cMonto) / num(cUnidades), cMoneda)}</b> por unidad
+            </p>
+          {/if}
+
+          <label class="campo"><span>Dónde</span>
+            <input bind:value={cBroker} maxlength="24"
+                   placeholder={familia === 'cripto' ? 'Binance' : 'Balanz'} />
+          </label>
+
+          {#if cKind === 'cedear'}
+            <div class="row campos">
+              <label class="campo"><span>Ratio</span>
+                <input class="monto" inputmode="decimal" bind:value={cRatio} placeholder="20" />
+              </label>
+              <label class="campo"><span>Acción que representa</span>
+                <input bind:value={cSubyacente} placeholder="AAPL" required />
+              </label>
+            </div>
+            <p class="aviso">
+              Se mide al <b>contado con liqui</b>: el precio en pesos ya lo lleva
+              adentro, y usarlo separa lo que rindió la acción de lo que se movió
+              el dólar. El símbolo de la acción es además con lo que se le pide el
+              precio a la fuente — sin él, hay que cargarlo a mano.
+            </p>
+          {/if}
+
+          <button class="btn-primary" type="submit" disabled={busy || !cSymbol.trim() || !cDesde}>
+            Registrar la compra
+          </button>
         {/if}
-        <button class="btn-primary" type="submit" disabled={busy || !cSymbol.trim() || !cDesde}>
-          Registrar la compra
-        </button>
+
         <button type="button" class="link" onclick={() => (comprando = false)}>Cancelar</button>
       </form>
-    {:else if posiciones.length}
-      <button class="btn-primary nueva" onclick={() => (comprando = true)}>+ Registrar una compra</button>
+    {:else}
+      <button class="btn-primary nueva" onclick={() => (comprando = true)}>+ Nueva inversión</button>
     {/if}
   {/if}
 </div>
@@ -379,12 +426,19 @@
   .total .grande { font-size: 1.5rem; }
   .total .linea { margin-top: .45rem; font-size: .88rem; }
   .pct { font-size: .8rem; margin-left: .3rem; }
-  .altas { display: flex; justify-content: flex-end; }
+  .familias { display: grid; gap: .5rem; }
+  .opcion {
+    display: flex; flex-direction: column; align-items: flex-start; gap: .15rem;
+    padding: .7rem .85rem; min-height: var(--tap); text-align: left;
+    border: 1px solid var(--border); border-radius: var(--radius);
+    background: var(--surface); color: inherit; text-decoration: none;
+  }
+  .opcion.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--surface)); }
+  fieldset { border: none; padding: 0; margin: 0; }
+  legend { font-size: .85rem; margin-bottom: .35rem; }
   .pf h2 { font-size: .95rem; margin: 0; }
   .pf .lista { list-style: none; margin: 0; padding: 0; display: grid; gap: .5rem; }
   .pf .txt { display: flex; flex-direction: column; gap: .1rem; }
-  .add { font-size: .84rem; text-decoration: none; padding: .35rem .6rem; border-radius: 999px;
-         background: var(--surface); border: 1px solid var(--border); }
   .aviso { margin: .7rem 0 0; font-size: .78rem; padding-top: .6rem; border-top: 1px solid var(--border); }
 
   .list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .4rem; }
@@ -413,12 +467,9 @@
   .monto { text-align: right; }
   .resumen { margin: 0; padding: .65rem .8rem; border-radius: 10px; background: var(--surface-2); font-size: .86rem; }
   .manual { color: var(--warn); }
-  .altas { display: flex; justify-content: flex-end; }
   .pf h2 { font-size: .95rem; margin: 0; }
   .pf .lista { list-style: none; margin: 0; padding: 0; display: grid; gap: .5rem; }
   .pf .txt { display: flex; flex-direction: column; gap: .1rem; }
-  .add { font-size: .84rem; text-decoration: none; padding: .35rem .6rem; border-radius: 999px;
-         background: var(--surface); border: 1px solid var(--border); }
   .aviso {
     margin: 0; padding: .65rem .8rem; border-radius: 10px; font-size: .82rem;
     background: color-mix(in srgb, var(--warn) 12%, transparent);

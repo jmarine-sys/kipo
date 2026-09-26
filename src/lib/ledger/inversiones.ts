@@ -112,6 +112,49 @@ export const TIPOS_ACTIVO = [
   { id: 'other',  label: 'Otro' }
 ] as const;
 
+/**
+ * Las tres familias de inversión, como los tres tipos de cuenta.
+ *
+ * Antes el plazo fijo era un botón aparte arriba y la compra otro abajo, así que
+ * «invertir» se hacía de dos maneras según en qué invirtieras. Son tres formas
+ * de lo mismo y se eligen en el mismo lugar; lo que cambia es el formulario,
+ * porque cada una pide datos distintos:
+ *
+ *   plazo fijo   vencimiento y cuánto vuelve — no cotiza, devenga
+ *   bursátil     un ticker que cotiza en pesos, y a veces un ratio
+ *   cripto       un ticker que cotiza en dólares las 24 horas
+ */
+export const FAMILIAS_INVERSION = [
+  {
+    id: 'plazo' as const,
+    label: 'Plazo fijo',
+    pista: 'sabés cuánto vuelve y cuándo',
+    /** Tiene pantalla propia: pide vencimiento y monto final, que no piden los otros. */
+    ruta: '/inversiones/plazo-fijo'
+  },
+  {
+    id: 'bursatil' as const,
+    label: 'Activo bursátil',
+    pista: 'CEDEARs, acciones, bonos, ETFs',
+    kinds: ['cedear', 'stock', 'bond', 'etf', 'fund'] as const,
+    moneda: 'ARS'
+  },
+  {
+    id: 'cripto' as const,
+    label: 'Cripto',
+    pista: 'bitcoin, ether, lo que sea',
+    kinds: ['crypto'] as const,
+    moneda: 'USDT'
+  }
+];
+
+export const etiquetaDeKind = (k: string) =>
+  TIPOS_ACTIVO.find((t) => t.id === k)?.label ?? k;
+
+/** A qué familia pertenece una posición ya cargada, para agruparla en pantalla. */
+export const familiaDe = (kind: string | null) =>
+  kind === 'crypto' ? 'cripto' : 'bursatil';
+
 export async function listPosiciones(): Promise<Posicion[]> {
   const { data, error } = await supabase.from('posicion').select('*').order('symbol');
   if (error) fallar('No se pudieron leer las inversiones', error);

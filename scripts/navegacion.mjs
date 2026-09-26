@@ -65,10 +65,42 @@ const agregar = (de, a) => {
   enlaces.get(de).add(a);
 };
 
+/**
+ * Las rutas que declara un modulo de $lib.
+ *
+ * Una pantalla puede enlazar con `href={f.ruta}`, donde la ruta vive en una
+ * estructura compartida —asi estan las familias de inversion y las pestanias de
+ * la barra—. Mirando solo los `href="..."` literales, esos caminos no existen
+ * para este chequeo y una pantalla perfectamente alcanzable figura como
+ * inalcanzable. Eso es un falso positivo, y un chequeo que miente se desactiva.
+ */
+function rutasDeModulo(mod) {
+  try {
+    const texto = readFileSync(mod, 'utf8');
+    return [...texto.matchAll(/(?:ruta|href)\s*:\s*'(\/[a-z/-]*)'/g)].map((m) => m[1]);
+  } catch {
+    return [];
+  }
+}
+
 for (const f of paginas) {
   const origen = rutaDe(f);
-  for (const [, destino] of readFileSync(f, 'utf8').matchAll(/href="(\/[a-z/-]*)"/g)) {
+  const texto = readFileSync(f, 'utf8');
+
+  // Se acepta lo que venga despues de `?` o `#`: `/nuevo?volver=/movimientos`
+  // lleva a /nuevo igual. Sin esto el boton flotante no contaba como enlace y
+  // /nuevo figuraba a dos clicks estando en la barra.
+  for (const [, destino] of texto.matchAll(/href="(\/[a-z/-]*)(?:[?#][^"]*)?"/g)) {
     agregar(origen, destino);
+  }
+
+  // Y las que le llegan por lo que importa de $lib.
+  for (const [, mod] of texto.matchAll(/from '\$lib\/([a-zA-Z0-9/._-]+)'/g)) {
+    const base = join('src/lib', mod.replace(/\.(ts|js|svelte)$/, ''));
+    for (const cand of [`${base}.ts`, `${base}.svelte`, base]) {
+      const rutas = rutasDeModulo(cand);
+      if (rutas.length) { for (const d of rutas) agregar(origen, d); break; }
+    }
   }
 }
 
@@ -76,7 +108,7 @@ for (const f of paginas) {
 // haber entrado a ningun lado.
 const layout = readFileSync(LAYOUT, 'utf8');
 const barra = [...layout.matchAll(/href: '(\/[a-z/-]*)'/g)].map((m) => m[1]);
-for (const [, destino] of layout.matchAll(/href="(\/[a-z/-]*)"/g)) barra.push(destino);
+for (const [, destino] of layout.matchAll(/href="(\/[a-z/-]*)(?:[?#{][^"]*)?"/g)) barra.push(destino);
 const salida = [...new Set(barra)];
 
 if (!salida.length) {
