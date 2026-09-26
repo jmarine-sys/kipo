@@ -140,3 +140,67 @@ select case when quote_size = 1
   from instrument where symbol = 'YPFD';
 
 reset role;
+
+-- ---------------------------------------------------------------------------
+-- Comprar en una moneda algo que cotiza en otra.  OD-58
+--
+-- Todo lo de arriba compra con una cuenta en la MISMA moneda en la que cotiza el
+-- activo, y por eso la suite entera se perdio el defecto: `invertido` salia en
+-- la moneda de la cuenta y se restaba de un `valor` en la moneda de cotizacion.
+-- El caso que faltaba es el mas comun de todos: mandar pesos y comprar cripto.
+-- ---------------------------------------------------------------------------
+set role rls_probe;
+select set_config('test.uid','11111111-1111-1111-1111-111111111111', false);
+
+insert into account (ledger_id, name, kind, valuation, unit, is_spendable, institution)
+values (my_ledger(), 'Binance pesos', 'asset', 'balance', 'ARS', false, 'Binance');
+
+-- 1.500.000 pesos por 0,01 BTC, con el BTC a 100.000 USDT. Con el dolar a 1.500
+-- eso es exactamente 1.000 USD: la posicion no gano ni perdio nada.
+select comprar_activo('BTCX','Bitcoin','crypto','USDT',8,
+                      (select id from account where name='Binance pesos'),
+                      1500000, 0.01, 'Binance', current_date) as btc \gset
+
+insert into price (instrument_id, ledger_id, on_date, price, currency, source)
+select (select id from instrument where symbol='BTCX'), my_ledger(),
+       current_date, 100000, 'USDT', 'manual';
+
+-- Primero SIN cotizacion: lo invertido no es cero, es desconocido. Con el
+-- coalesce que tenia la vista esto daba invertido = 0 y la posicion entera como
+-- ganancia -un numero enorme y perfectamente creible-.
+select case when invertido is null and ganancia is null
+            then 'ok  sin cotizacion dice que no sabe, no cero'
+            else format('FALLO  invertido %s, ganancia %s', invertido, ganancia) end
+  from posicion where account_id = :'btc';
+
+insert into fx_rate (ledger_id, on_date, base, quote, rate, source)
+values (my_ledger(), current_date, 'USD','ARS', 1500, 'mep');
+
+select case when round(invertido, 2) = 1000.00 and round(ganancia, 2) = 0.00
+            then 'ok  lo invertido se convierte a la moneda en que cotiza'
+            else format('FALLO  invertido %s, ganancia %s', invertido, ganancia) end
+  from posicion where account_id = :'btc';
+
+-- Y al reves: un CEDEAR cotiza en PESOS y se paga con los dolares del broker.
+-- Ademas nace midiendose al CCL (ADR-024), no al dolar del libro: con el mep
+-- -1.500- lo invertido daria 1.500.000 y una ganancia de 100.000 de la nada.
+insert into account (ledger_id, name, kind, valuation, unit, is_spendable, institution)
+values (my_ledger(), 'Balanz dolares', 'asset', 'balance', 'USD', false, 'Balanz');
+
+insert into fx_rate (ledger_id, on_date, base, quote, rate, source)
+values (my_ledger(), current_date, 'USD','ARS', 1600, 'ccl');
+
+select comprar_activo('AAPLX','Apple','cedear','ARS',0,
+                      (select id from account where name='Balanz dolares'),
+                      1000, 50, 'Balanz', current_date, 20, 'AAPL') as ced \gset
+
+insert into price (instrument_id, ledger_id, on_date, price, currency, source)
+select (select id from instrument where symbol='AAPLX'), my_ledger(),
+       current_date, 32000, 'ARS', 'manual';
+
+select case when round(invertido, 2) = 1600000.00 and round(ganancia, 2) = 0.00
+            then 'ok  usa la fuente de LA POSICION (ccl), no la del libro'
+            else format('FALLO  invertido %s, ganancia %s', invertido, ganancia) end
+  from posicion where account_id = :'ced';
+
+reset role;
