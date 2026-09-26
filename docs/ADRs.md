@@ -56,6 +56,7 @@ decision nobody made is fiction, and an agent will believe it.
 | [ADR-033](#adr-033--la-navegación-agrupa-por-significado-y-no-todo-merece-estar-cerca) | La navegación agrupa por significado, y no todo merece estar cerca | Accepted |
 | [ADR-034](#adr-034--una-fila-muestra-lo-obligatorio-y-un-filtro-sugiere-antes-de-listar) | Una fila muestra lo obligatorio, y un filtro sugiere antes de listar | Accepted |
 | [ADR-035](#adr-035--el-alta-de-movimiento-se-lee-de-arriba-abajo) | El alta de movimiento se lee de arriba abajo | Accepted |
+| [ADR-036](#adr-036--el-dólar-se-elige-en-las-cuentas-en-pesos-y-no-es-un-tipo-de-cuenta) | El dólar se elige en las cuentas en pesos, y no es un tipo de cuenta | Accepted |
 
 ---
 
@@ -1958,3 +1959,76 @@ probado en la bateria:
 O sea que el formulario ofrecia una operacion que la base ya sabia rechazar: lo
 que faltaba era que no se pudiera elegir.
 ```
+
+
+---
+
+## ADR-036 — El dólar se elige en las cuentas en pesos, y no es un tipo de cuenta
+
+**Context.** [ADR-011](#adr-011--la-fuente-de-cotización-es-una-propiedad-de-la-cuenta-no-de-la-fecha)
+decidió que la fuente de cotización es una propiedad de la cuenta. La implementación preguntaba por
+ella **solo si la moneda era USD**, y eso quedó al revés de lo que la decisión quería:
+
+- En una cuenta en **USD** la elección casi no interviene. `convertir()` devuelve el monto tal cual
+  cuando la unidad no es ARS, así que **medido en dólares un dólar es un dólar**. La fuente ahí solo
+  pesa al medir en **UVAs**, que pasa por pesos.
+- En una cuenta en **ARS** la elección lo decide todo, y no se preguntaba: se usaba la del libro, que
+  nacía en `mep` y **no tenía ninguna pantalla para verse ni cambiarse**.
+
+Preguntado por qué existen USD y USDT como unidades distintas pero no «dólar MEP» y «dólar blue», el
+usuario expuso su modelo el 2026-09-26: *sus pesos digitales se realizan al MEP y los de efectivo al
+blue*, y notó que la distinción **efectivo / digital** se había descartado al diseñar los tipos de
+cuenta.
+
+**Decision.** El dólar se pregunta en **toda** cuenta, con «el del libro» como opción; el del libro se
+elige en Ajustes; y la distinción efectivo/digital **no vuelve como tipo de cuenta**.
+
+**Consequences.**
+- La unidad y la fuente contestan preguntas distintas, y eso queda dicho en pantalla. **La unidad es
+  lo que tenés** —un billete y un USDT son dos cosas, se transfieren por vías distintas y el USDT se
+  despega unas centésimas—. **La fuente es a qué precio traducís pesos**: el «dólar MEP» no es algo
+  que tengas, es el precio de pasar pesos a dólares por un bono; terminada la operación en tu cuenta
+  hay dólares a secas.
+- Un fajo de pesos y una caja de ahorro **siguen siendo el mismo tipo**: se valúan igual
+  ([ADR-012](#adr-012--las-cuentas-se-clasifican-por-cómo-se-valúan-no-por-cómo-las-llama-el-banco))
+  y se gastan igual
+  ([ADR-030](#adr-030--la-cuenta-comitente-es-un-tipo-propio-no-una-caja-de-ahorro-más)), que son los
+  dos ejes del tipo. Lo único que los separa es este campo.
+- El dólar **cripto** pasa a ser elegible: `scripts/cotizaciones.mjs` lo traía todos los días y la
+  restricción de `account` no lo admitía, así que se guardaba para nadie. La **UVA** no entra: es la
+  otra vara de medición ([ADR-023](#adr-023--la-unidad-de-medida-es-un-divisor)), y elegirla como
+  dólar haría que el patrimonio «en dólares» se calculara dividiendo por el valor de la UVA.
+- Cambiar el dólar del libro es de **quien lo creó**: reescribe los totales de todos los que lo
+  comparten, igual que crear una cuenta
+  ([ADR-031](#adr-031--un-invitado-registra-movimientos-y-nada-más)).
+- **La parte incómoda:** el alta de cuenta tiene un campo más en el camino, y es un campo que casi
+  nadie va a cambiar. Se acepta porque la alternativa era que el número más importante de la
+  aplicación saliera de una elección que nunca se hizo.
+
+**Rejected alternatives.**
+- *Recuperar «efectivo» como cuarto tipo de cuenta*, que es lo que sugería el modelo mental del
+  usuario. Mezcla dos preguntas en una: el tipo sería un disfraz de la fuente, y sería **falso** el día
+  que tenga efectivo en dólares, que no necesita ninguna cotización para medirse en dólares. Es el
+  mismo error que ya se cometió con «Banco» y «Mercado Pago» ofrecidos como tipos y corregido en
+  [`src/lib/ledger/tipos.ts`](../src/lib/ledger/tipos.ts).
+- *Dejar de preguntar la fuente en las cuentas en USD*, que fue la primera lectura del defecto. Es
+  falsa: ahí la fuente decide la medición **en UVAs**, que es la mitad que contesta *«¿le gano a la
+  inflación?»*.
+- *Una sola fuente por libro, sin excepción por cuenta*: más simple y no representa lo que el usuario
+  hace. Es la alternativa que ADR-011 ya había descartado, y por la misma razón.
+
+**Evidence.** Conversación con el usuario del 2026-09-26, y la lectura de `convertir()` en
+`supabase/migrations/20260916140000_medicion.sql`.
+
+**Verified against what already exists.**
+
+```bash
+grep -n "p_unidad <> 'ARS'" supabase/migrations/20260916140000_medicion.sql
+#  -> if p_unidad <> 'ARS' then return p_monto; end if;   (medida USD)
+#  -> la rama UVA en cambio hace  v_ars := p_monto * cotizacion(p_fecha, v_fuente)
+
+./supabase/tests/run.sh   # -> 180 aserciones, incluida el rechazo de la UVA como dolar
+```
+
+La asimetría está en el código, no en la interpretación: la fuente se ignora al medir en dólares una
+cuenta que ya está en dólares, y se usa en los otros tres casos.
