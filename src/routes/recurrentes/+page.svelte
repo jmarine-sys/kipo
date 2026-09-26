@@ -232,7 +232,7 @@
 
               {#if abierto === i.id && i.kind === 'maturity'}
                 <div class="panel stack">
-                  <p class="dim sm nota">
+                  <p class="ayuda">
                     Hay <b class="money">{money(i.capital ?? 0, i.currency)}</b> puestos.
                     Al registrarlo, el capital vuelve y el interés se anota como ingreso.
                   </p>
@@ -277,7 +277,7 @@
                       </select>
                     </label>
                   </div>
-                  <p class="dim sm nota">
+                  <p class="ayuda">
                     Se registra con fecha {shortDate(i.next_on)} y la regla pasa al período siguiente.
                   </p>
                   <button class="btn-primary" onclick={() => registrar(i)} disabled={busy || !montoRaw || !cuentaElegida}>
@@ -402,7 +402,6 @@
 
   .panel { padding: .8rem; background: var(--surface-2); }
   .panel p { margin: 0; }
-  .nota { margin-top: -.2rem; }
   .campos { gap: .5rem; align-items: flex-end; }
   .campos > .campo { flex: 1; }
   .finales { display: flex; gap: .5rem; }

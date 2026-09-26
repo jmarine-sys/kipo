@@ -146,7 +146,7 @@
         </button>
       {/each}
     </div>
-    <p class="dim sm pie">
+    <p class="ayuda">
       {#if unit === 'ARS'}
         Es el dólar que <b>realmente conseguirías</b> con esta plata: los pesos del
         banco no se realizan igual que los de la mano.
@@ -183,5 +183,4 @@
   fieldset { border: none; padding: 0; margin: 0; }
   legend { font-size: .85rem; margin-bottom: .35rem; }
   .sm { font-size: .76rem; }
-  .pie { margin: .45rem 0 0; }
 </style>

@@ -60,7 +60,7 @@
   {#if libro}
     <section class="card stack">
       <h2>Con qué dólar medís</h2>
-      <p class="dim sm ayuda">
+      <p class="ayuda">
         Tus dólares ya son dólares. Esto es para <b>tus pesos</b>: los mismos pesos
         valen distinto según a qué dólar los pases, y kipo tiene que elegir uno para
         poder contestarte cuánto tenés. Una cuenta puede usar otro.
@@ -81,7 +81,7 @@
       {:else}
         <!-- Cambiarlo reescribe los totales de todos los que comparten el libro,
              igual que crear una cuenta (ADR-031). -->
-        <p class="dim sm ayuda">
+        <p class="ayuda">
           Este libro mide al <b>{FUENTES_DOLAR.find((f) => f.id === libro?.dolar)?.label ?? libro.dolar}</b>.
           Solo quien lo creó puede cambiarlo.
         </p>
@@ -102,7 +102,7 @@
         {/each}
       </div>
       {#if prefs.tema === 'auto'}
-        <p class="dim sm ayuda">Sigue lo que tenga configurado tu teléfono.</p>
+        <p class="ayuda">Sigue lo que tenga configurado tu teléfono.</p>
       {/if}
     </div>
 
@@ -148,5 +148,4 @@
   .row { display: flex; align-items: center; gap: .5rem; }
   .row input { max-width: 7rem; }
   .sm { font-size: .77rem; }
-  .ayuda { margin: .35rem 0 0; }
 </style>

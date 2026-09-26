@@ -212,13 +212,13 @@
               {#if !cotizaSola(p)}
                 <!-- El motivo lo da el mismo módulo que decide quién cotiza, así
                      que no puede explicar algo distinto de lo que hace. -->
-                <p class="dim sm nota">
+                <p class="ayuda">
                   Esta posición <b>no cotiza sola</b>: hay que cargarle el precio acá.
                   {porQueNoCotiza(p)}
                 </p>
               {/if}
               {#if p.precio_al}
-                <p class="dim sm nota">
+                <p class="ayuda">
                   Último precio del {shortDate(p.precio_al)}
                   {#if p.precio_fuente === 'manual'}· cargado a mano{/if}
                 </p>
@@ -242,7 +242,7 @@
                       disabled={busy || !vUnidades || !vMonto || !vHacia}>
                 {busy ? 'Registrando…' : 'Registrar la venta'}
               </button>
-              <p class="dim sm nota">
+              <p class="ayuda">
                 Vender no cambia tu patrimonio: cambia de forma. La ganancia ya estaba
                 contada mientras el precio subía.
               </p>
@@ -291,7 +291,6 @@
 
   .panel { padding: .85rem; background: var(--surface-2); }
   .panel p { margin: 0; }
-  .nota { margin-top: -.15rem; }
   .campos { gap: .5rem; align-items: flex-end; }
   .campos > .campo { flex: 1; }
   .campo .row { gap: .4rem; }

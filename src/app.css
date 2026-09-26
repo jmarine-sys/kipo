@@ -270,6 +270,21 @@ input[type='checkbox'] {
 .opts.row3 { grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)); }
 .opts.row3 button { align-items: center; justify-content: center; }
 
+/* La aclaracion que cuelga de lo de arriba: el renglon chico que explica un
+   grupo de opciones, un campo o una cifra.
+
+   Estaba escrita SIETE veces con cuatro nombres -`.nota`, `.ayuda`, `.pie`,
+   `.hint`- y siete margenes distintos: .9, .8, .45, .35, 0, -.15 y -.2. Nadie
+   decidio ninguno. El de CERO era un defecto a la vista: en el alta de inversion
+   la explicacion de "En que cotiza" quedaba pegada a los botones.
+
+   Las dos posiciones que existen se resuelven con una regla cada una. Dentro de
+   un grupo -un fieldset, un label- hace falta su propio margen. Como hija
+   directa de un `.stack`, el gap de .75rem ya separa DE MAS, asi que se tira
+   para atras hasta la misma distancia. (OD-46) */
+.ayuda { margin: .4rem 0 0; font-size: .78rem; color: var(--text-dim); }
+.stack > .ayuda { margin-top: -.35rem; }
+
 .page {
   max-width: 680px; margin: 0 auto;
   /* El ultimo boton de una pantalla quedaba a medias debajo de la barra: 6rem

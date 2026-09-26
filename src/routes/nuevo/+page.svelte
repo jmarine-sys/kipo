@@ -2,7 +2,8 @@
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
-  import { listAccounts, listCategories, createTransaction, cotizacionesVigentes } from '$lib/ledger/api';
+  import { listAccounts, listBalances, listCategories, createTransaction, cotizacionesVigentes } from '$lib/ledger/api';
+  import { avisoDeSaldo } from '$lib/ledger/saldo';
   import { plausibilidad, type Cotizacion } from '$lib/ledger/plausibilidad';
   import { misLibros, cuentasDeLibro, aportarALibro } from '$lib/ledger/libros';
   import { createScheduled, FRECUENCIAS, type Frecuencia } from '$lib/ledger/recurrentes';
@@ -40,10 +41,34 @@
   let error = $state<string | null>(null);
 
   let accounts = $state<Account[]>([]);
+
+  /**
+   * Los saldos, aparte y sin bloquear — OD-55.
+   *
+   * No se cambia `listAccounts()` por `listBalances()`: el formulario funciona
+   * sin esto y lo único que hace falta es poder AVISAR. Si la consulta falla, se
+   * pierde el aviso, no el alta.
+   */
+  let saldos = $state<Map<string, number>>(new Map());
   let categories = $state<Category[]>([]);
   let loaded = $state(false);
 
   const amount = $derived(num(raw));
+
+  /**
+   * Lo que quedaría en la cuenta de la que sale la plata.
+   *
+   * Solo cuando sale: en un ingreso la cuenta sube, y en un *Mover* el destino
+   * también. El que puede quedar en rojo es el origen.
+   */
+  const rojo = $derived(
+    mode === 'income' ? null
+      : avisoDeSaldo(
+          accounts.find((a) => a.id === accountId),
+          saldos.get(accountId ?? ''),
+          amount
+        )
+  );
   const amount2 = $derived(num(raw2));
 
   /**
@@ -281,6 +306,12 @@
       // En segundo plano: si no hay cotizaciones, el aviso no aparece y cargar
       // sigue siendo igual de rápido. Nunca debe demorar el formulario.
       cotizacionesVigentes(date).then((c) => (cotizaciones = c)).catch(() => {});
+
+      // Los saldos, también en segundo plano: sirven para AVISAR que la cuenta
+      // queda en rojo (OD-55), y sin ellos el formulario funciona igual.
+      listBalances()
+        .then((bs) => (saldos = new Map(bs.map((b) => [b.account_id, Number(b.balance)]))))
+        .catch(() => {});
 
       // Y las cuentas de tus otros libros, si tenés más de uno. También en
       // segundo plano: el 99% de los movimientos no cruzan libros.
@@ -624,6 +655,22 @@
         </p>
       {/if}
 
+      <!-- AVISA, NO IMPIDE (OD-55). Vender más unidades de las que tenés sí se
+           bloquea, porque las unidades se cuentan; la plata se estima, y por eso
+           existe el ajuste de saldo. Bloquear haría que la app se niegue a
+           registrar algo que ya pasó, y rompería cargar en desorden. -->
+      {#if rojo}
+        <p class="rojo">
+          {#if rojo.yaEstaba}
+            Esta cuenta ya está en rojo: quedaría en
+          {:else}
+            Te quedaría en
+          {/if}
+          <b class="money">{money(rojo.queda, account?.unit)}</b>.
+          <span class="dim">Se registra igual — puede que falte cargar un ingreso.</span>
+        </p>
+      {/if}
+
       <!-- Solo con tarjeta, para no tocar el camino rápido: el 90% de los gastos
            no son en cuotas y no tienen que ver este campo. OD-23. -->
       {#if onCard}
@@ -785,6 +832,14 @@
     background: color-mix(in srgb, var(--warn) 12%, transparent);
     border: 1px solid color-mix(in srgb, var(--warn) 35%, transparent);
     color: var(--text);
+  }
+  /* Un aviso, no un error: el movimiento se guarda. Por eso no usa `.err`, que
+     en esta app significa "esto no se pudo hacer". */
+  .rojo {
+    margin: .6rem 0 0; font-size: .82rem;
+    padding: .55rem .7rem; border-radius: 10px;
+    background: color-mix(in srgb, var(--warn) 12%, var(--surface));
+    border: 1px solid color-mix(in srgb, var(--warn) 35%, transparent);
   }
   .salida {
     margin: 0; padding: .7rem .85rem; border-radius: 10px; font-size: .86rem;

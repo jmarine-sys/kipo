@@ -62,6 +62,20 @@
     num(pfEsperado) > num(pfCapital) && pfDias > 0
   );
 
+  /**
+   * Si el símbolo parece de la serie en dólares (D) o en cable (C).
+   *
+   * Solo se mira cuando se declaró que cotiza en PESOS, que es el único caso en
+   * el que equivocarse guarda un precio en la moneda que no es.
+   */
+  const sufijoSerie = $derived.by(() => {
+    if (familia !== 'bursatil' || cMoneda !== 'ARS') return null;
+    const s = cSymbol.trim().toUpperCase();
+    if (s.length < 3) return null;
+    const ultima = s.at(-1);
+    return ultima === 'D' || ultima === 'C' ? ultima : null;
+  });
+
   /** Elegir la familia fija lo que esa familia ya sabe: el tipo y en qué cotiza. */
   function elegirFamilia(id: Familia) {
     familia = id;
@@ -185,7 +199,7 @@
       <button class="btn-primary" type="submit" disabled={busy || !pfListo}>
         {busy ? 'Constituyendo…' : 'Constituir'}
       </button>
-      <p class="dim sm nota">
+      <p class="ayuda">
         La plata sale de tu cuenta y queda inmovilizada: tu patrimonio no cambia,
         pero baja lo disponible. El día del vencimiento aparece en la
         <a href="/recurrentes">Agenda</a> para registrar la vuelta.
@@ -212,6 +226,25 @@
                placeholder={familia === 'cripto' ? 'BTC' : 'AAPL'} />
       </label>
 
+      <!-- El mismo papel cotiza en las tres monedas con tres tickers: SPY en
+           pesos, SPYD en dólares MEP y SPYC en cable. Y la fuente de precios los
+           publica MEZCLADOS en la misma lista, sin decir la moneda de cada uno
+           (comprobado en vivo el 2026-09-26). Cargar SPYD como si fuera en pesos
+           guarda un precio 1.500 veces menor y nadie se entera.
+
+           Se pregunta en vez de afirmar a propósito: hay CEDEARs en pesos que
+           terminan en D o en C —AMD, GILD, CRWD, GLD, C— y decirles que son la
+           serie dólar sería mentir. -->
+      {#if sufijoSerie}
+        <p class="ayuda">
+          Un ticker terminado en <b>{sufijoSerie}</b> suele ser la serie que cotiza
+          {sufijoSerie === 'D' ? 'en dólares (MEP)' : 'en cable (CCL)'}:
+          <b>SPY</b> va en pesos y <b>SPY{sufijoSerie}</b> no. Si es tu caso, elegí USD
+          acá abajo. Hay CEDEARs en pesos que igual terminan así —AMD, GILD—, así que
+          no lo cambiamos solos.
+        </p>
+      {/if}
+
       <!-- EN QUÉ COTIZA, que no es con qué pagás. Era un campo de texto libre
            llamado «Moneda» pegado al símbolo, y ahí se leía como la moneda de la
            operación. Escribir «usdt» en minúscula o «dolares» creaba un
@@ -225,7 +258,7 @@
                       onclick={() => (cMoneda = m)}>{m}</button>
             {/each}
           </div>
-          <p class="dim sm nota">
+          <p class="ayuda">
             La moneda del <b>precio</b>, no la de la cuenta con la que pagás:
             un CEDEAR cotiza en pesos aunque lo pagues con dólares del broker.
           </p>
@@ -302,5 +335,4 @@
   .monto { text-align: right; }
   .resumen { margin: 0; padding: .65rem .8rem; border-radius: 10px; background: var(--surface-2); font-size: .86rem; }
   .aviso { margin: 0; font-size: .78rem; padding-top: .6rem; border-top: 1px solid var(--border); }
-  .nota { margin: 0; }
 </style>
